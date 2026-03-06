@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.19
+// @version      7.0.20
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.19';
+  const VERSION = '7.0.20';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1280,7 +1280,7 @@
       renewal,
       upcUe: {
         ueStatus: ue.ueStatus || 'Unknown',
-        upcOptOut: upcRegistry ? (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found') : (ue.upcOptOut || 'Unknown'),
+        upcOptOut: upcRegistry ? (upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')) : (ue.upcOptOut || 'Unknown'),
         note: upcRegistry
           ? `UPC opt-out checked against registry for ${upcRegistry.patentNumber}.`
           : (ue.ueStatus

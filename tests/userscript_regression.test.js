@@ -20,6 +20,7 @@ has(/@grant\s+GM_xmlhttpRequest/, 'Missing GM_xmlhttpRequest grant for UPC regis
 has(/@connect\s+unifiedpatentcourt\.org/, 'Missing @connect unifiedpatentcourt.org');
 has(/function\s+refreshUpcRegistry\s*\(/, 'Missing UPC registry refresh function');
 has(/parseUpcOptOutResult/, 'Missing UPC opt-out parser');
+hasText("upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')", 'Overview should preserve explicit UPC registry status (e.g., Opt-out withdrawn)');
 hasText('opt(?:ed)?[\\s-]*out(?:\\s+\\w+){0,8}\\s+(?:register', 'UPC positive matcher should allow words between opt-out and registered/entered/effective');
 
 // Timeline grouped items UX (collapsible + arrow)
