@@ -37,5 +37,7 @@ notHas(/IPC\/CPC/, 'IPC/CPC should be removed from UI');
 has(/dedupeMultiline/, 'dedupeMultiline helper missing');
 has(/parentCase/, 'Divisional parent case tracking missing');
 has(/cleanTitle/, 'Title cleanup helper missing');
+has(/function\s+enhanceDoclistGrouping\s*\(/, 'All-documents grouping enhancer missing');
+has(/epoRP-docgrp/, 'All-documents grouping row class missing');
 
 console.log('userscript regression checks passed');

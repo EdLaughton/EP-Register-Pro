@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.8
+// @version      7.0.9
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.8';
+  const VERSION = '7.0.9';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -634,6 +634,35 @@
     }
 
     return { docs: dedupe(docs, (d) => `${d.dateStr}|${d.title}|${d.url}`).sort(compareDateDesc) };
+  }
+
+  function enhanceDoclistGrouping() {
+    if (tabSlug() !== 'doclist') return;
+
+    const table = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
+    if (!table) return;
+
+    table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
+
+    const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
+    let prevBundle = '';
+
+    for (const row of rows) {
+      const cells = [...row.querySelectorAll('td')];
+      if (!cells.length) continue;
+      const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[1] || cells[0] || row);
+      const bundle = classifyDocument(title).bundle || 'Other';
+      if (bundle === prevBundle) continue;
+
+      const headerRow = document.createElement('tr');
+      headerRow.className = 'epoRP-docgrp';
+      const td = document.createElement('td');
+      td.colSpan = Math.max(1, cells.length);
+      td.textContent = bundle;
+      headerRow.appendChild(td);
+      row.parentElement?.insertBefore(headerRow, row);
+      prevBundle = bundle;
+    }
   }
 
   function parseDatedRows(doc, url) {
@@ -1551,6 +1580,7 @@
 
     captureLiveSource(caseNo);
     renderPanel();
+    enhanceDoclistGrouping();
 
     if (initTimer) clearTimeout(initTimer);
     initTimer = setTimeout(() => {
@@ -1558,6 +1588,7 @@
       captureLiveSource(caseNo);
       flushNow();
       renderPanel();
+      enhanceDoclistGrouping();
     }, 1800);
 
     if (force) {
@@ -1634,6 +1665,7 @@
     .epoRP-lr{display:grid;grid-template-columns:80px 11px 1fr;gap:6px;padding:5px 2px;border-bottom:1px solid #f1f5f9}
     .epoRP-lt{font-variant-numeric:tabular-nums;font-size:10px;color:#64748b}
     .epoRP-lm{font-size:11px;color:#0f172a}
+    tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:6px 8px}
   `);
 
   setInterval(() => {
@@ -1652,6 +1684,7 @@
   addEventListener('focus', () => {
     if (!isCasePage()) return;
     renderPanel();
+    enhanceDoclistGrouping();
     const needsRefresh = SOURCES.some((s) => !isFresh(getCase(runtime.appNo).sources[s.key], options().refreshHours));
     if (needsRefresh) prefetchCase(runtime.appNo, false);
   });
@@ -1659,6 +1692,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || !isCasePage()) return;
     renderPanel();
+    enhanceDoclistGrouping();
   });
 
   addEventListener('pageshow', () => init(false));
