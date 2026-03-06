@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.22
+// @version      7.0.23
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.22';
+  const VERSION = '7.0.23';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -277,16 +277,6 @@
     } catch {
       // logging must never break script
     }
-  }
-
-  function getLogs(caseNo) {
-    return getCase(caseNo).logs || [];
-  }
-
-  function clearLogs(caseNo) {
-    patchCase(caseNo, (c) => {
-      c.logs = [];
-    });
   }
 
   function isFresh(src, refreshHours) {
@@ -1372,10 +1362,6 @@
             : 'UE/UPC data unavailable in current cache; will populate when source loads.'),
       },
       docs,
-      docBundles: docs.reduce((acc, d) => {
-        acc[d.bundle] = (acc[d.bundle] || 0) + 1;
-        return acc;
-      }, {}),
     };
   }
 
@@ -1467,15 +1453,6 @@
       if (i.type === 'group') return `g|${i.dateStr}|${i.title}|${(i.items || []).map((x) => `${x.title}|${x.url}`).join('||')}`;
       return `i|${i.dateStr}|${i.title}|${i.detail}|${i.url}`;
     }).sort(compareDateDesc).slice(0, opts.timelineMaxEntries);
-  }
-
-  function documentIndexModel(caseNo, query = '') {
-    const docs = getCase(caseNo).sources.doclist?.data?.docs || [];
-    const q = normalize(query).toLowerCase();
-    const filtered = !q
-      ? docs
-      : docs.filter((d) => `${d.dateStr} ${d.title} ${d.procedure} ${d.bundle}`.toLowerCase().includes(q));
-    return filtered.slice(0, 120);
   }
 
   function renderOverview(caseNo) {
@@ -1646,15 +1623,6 @@
     </div>`;
   }
 
-  function renderLogs(caseNo) {
-    const logs = getLogs(caseNo).slice().reverse();
-    const rows = logs.length
-      ? logs.map((entry) => `<div class="epoRP-lr"><div class="epoRP-lt">${esc(entry.ts.split('T')[1]?.replace('Z', '') || '')}</div><div class="epoRP-dot ${esc(entry.level)}"></div><div class="epoRP-lm">${esc(entry.message)}${entry.meta?.source ? ` · ${esc(entry.meta.source)}` : ''}${entry.meta?.transport ? ` · ${esc(entry.meta.transport)}` : ''}</div></div>`).join('')
-      : `<div class="epoRP-m">No logs for this case yet.</div>`;
-
-    return `<div class="epoRP-c"><h4>Logs (${logs.length})</h4><div class="epoRP-actions"><button class="epoRP-btn" id="epoRP-logRefresh">Refresh</button><button class="epoRP-btn" id="epoRP-logClear">Clear logs</button></div><div class="epoRP-ll">${rows}</div></div>`;
-  }
-
   function renderBadges(caseNo) {
     const c = getCase(caseNo);
     const loaded = SOURCES.filter((s) => c.sources[s.key]?.status === 'ok').length;
@@ -1763,17 +1731,6 @@
       captureLiveSource(runtime.appNo);
       renderPanel();
       prefetchCase(runtime.appNo, true);
-    });
-  }
-
-  function wireLogs() {
-    const b = runtime.body;
-    if (!b) return;
-    b.querySelector('#epoRP-logRefresh')?.addEventListener('click', () => renderPanel());
-    b.querySelector('#epoRP-logClear')?.addEventListener('click', () => {
-      clearLogs(runtime.appNo);
-      addLog(runtime.appNo, 'warn', 'Logs cleared');
-      renderPanel();
     });
   }
 
@@ -1928,11 +1885,6 @@
     .epoRP-oh{font-size:10px;color:#64748b}
     .epoRP-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .epoRP-in{border:1px solid #cbd5e1;border-radius:8px;padding:5px 7px;font-size:12px;width:100%}
-    .epoRP-docIdx{max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin-top:8px}
-    .epoRP-ll{display:flex;flex-direction:column;max-height:530px;overflow:auto}
-    .epoRP-lr{display:grid;grid-template-columns:80px 11px 1fr;gap:6px;padding:5px 2px;border-bottom:1px solid #f1f5f9}
-    .epoRP-lt{font-variant-numeric:tabular-nums;font-size:10px;color:#64748b}
-    .epoRP-lm{font-size:11px;color:#0f172a}
     .epoRP-deadlineRow{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px dashed #cbd5e1;align-items:start;background:#f8fafc}
     tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:4px 8px}
     .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent;border:0;padding:0;box-shadow:none}
@@ -1949,7 +1901,7 @@
       runtime.href = location.href;
       init(false);
     }
-  }, 650);
+  }, 1000);
 
   addEventListener('storage', (event) => {
     if (![CACHE_KEY, OPTIONS_KEY, UI_KEY].includes(event.key)) return;
