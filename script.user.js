@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.11
+// @version      7.0.12
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.11';
+  const VERSION = '7.0.12';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -500,6 +500,26 @@
     return v;
   }
 
+  function pickApplicantLine(raw) {
+    const lines = dedupeMultiline(raw)
+      .split('\n')
+      .map((line) => normalize(line))
+      .filter(Boolean)
+      .filter((line) => !/^for all designated states$/i.test(line))
+      .filter((line) => !/^\[[^\]]+\]$/.test(line));
+    return lines[0] || '';
+  }
+
+  function formatDaysHuman(days) {
+    if (!Number.isFinite(days)) return '—';
+    const sign = days < 0 ? '-' : '';
+    const abs = Math.abs(days);
+    const years = Math.floor(abs / 365);
+    const rem = abs % 365;
+    if (years <= 0) return `${sign}${rem}d`;
+    return `${sign}${years}y ${rem}d`;
+  }
+
   function extractTitle(doc) {
     const rawTitle = dedupeMultiline(fieldByLabel(doc, [/^Title$/i]));
     const page = bodyText(doc);
@@ -509,7 +529,14 @@
 
       const englishFromPage = page.match(/\bEnglish\s*:\s*([^\n\r\[]+)/i);
       if (englishFromPage?.[1]) return cleanTitle(englishFromPage[1]);
+    }
 
+    for (const el of [...doc.querySelectorAll('h1,h2,h3,strong,b,a')].slice(0, 120)) {
+      const m = text(el).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
+      if (m?.[1]) return cleanTitle(m[1]);
+    }
+
+    if (rawTitle) {
       const cleanedLines = rawTitle
         .split('\n')
         .map((line) => line.trim())
@@ -517,10 +544,6 @@
       if (cleanedLines.length) return cleanTitle(cleanedLines[0]);
     }
 
-    for (const el of [...doc.querySelectorAll('h1,h2,h3,strong,b,a')].slice(0, 120)) {
-      const m = text(el).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
-      if (m?.[1]) return cleanTitle(m[1]);
-    }
     const fromBody = bodyText(doc).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
     return cleanTitle(fromBody?.[1] || '');
   }
@@ -547,7 +570,7 @@
     const result = {
       appNo: caseNo,
       title: cleanTitle(titleField || extractTitle(doc)),
-      applicant: normalize(applicantField.split('\n').find(Boolean) || ''),
+      applicant: pickApplicantLine(applicantField) || normalize(applicantField.split('\n').find(Boolean) || ''),
       representative: normalize(representativeField.split('\n').find(Boolean) || ''),
       filingDate: appInfo.filingDate,
       checksum: appInfo.checksum,
@@ -1333,7 +1356,6 @@
       <div class="epoRP-l">Priority</div><div class="epoRP-v">${esc(m.priority)}</div>
       <div class="epoRP-l">Type</div><div class="epoRP-v">${esc(m.applicationType)}${m.parentCase ? ` (<a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>)` : ''}</div>
       <div class="epoRP-l">Stage</div><div class="epoRP-v">${esc(m.stage)}</div>
-      <div class="epoRP-l">Status</div><div class="epoRP-v"><span class="epoRP-bdg ${esc(m.statusLevel)}">${esc(m.statusSimple)}</span></div>
       <div class="epoRP-l">Representative</div><div class="epoRP-v">${esc(m.representative)}</div>
     </div></div>`;
 
@@ -1343,7 +1365,7 @@
         const ds = formatDate(d.date);
         const dd = Math.ceil((d.date.getTime() - Date.now()) / 86400000);
         const proximity = dd < 0 ? 'bad' : dd <= 14 ? 'bad' : dd <= 45 ? 'warn' : 'ok';
-        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? `${dd}d` : `${Math.abs(dd)}d overdue`}` : ''}</span></div></div>`;
+        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span></div></div>`;
       }
       html += `</div><div class="epoRP-m">Heuristic dates from available Register documents.</div></div>`;
     }
@@ -1352,7 +1374,7 @@
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}` : '—'}</div>
       <div class="epoRP-l">EPO last action</div><div class="epoRP-v">${m.latestEpo ? `${esc(m.latestEpo.dateStr)} · ${esc(m.latestEpo.title)}` : '—'}</div>
       <div class="epoRP-l">Applicant last filing</div><div class="epoRP-v">${m.latestApplicant ? `${esc(m.latestApplicant.dateStr)} · ${esc(m.latestApplicant.title)}` : '—'}</div>
-      <div class="epoRP-l">${m.waitingOn === 'EPO' ? 'Days since applicant response' : 'Days to next deadline'}</div><div class="epoRP-v">${m.waitingOn === 'EPO' ? (m.waitingDays != null ? `<span class="epoRP-bdg ${m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok'}">${m.waitingDays} days</span>` : '—') : (m.daysToDeadline != null ? `<span class="epoRP-bdg ${m.daysToDeadline < 0 ? 'bad' : m.daysToDeadline <= 14 ? 'bad' : m.daysToDeadline <= 45 ? 'warn' : 'ok'}">${m.daysToDeadline >= 0 ? `${m.daysToDeadline} days` : `${Math.abs(m.daysToDeadline)} days overdue`}</span>` : '—')}</div>
+      <div class="epoRP-l">${m.waitingOn === 'EPO' ? 'Days since applicant response' : 'Days to next deadline'}</div><div class="epoRP-v">${m.waitingOn === 'EPO' ? (m.waitingDays != null ? `<span class="epoRP-bdg ${m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok'}">${formatDaysHuman(m.waitingDays)}</span>` : '—') : (m.daysToDeadline != null ? `<span class="epoRP-bdg ${m.daysToDeadline < 0 ? 'bad' : m.daysToDeadline <= 14 ? 'bad' : m.daysToDeadline <= 45 ? 'warn' : 'ok'}">${m.daysToDeadline >= 0 ? formatDaysHuman(m.daysToDeadline) : `${formatDaysHuman(m.daysToDeadline).slice(1)} overdue`}</span>` : '—')}</div>
       <div class="epoRP-l">Most recent event</div><div class="epoRP-v">${m.recentMainEvent ? `${esc(m.recentMainEvent.dateStr)} · ${esc(m.recentMainEvent.title)}` : '—'}</div>
     </div></div>`;
 
@@ -1452,7 +1474,7 @@
     if (model.nextDeadline) {
       const days = Math.ceil((model.nextDeadline.date.getTime() - Date.now()) / 86400000);
       const level = days < 0 ? 'bad' : days <= 14 ? 'bad' : days <= 45 ? 'warn' : 'ok';
-      out.unshift(`<div class="epoRP-deadlineRow"><div class="epoRP-dot dotted ${level}"></div><div class="epoRP-d">${esc(formatDate(model.nextDeadline.date))}</div><div><div class="epoRP-mn">Next deadline</div><div class="epoRP-sb">${esc(model.nextDeadline.label)} · ${days >= 0 ? `${days}d` : `${Math.abs(days)}d overdue`}</div></div></div>`);
+      out.unshift(`<div class="epoRP-deadlineRow"><div class="epoRP-dot dotted ${level}"></div><div class="epoRP-d">${esc(formatDate(model.nextDeadline.date))}</div><div><div class="epoRP-mn">Next deadline</div><div class="epoRP-sb">${esc(model.nextDeadline.label)} · ${days >= 0 ? formatDaysHuman(days) : `${formatDaysHuman(days).slice(1)} overdue`}</div></div></div>`);
     }
 
     if (verbose) out.unshift(`<div class="epoRP-m">Verbose mode shows extended source labels and grouped event bodies.</div>`);
@@ -1725,10 +1747,10 @@
     .epoRP-pm{font-size:11px;color:#64748b}
     .epoRP-a{color:#1d4ed8;text-decoration:none}
     .epoRP-a:hover{text-decoration:underline}
-    .epoRP-it{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #f1f5f9;align-items:start}
+    .epoRP-it{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #f1f5f9;align-items:center}
     .epoRP-it.compact{padding:4px 2px}
     .epoRP-it:last-child{border-bottom:0}
-    .epoRP-dot{width:9px;height:9px;border-radius:999px;margin-top:4px;background:#94a3b8}
+    .epoRP-dot{width:9px;height:9px;border-radius:999px;margin-top:0;background:#94a3b8}
     .epoRP-dot.dotted{background:transparent;border:2px dotted #94a3b8;width:10px;height:10px}
     .epoRP-dot.ok{background:#16a34a}
     .epoRP-dot.warn{background:#d97706}
@@ -1744,7 +1766,7 @@
     .epoRP-mn{font-weight:700}
     .epoRP-sb{font-size:11px;color:#64748b;white-space:pre-wrap}
     .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:5px;background:#f8fafc;margin-bottom:7px}
-    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:4px;cursor:pointer;list-style:none;align-items:start}
+    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:4px;cursor:pointer;list-style:none;align-items:center}
     .epoRP-grph::-webkit-details-marker{display:none}
     .epoRP-garrow{font-size:16px;font-weight:700;color:#334155;justify-self:end;transition:transform .15s ease}
     .epoRP-grp[open] .epoRP-garrow{transform:rotate(90deg)}
@@ -1769,7 +1791,7 @@
     .epoRP-lm{font-size:11px;color:#0f172a}
     .epoRP-deadlineRow{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px dashed #cbd5e1;align-items:start;background:#f8fafc}
     tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:4px 8px}
-    .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a}
+    .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent;border:0;padding:0;box-shadow:none}
     .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}
     .epoRP-docgrp-btn[aria-expanded="true"] .epoRP-docgrp-arrow{transform:rotate(90deg)}
     tr.epoRP-docgrp-item.collapsed{display:none}
