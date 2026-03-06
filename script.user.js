@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.10
+// @version      7.0.11
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.10';
+  const VERSION = '7.0.11';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -640,15 +640,52 @@
     return { docs: dedupe(docs, (d) => `${d.dateStr}|${d.title}|${d.url}`).sort(compareDateDesc) };
   }
 
+  function applyDoclistFilter(table, query) {
+    const q = normalize(query).toLowerCase();
+    const rows = [...table.querySelectorAll('tr')];
+
+    for (const row of rows) {
+      if (row.classList.contains('epoRP-docgrp')) continue;
+      if (!row.querySelector("input[type='checkbox']")) continue;
+      const txt = text(row).toLowerCase();
+      row.classList.toggle('epoRP-filter-hidden', !!q && !txt.includes(q));
+    }
+
+    table.querySelectorAll('tr.epoRP-docgrp').forEach((groupHeader) => {
+      const group = groupHeader.querySelector('.epoRP-docgrp-btn')?.getAttribute('data-group');
+      if (!group) return;
+      const groupRows = [...table.querySelectorAll(`tr[data-eporp-group='${group}']`)];
+      const visibleCount = groupRows.filter((r) => !r.classList.contains('epoRP-filter-hidden')).length;
+      groupHeader.classList.toggle('epoRP-filter-hidden', visibleCount === 0);
+      const label = groupHeader.querySelector('.epoRP-docgrp-label');
+      if (label) {
+        const base = label.getAttribute('data-bundle') || 'Group';
+        label.textContent = `${base} (${visibleCount}/${groupRows.length})`;
+      }
+    });
+  }
+
   function enhanceDoclistGrouping() {
     if (tabSlug() !== 'doclist') return;
 
     const table = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
     if (!table) return;
 
+    let filterWrap = document.getElementById('epoRP-doclist-filter-wrap');
+    if (!filterWrap) {
+      filterWrap = document.createElement('div');
+      filterWrap.id = 'epoRP-doclist-filter-wrap';
+      filterWrap.className = 'epoRP-doclist-filter-wrap';
+      filterWrap.innerHTML = `<input id="epoRP-doclist-filter" class="epoRP-doclist-filter" placeholder="Filter documents by name…" />`;
+      table.parentElement?.insertBefore(filterWrap, table);
+      filterWrap.querySelector('#epoRP-doclist-filter')?.addEventListener('input', (event) => {
+        applyDoclistFilter(table, event.target.value || '');
+      });
+    }
+
     table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
     table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
-      row.classList.remove('epoRP-docgrp-item', 'collapsed');
+      row.classList.remove('epoRP-docgrp-item', 'collapsed', 'epoRP-filter-hidden');
       row.removeAttribute('data-eporp-group');
     });
 
@@ -684,7 +721,7 @@
       headerRow.className = 'epoRP-docgrp';
       const td = document.createElement('td');
       td.colSpan = Math.max(1, cells.length);
-      td.innerHTML = `<button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" aria-expanded="false"><span>${esc(r.bundle)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button>`;
+      td.innerHTML = `<button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" aria-expanded="false"><span class="epoRP-docgrp-label" data-bundle="${esc(r.bundle)}">${esc(r.bundle)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button>`;
       headerRow.appendChild(td);
       firstRow.parentElement?.insertBefore(headerRow, firstRow);
 
@@ -700,6 +737,9 @@
         for (const row of r.rows) row.classList.toggle('collapsed', expanded);
       });
     }
+
+    const currentQuery = (filterWrap.querySelector('#epoRP-doclist-filter')?.value || '');
+    applyDoclistFilter(table, currentQuery);
   }
 
   function parseDatedRows(doc, url) {
@@ -1733,6 +1773,9 @@
     .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}
     .epoRP-docgrp-btn[aria-expanded="true"] .epoRP-docgrp-arrow{transform:rotate(90deg)}
     tr.epoRP-docgrp-item.collapsed{display:none}
+    .epoRP-doclist-filter-wrap{margin:8px 0}
+    .epoRP-doclist-filter{width:100%;max-width:420px;border:1px solid #cbd5e1;border-radius:8px;padding:7px 10px;font:13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    .epoRP-filter-hidden{display:none !important}
   `);
 
   setInterval(() => {
