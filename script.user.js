@@ -656,10 +656,14 @@
   async function fetchWithRetry(url, signal) {
     let lastError;
     for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
       try {
         return await fetchWithTimeout(url, signal);
       } catch (error) {
         lastError = error;
+        if (signal?.aborted || error?.name === 'AbortError') throw error;
         if (attempt >= FETCH_RETRIES) throw error;
       }
     }
