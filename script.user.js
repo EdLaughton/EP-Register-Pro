@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.6
+// @version      7.0.7
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @match        https://register.epo.org/*
 // @run-at       document-idle
 // @grant        GM_addStyle
+// @grant        GM_xmlhttpRequest
+// @connect      unifiedpatentcourt.org
 // ==/UserScript==
 
 (() => {
@@ -17,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.6';
+  const VERSION = '7.0.7';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -752,6 +754,87 @@
     }
   }
 
+  function fetchCrossOrigin(url, signal) {
+    if (typeof GM_xmlhttpRequest !== 'function') return fetchWithRetry(url, signal);
+    return new Promise((resolve, reject) => {
+      const req = GM_xmlhttpRequest({
+        method: 'GET',
+        url,
+        timeout: FETCH_TIMEOUT_MS,
+        onload: (res) => {
+          if (res.status >= 200 && res.status < 400) resolve(String(res.responseText || ''));
+          else reject(new Error(`HTTP ${res.status}`));
+        },
+        onerror: () => reject(new Error('Cross-origin request failed')),
+        ontimeout: () => reject(new Error('Cross-origin request timed out')),
+      });
+
+      const onAbort = () => {
+        try { req?.abort?.(); } catch {}
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  function parseUpcOptOutResult(html, patentNumber) {
+    const t = normalize((html || '').replace(/<[^>]+>/g, ' ')).toLowerCase();
+    if (!t) return null;
+    if (/no results found/.test(t)) {
+      return { patentNumber, optedOut: false, status: 'No opt-out found', source: 'UPC registry' };
+    }
+    if (/opt-?out/.test(t) && (t.includes((patentNumber || '').toLowerCase()) || /results/.test(t))) {
+      return { patentNumber, optedOut: true, status: 'Opted out', source: 'UPC registry' };
+    }
+    return null;
+  }
+
+  function upcCandidateNumbers(caseNo) {
+    const c = getCase(caseNo);
+    const main = c.sources.main?.data || {};
+    const family = c.sources.family?.data || {};
+    const picks = [];
+
+    for (const p of [...(main.publications || []), ...(family.publications || [])]) {
+      const m = String(p.no || '').toUpperCase().match(/^(EP\d{6,})/);
+      if (m?.[1]) picks.push(m[1]);
+    }
+
+    if (/^EP\d{6,}$/i.test(main.parentCase || '')) picks.push(main.parentCase.toUpperCase());
+    if (/^EP\d{6,}$/i.test(caseNo || '')) picks.push(caseNo.toUpperCase());
+
+    return [...new Set(picks)].slice(0, 8);
+  }
+
+  async function refreshUpcRegistry(caseNo, signal) {
+    const candidates = upcCandidateNumbers(caseNo);
+    if (!candidates.length) return;
+
+    for (const patentNumber of candidates) {
+      const url = `https://www.unifiedpatentcourt.org/en/registry/opt-out/results?patent_number=${encodeURIComponent(patentNumber)}`;
+      try {
+        const html = await fetchCrossOrigin(url, signal);
+        const parsed = parseUpcOptOutResult(html, patentNumber);
+        if (!parsed) continue;
+        patchCase(caseNo, (c) => {
+          c.sources.upcRegistry = {
+            key: 'upcRegistry',
+            title: 'UPC Opt-out registry',
+            status: 'ok',
+            fetchedAt: Date.now(),
+            url,
+            transport: 'cross-origin',
+            data: parsed,
+          };
+        });
+        addLog(caseNo, 'ok', `UPC registry check: ${parsed.status}`, { source: 'upcRegistry', patentNumber });
+        return;
+      } catch (error) {
+        addLog(caseNo, 'warn', `UPC registry check failed for ${patentNumber}: ${error?.message || error}`, { source: 'upcRegistry' });
+      }
+    }
+  }
+
   async function fetchWithRetry(url, signal) {
     let lastError;
     for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
@@ -875,6 +958,12 @@
       }), FETCH_CONCURRENCY);
     } finally {
       if (runtime.abortController === controller) {
+        try {
+          await refreshUpcRegistry(caseNo, controller.signal);
+        } catch {
+          // non-blocking
+        }
+
         const c = getCase(caseNo);
         const okCount = SOURCES.filter((s) => c.sources[s.key]?.status === 'ok').length;
         addLog(caseNo, 'ok', `Background prefetch finish (${okCount}/${SOURCES.length} sources ok)`);
@@ -925,6 +1014,7 @@
     const family = c.sources.family?.data || {};
     const legal = c.sources.legal?.data || {};
     const ue = c.sources.ueMain?.data || {};
+    const upcRegistry = c.sources.upcRegistry?.data || null;
 
     const docs = [...(doclist.docs || [])].sort(compareDateDesc);
     const latestEpo = docs.find((d) => d.actor === 'EPO');
@@ -992,11 +1082,12 @@
       renewal,
       upcUe: {
         ueStatus: ue.ueStatus || 'Unknown',
-        upcOptOut: ue.upcOptOut || 'Unknown',
-        memberStates: ue.memberStates || '',
-        note: ue.ueStatus
-          ? 'UE/UPC inferred from UP tab and legal data where available.'
-          : 'UE/UPC data unavailable in current cache; will populate when source loads.',
+        upcOptOut: upcRegistry ? (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found') : (ue.upcOptOut || 'Unknown'),
+        note: upcRegistry
+          ? `UPC opt-out checked against registry for ${upcRegistry.patentNumber}.`
+          : (ue.ueStatus
+            ? 'UE/UPC inferred from UP tab and legal data where available.'
+            : 'UE/UPC data unavailable in current cache; will populate when source loads.'),
       },
       docs,
       docBundles: docs.reduce((acc, d) => {
