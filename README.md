@@ -91,16 +91,36 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.9
+- Restored visual document grouping headers on the native **All documents** page (`tab=doclist`).
+- Added stable regrouping behavior on init/focus/visibility updates.
+
+### 7.0.8
+- Moved timeline inclusion/importance controls from Timeline tab into **Options** tab.
+- Reordered overview to put **Deadlines & clocks** before **Actionable status**.
+- Added actionable countdown logic (days since applicant response vs days to deadline) with color severity.
+- Improved title language preference (English first where available).
+- Expanded divisional detection heuristics and parent-link support.
+- Renewals panel redesigned around patent-year progression + next fee countdown.
+
+### 7.0.7
+- Added UPC registry cross-check integration for opt-out status.
+- Added Tampermonkey cross-origin permissions for `unifiedpatentcourt.org`.
+
+### 7.0.6
+- Added timeline group collapse UX improvements and better repeated-text cleanup.
+
+### 7.0.5
+- Removed IPC/CPC and logs/debug tab from sidebar UI.
+- Improved sidebar data fallback/cleanup and consolidated to a single canonical `README.md`.
+
 ### 7.0.4
-- Timeline grouped bundles are now collapsible/minimizable.
-- Deduped repeated multiline status/designated-state text.
-- Added fallback for “Most recent event” from legal events when main is missing.
-- Added publication fallback inference from document rows when publication sources are empty.
+- Timeline grouped bundles became collapsible/minimizable.
+- Added fallback for “Most recent event” when missing on main source.
+- Added publication fallback inference from document rows.
 
 ### 7.0.3
-- Removed IPC/CPC from sidebar output.
-- Removed Logs/debug tab from visible sidebar UI.
-- Improved title extraction by preferring explicit Title field.
+- Improved title extraction preference for explicit `Title` values.
 
 ### 7.0.2
 - Fixed options checkbox persistence across toggles/reloads.
