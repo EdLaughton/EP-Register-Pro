@@ -23,11 +23,10 @@ has(/class="epoRP-garrow"/, 'Timeline group arrow indicator missing');
 has(/\.epoRP-grp\[open\]\s+\.epoRP-garrow\{transform:rotate\(90deg\)/, 'Timeline arrow rotation style missing');
 
 // Timeline controls (include/exclude + importance)
-has(/id="epoRP-tl-events"/, 'Timeline event include toggle missing');
-has(/id="epoRP-tl-legal"/, 'Timeline legal include toggle missing');
-has(/id="epoRP-tl-event-level"/, 'Timeline event level selector missing');
-has(/id="epoRP-tl-legal-level"/, 'Timeline legal level selector missing');
-has(/function\s+wireTimeline\s*\(/, 'wireTimeline handler missing');
+has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
+has(/checkbox\('epoRP-opt-legal'/, 'Timeline legal include toggle missing from options');
+has(/id="epoRP-opt-event-level"/, 'Timeline event level selector missing from options');
+has(/id="epoRP-opt-legal-level"/, 'Timeline legal level selector missing from options');
 
 // UI removals requested
 notHas(/Document index/, 'Document index UI should be removed');
