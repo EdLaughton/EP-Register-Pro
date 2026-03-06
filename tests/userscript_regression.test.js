@@ -46,6 +46,7 @@ has(/cleanTitle/, 'Title cleanup helper missing');
 has(/function\s+extractEpNumbersByHeader\s*\(/, 'Header-based EP number extraction helper missing');
 has(/extractEpNumbersByHeader\(doc,\s*\/\\bParent application/, 'Parent application extraction should use header-scoped helper');
 has(/extractEpNumbersByHeader\(doc,\s*\/\\bDivisional application/, 'Divisional child extraction should use header-scoped helper');
+hasText('[A-Z]{2}\\d[0-9A-Z\\/\\-]{4,}', 'Priority parser should require numeric body after country code (prevents LANGUAGE false matches)');
 has(/const\s+isEuroPct\s*=\s*!!internationalAppNo\s*\|\|\s*\/\\bPCT\\b\/i\.test\(\`\$\{String\(appField \|\| ''\)\} \$\{pageText\}\`\)/, 'E/PCT detection should include broader app/page context');
 has(/function\s+enhanceDoclistGrouping\s*\(/, 'All-documents grouping enhancer missing');
 has(/epoRP-docgrp/, 'All-documents grouping row class missing');

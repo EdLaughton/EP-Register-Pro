@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.23
+// @version      7.0.24
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,15 +19,15 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.23';
+  const VERSION = '7.0.24';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
   const DATE_RE = /(\d{2}\.\d{2}\.\d{4})/;
 
   const CACHE_SCHEMA = 2;
-  const MAX_CASES = 80;
-  const MAX_LOGS_PER_APP = 600;
+  const MAX_CASES = 30;
+  const MAX_LOGS_PER_APP = 180;
   const FETCH_CONCURRENCY = 2;
   const FETCH_TIMEOUT_MS = 15000;
   const FETCH_RETRIES = 1;
@@ -447,15 +447,22 @@
     const out = [];
     const rawLines = String(raw || '').split('\n').map((v) => v.trim()).filter(Boolean);
 
+    // Priority IDs are usually country-code + numeric-ish body (e.g. GB20230019788).
+    const parseLine = (line) => {
+      const m = String(line || '').match(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i);
+      if (!m) return null;
+      return { no: m[1].replace(/\s+/g, '').toUpperCase(), dateStr: m[2] };
+    };
+
     for (const line of rawLines) {
-      const m = line.match(/\b([A-Z]{2}[A-Z0-9\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i);
-      if (!m) continue;
-      out.push({ no: m[1].replace(/\s+/g, '').toUpperCase(), dateStr: m[2] });
+      const parsed = parseLine(line);
+      if (!parsed) continue;
+      out.push(parsed);
     }
 
     if (!out.length && pageText) {
-      const section = String(pageText).match(/Priority\s+number,\s*date[\s\S]{0,350}/i)?.[0] || '';
-      for (const m of section.matchAll(/\b([A-Z]{2}[A-Z0-9\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
+      const section = String(pageText).match(/Priority\s+number,\s*date[\s\S]{0,420}/i)?.[0] || '';
+      for (const m of section.matchAll(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
         out.push({ no: String(m[1] || '').replace(/\s+/g, '').toUpperCase(), dateStr: String(m[2] || '') });
       }
     }
@@ -706,9 +713,13 @@
       return { bundle: 'Other', level: 'info', actor: 'System' };
     }
 
+    if (/amended claims filed|amendment by applicant|claims and\/or description|filed after receipt/i.test(t)) {
+      return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
+    }
+
     if (/search report|search opinion|written opinion|search strategy|esr/.test(t)) return { bundle: 'Search package', level: 'info', actor: 'EPO' };
     if (/rule\s*71\(3\)|intention to grant|text intended for grant|mention of grant/.test(t)) return { bundle: 'Grant package', level: 'warn', actor: 'EPO' };
-    if (/article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
+    if (/article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining|examining division has become responsible/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
     if (/renewal|annual fee/.test(t)) return { bundle: 'Renewal', level: 'ok', actor: 'Applicant' };
     if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
     if (/reply|response|arguments|observations|letter|filed by applicant|submission|request/.test(t)) return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
@@ -1266,10 +1277,9 @@
     const upcRegistry = c.sources.upcRegistry?.data || null;
 
     const docs = [...(doclist.docs || [])].sort(compareDateDesc);
-    const latestEpo = docs.find((d) => d.actor === 'EPO');
+    const latestEpo = docs.find((d) => d.actor === 'EPO' && d.bundle !== 'Other') || docs.find((d) => d.actor === 'EPO') || null;
     const applicantDocs = docs.filter((d) => d.actor === 'Applicant');
-    const filingDoc = applicantDocs.find((d) => d.bundle === 'Filing package');
-    const latestApplicant = filingDoc || applicantDocs[0] || null;
+    const latestApplicant = applicantDocs.find((d) => d.bundle !== 'Other') || applicantDocs[0] || null;
     const publicationsPrimary = dedupe([...(main.publications || []), ...(family.publications || [])], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
     const publicationFallback = publicationsPrimary.length ? [] : inferPublicationsFromDocs(docs);
     const publications = dedupe([...publicationsPrimary, ...publicationFallback], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`).sort(compareDateDesc);
@@ -1316,7 +1326,7 @@
         deadlines.push({ label: 'Exam/designation fee reminder period (approx.)', date: addMonths(d, 6), level: 'bad' });
       }
     }
-    if (filingDate) deadlines.push({ label: '20-year term from filing (reference)', date: addMonths(filingDate, 12 * 20), level: 'info' });
+    if (filingDate) deadlines.push({ label: '20-year term from filing (reference)', date: addMonths(filingDate, 12 * 20), level: 'info', reference: true });
 
     const renewal = inferRenewalModel(main, legal, ue);
 
@@ -1324,7 +1334,12 @@
     const latestApplicantDate = parseDateString(latestApplicant?.dateStr);
     const waitingOn = latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant';
     const waitingDays = waitingOn === 'EPO' && latestApplicantDate ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000) : null;
-    const nextDeadline = deadlines.find((d) => d.date > new Date()) || deadlines[0] || null;
+
+    const actionableDeadlines = deadlines.filter((d) => !d.reference);
+    const nextDeadline = actionableDeadlines.find((d) => d.date > new Date())
+      || actionableDeadlines[0]
+      || null;
+
     const daysToDeadline = nextDeadline ? Math.ceil((nextDeadline.date.getTime() - Date.now()) / 86400000) : null;
 
     return {
@@ -1412,7 +1427,8 @@
         });
         continue;
       }
-      const key = `${d.bundle}`;
+      const monthBucket = String(d.dateStr || '').split('.').slice(1).join('.');
+      const key = `${d.bundle}|${monthBucket || 'nodate'}`;
       if (!grouped.has(key)) {
         grouped.set(key, { type: 'group', dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor: d.actor || 'Other', items: [] });
       }
