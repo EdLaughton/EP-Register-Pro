@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.18
+// @version      7.0.19
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.18';
+  const VERSION = '7.0.19';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -730,7 +730,9 @@
       filterWrap.innerHTML = `<input id="epoRP-doclist-filter" class="epoRP-doclist-filter" placeholder="Filter documents by name…" />`;
       table.parentElement?.insertBefore(filterWrap, table);
       filterWrap.querySelector('#epoRP-doclist-filter')?.addEventListener('input', (event) => {
-        applyDoclistFilter(table, event.target.value || '');
+        const liveTable = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
+        if (!liveTable) return;
+        applyDoclistFilter(liveTable, event.target.value || '');
       });
     }
 
@@ -948,8 +950,23 @@
 
     const pn = String(patentNumber || '').toLowerCase();
     const hasPatentRef = pn && t.includes(pn);
-    const positiveSignal = /opted out|opt-?out\s+registered|opt-?out\s+entered|opt-?out\s+effective/.test(t);
-    if (hasPatentRef && positiveSignal) {
+    if (!hasPatentRef) return null;
+
+    const hasOptOutToken = /\bopt(?:ed)?[\s-]*out\b/.test(t);
+    const positiveSignal =
+      /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+(?:register(?:ed)?|enter(?:ed)?|effective)\b/.test(t)
+      || /\b(?:register(?:ed)?|enter(?:ed)?|effective)(?:\s+\w+){0,8}\s+opt(?:ed)?[\s-]*out\b/.test(t);
+    const withdrawnSignal = /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+(?:withdrawn|removed|revoked)\b/.test(t);
+    const negativeSignal =
+      /\bnot\s+opt(?:ed)?[\s-]*out\b/.test(t)
+      || /\bno\s+opt(?:ed)?[\s-]*out\b/.test(t)
+      || /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+not\s+(?:been\s+)?(?:register(?:ed)?|enter(?:ed)?|effective)\b/.test(t);
+
+    if (withdrawnSignal) {
+      return { patentNumber, optedOut: false, status: 'Opt-out withdrawn', source: 'UPC registry' };
+    }
+
+    if (hasOptOutToken && positiveSignal && !negativeSignal) {
       return { patentNumber, optedOut: true, status: 'Opted out', source: 'UPC registry' };
     }
 
@@ -1416,7 +1433,9 @@
       const filingDateObj = parseDateString(m.filingDate);
       const yearsFromFiling = filingDateObj ? Math.max(0, Math.floor((Date.now() - filingDateObj.getTime()) / (365.25 * 86400000))) : null;
       const patentYearFromFiling = yearsFromFiling != null ? yearsFromFiling + 1 : null;
-      const nextRenewalYear = patentYearFromFiling != null ? Math.max(3, patentYearFromFiling + 1) : ((m.renewal.highestYear || 2) + 1);
+      const filingBasedNextYear = patentYearFromFiling != null ? Math.max(3, patentYearFromFiling + 1) : null;
+      const highestPaidNextYear = m.renewal.highestYear ? (m.renewal.highestYear + 1) : null;
+      const nextRenewalYear = Math.max(3, filingBasedNextYear || 0, highestPaidNextYear || 0);
       const nextDueDays = m.renewal.nextDue ? Math.ceil((m.renewal.nextDue.getTime() - Date.now()) / 86400000) : null;
       const dueLevel = nextDueDays == null ? 'info' : (nextDueDays < 0 ? 'bad' : nextDueDays <= 30 ? 'bad' : nextDueDays <= 75 ? 'warn' : 'ok');
       html += `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
