@@ -17,7 +17,6 @@ for (const option of ['preloadAllTabs', 'showPublications', 'showEventHistory', 
   assert(src.includes(option), `Missing option ${option}`);
 }
 
-assert(src.includes("data-view=\"logs\""), 'Logs tab not found');
-assert(src.includes('Background prefetch start'), 'Expected debug logging markers missing');
+assert(!src.includes('IPC/CPC'), 'IPC/CPC block should be removed from sidebar UI');
 
 console.log('userscript smoke checks passed');

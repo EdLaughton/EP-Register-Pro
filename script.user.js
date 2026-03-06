@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.2
+// @version      7.0.3
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -17,7 +17,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.2';
+  const VERSION = '7.0.3';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -460,11 +460,15 @@
     const priorities = parsePriority(priorityField);
     const status = summarizeStatus(statusField);
 
+    const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
+    const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
+    const representativeField = normalize(fieldByLabel(doc, [/^Representative/i]));
+
     const result = {
       appNo: caseNo,
-      title: extractTitle(doc),
-      applicant: normalize(fieldByLabel(doc, [/^Applicant/i]).split('\n')[0] || ''),
-      representative: normalize(fieldByLabel(doc, [/^Representative/i]).split('\n')[0] || ''),
+      title: titleField || extractTitle(doc),
+      applicant: normalize(applicantField.split('\n').find(Boolean) || ''),
+      representative: normalize(representativeField.split('\n').find(Boolean) || ''),
       filingDate: appInfo.filingDate,
       checksum: appInfo.checksum,
       priorities,
@@ -473,7 +477,6 @@
       statusSimple: status.simple,
       statusLevel: status.level,
       designatedStates: normalize(fieldByLabel(doc, [/^Designated/i])),
-      ipc: normalize(fieldByLabel(doc, [/^IPC$/i, /^Classification$/i, /^CPC$/i])),
       recentEvents: parseRecentEvents(recentEventField),
       publications: parsePublications(publicationField, 'EP (this file)'),
       isDivisional: priorities.some((p) => /^EP/i.test(p.no)),
@@ -1030,7 +1033,6 @@
       <div class="epoRP-l">Status</div><div class="epoRP-v"><span class="epoRP-bdg ${esc(m.statusLevel)}">${esc(m.statusSimple)}</span> ${esc(m.status)}</div>
       <div class="epoRP-l">Representative</div><div class="epoRP-v">${esc(m.representative)}</div>
       ${m.designatedStates ? `<div class="epoRP-l">Designated states</div><div class="epoRP-v">${esc(m.designatedStates)}</div>` : ''}
-      ${m.ipc ? `<div class="epoRP-l">IPC/CPC</div><div class="epoRP-v">${esc(m.ipc)}</div>` : ''}
     </div></div>`;
 
     html += `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
@@ -1204,7 +1206,6 @@
         <button class="epoRP-tab" data-view="overview">Overview</button>
         <button class="epoRP-tab" data-view="timeline">Timeline</button>
         <button class="epoRP-tab" data-view="options">Options</button>
-        <button class="epoRP-tab" data-view="logs">Logs</button>
       </div>
     </div><div class="epoRP-body" id="epoRP-body"></div>`;
 
@@ -1350,12 +1351,6 @@
       wireOptions();
       return;
     }
-    if (runtime.activeView === 'logs') {
-      body.innerHTML = renderLogs(caseNo);
-      wireLogs();
-      return;
-    }
-
     body.innerHTML = renderOverview(caseNo);
     wireOverview(caseNo);
   }
