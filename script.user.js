@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.15
+// @version      7.0.16
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.15';
+  const VERSION = '7.0.16';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1560,7 +1560,7 @@
     panel.id = 'epoRP-panel';
     panel.className = 'epoRP';
     panel.innerHTML = `<div class="epoRP-hd">
-      <div class="epoRP-row"><div><div class="epoRP-t">EP Register Pro</div><div class="epoRP-st" id="epoRP-sub"></div></div><div class="epoRP-acts"><button class="epoRP-btn" id="epoRP-refresh">↻</button><button class="epoRP-btn" id="epoRP-collapse">−</button></div></div>
+      <div class="epoRP-row"><div><div class="epoRP-t">EP Register Pro <span class="epoRP-ver">v${VERSION}</span></div><div class="epoRP-st" id="epoRP-sub"></div></div><div class="epoRP-acts"><button class="epoRP-btn" id="epoRP-refresh">↻</button><button class="epoRP-btn" id="epoRP-collapse">−</button></div></div>
       <div class="epoRP-badges"><div id="epoRP-badge-left"></div><div id="epoRP-badge-right"></div></div>
       <div class="epoRP-tabs">
         <button class="epoRP-tab" data-view="overview">Overview</button>
@@ -1745,6 +1745,7 @@
     .epoRP-hd{padding:8px 10px;border-bottom:1px solid #e2e8f0;background:linear-gradient(180deg,#f8fafc,#f1f5f9)}
     .epoRP-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
     .epoRP-t{font-size:14px;font-weight:800}
+    .epoRP-ver{font-size:11px;font-weight:700;color:#64748b;margin-left:4px}
     .epoRP-st{font-size:11px;color:#475569}
     .epoRP-tabs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
     .epoRP-tab,.epoRP-btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer}
