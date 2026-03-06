@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.20
+// @version      7.0.21
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.20';
+  const VERSION = '7.0.21';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -407,6 +407,32 @@
     return { checksum: m?.[1] || '', filingDate: m?.[2] || '' };
   }
 
+  function extractEpNumbersByHeader(doc, headerRegex) {
+    const values = [];
+
+    for (const tr of doc.querySelectorAll('tr')) {
+      const headers = [...tr.querySelectorAll('th')];
+      const th = headers.find((h) => headerRegex.test(text(h)));
+      if (!th) continue;
+
+      const rows = [tr];
+      const rowspan = Math.max(1, parseInt(th.getAttribute('rowspan') || '1', 10) || 1);
+      let next = tr;
+      for (let i = 1; i < rowspan; i++) {
+        next = next?.nextElementSibling;
+        if (!next || next.tagName !== 'TR') break;
+        rows.push(next);
+      }
+
+      const chunk = rows.map((r) => text(r)).join('\n');
+      for (const m of chunk.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)) {
+        values.push(String(m[1] || '').toUpperCase());
+      }
+    }
+
+    return dedupe(values, (x) => x);
+  }
+
   function parsePriority(raw) {
     const out = [];
     for (const line of String(raw || '').split('\n').map((v) => v.trim()).filter(Boolean)) {
@@ -573,17 +599,16 @@
     const status = summarizeStatus(statusField);
 
     const pageText = bodyText(doc);
-    const parentField = dedupeMultiline(fieldByLabel(doc, [/^Parent application/i, /^Parent applications/i]));
-    const parentCandidates = [...parentField.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
+
+    const parentCandidates = extractEpNumbersByHeader(doc, /\bParent application(?:\(s\))?\b/i);
     const parentMatch = pageText.match(/\bparent\s+application(?:\(s\))?[^\n]{0,140}\b(EP\d{6,12})\b/i);
     const parentCase = parentCandidates[0] || (parentMatch ? parentMatch[1].toUpperCase() : '');
 
-    const divisionalField = dedupeMultiline(fieldByLabel(doc, [/^Divisional application/i, /^Divisional applications/i]));
-    const divisionalChildren = dedupe([...divisionalField.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase()), (x) => x);
+    const divisionalChildren = extractEpNumbersByHeader(doc, /\bDivisional application(?:\(s\))?\b/i);
 
-    const woMatch = String(appField || '').match(/\b(WO\d{4}[A-Z]{2}\d{4,})\b/i);
+    const woMatch = `${String(appField || '')}\n${pageText}`.match(/\b(WO\d{4}[A-Z]{2}\d{3,})\b/i);
     const internationalAppNo = woMatch ? woMatch[1].toUpperCase() : '';
-    const isEuroPct = !!internationalAppNo || /\bPCT\b/i.test(String(appField || ''));
+    const isEuroPct = !!internationalAppNo || /\bPCT\b/i.test(`${String(appField || '')} ${pageText}`);
 
     const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
     const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
