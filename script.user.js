@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.4
+// @version      7.0.5
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -17,7 +17,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.4';
+  const VERSION = '7.0.5';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -413,6 +413,24 @@
     let m;
     while ((m = re.exec(textBlock || '')) !== null) {
       out.push({ no: m[1].toUpperCase(), kind: (m[2] || '').toUpperCase(), dateStr: m[3], role });
+    }
+    return dedupe(out, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
+  }
+
+  function inferPublicationsFromDocs(docs = []) {
+    const out = [];
+    const re = /\b((?:EP|WO)[A-Z0-9]{6,})([A-Z]\d)?\b/i;
+    for (const d of docs) {
+      const title = String(d?.title || '');
+      if (!/publication|published|a1|a2|a3|b1|b2/i.test(title)) continue;
+      const m = title.match(re);
+      if (!m) continue;
+      out.push({
+        no: String(m[1] || '').toUpperCase(),
+        kind: String(m[2] || '').toUpperCase(),
+        dateStr: d.dateStr || '',
+        role: 'Inferred from documents',
+      });
     }
     return dedupe(out, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
   }
@@ -874,7 +892,9 @@
     const docs = [...(doclist.docs || [])].sort(compareDateDesc);
     const latestEpo = docs.find((d) => d.actor === 'EPO');
     const latestApplicant = docs.find((d) => d.actor === 'Applicant');
-    const publications = dedupe([...(main.publications || []), ...(family.publications || [])], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`).sort(compareDateDesc);
+    const publicationsPrimary = dedupe([...(main.publications || []), ...(family.publications || [])], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
+    const publicationFallback = publicationsPrimary.length ? [] : inferPublicationsFromDocs(docs);
+    const publications = dedupe([...publicationsPrimary, ...publicationFallback], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`).sort(compareDateDesc);
 
     const stage = docs.some((d) => d.bundle === 'Grant package')
       ? 'Grant stage'
@@ -919,7 +939,7 @@
       applicationType: main.applicationType || parseApplicationType(main),
       designatedStates: main.designatedStates || '',
       ipc: main.ipc || '',
-      recentMainEvent: main.recentEvents?.[0] || null,
+      recentMainEvent: main.recentEvents?.[0] || (legal.events || [])[0] || null,
       latestEpo,
       latestApplicant,
       waitingDays: latestApplicant?.dateStr ? Math.floor((Date.now() - parseDateString(latestApplicant.dateStr).getTime()) / 86400000) : null,
