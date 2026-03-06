@@ -7,6 +7,10 @@ function has(re, message) {
   assert(re.test(src), message);
 }
 
+function hasText(text, message) {
+  assert(src.includes(text), message);
+}
+
 function notHas(re, message) {
   assert(!re.test(src), message);
 }
@@ -16,6 +20,8 @@ has(/@grant\s+GM_xmlhttpRequest/, 'Missing GM_xmlhttpRequest grant for UPC regis
 has(/@connect\s+unifiedpatentcourt\.org/, 'Missing @connect unifiedpatentcourt.org');
 has(/function\s+refreshUpcRegistry\s*\(/, 'Missing UPC registry refresh function');
 has(/parseUpcOptOutResult/, 'Missing UPC opt-out parser');
+hasText("upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')", 'Overview should preserve explicit UPC registry status (e.g., Opt-out withdrawn)');
+hasText('opt(?:ed)?[\\s-]*out(?:\\s+\\w+){0,8}\\s+(?:register', 'UPC positive matcher should allow words between opt-out and registered/entered/effective');
 
 // Timeline grouped items UX (collapsible + arrow)
 has(/<details class="epoRP-grp">/, 'Timeline groups should render as collapsed <details> by default');
@@ -39,5 +45,8 @@ has(/parentCase/, 'Divisional parent case tracking missing');
 has(/cleanTitle/, 'Title cleanup helper missing');
 has(/function\s+enhanceDoclistGrouping\s*\(/, 'All-documents grouping enhancer missing');
 has(/epoRP-docgrp/, 'All-documents grouping row class missing');
+has(/const\s+highestPaidNextYear\s*=\s*m\.renewal\.highestYear\s*\?\s*\(m\.renewal\.highestYear\s*\+\s*1\)\s*:\s*null;/, 'Renewal next-year should account for paid-ahead highest year');
+has(/Math\.max\(3,\s*filingBasedNextYear\s*\|\|\s*0,\s*highestPaidNextYear\s*\|\|\s*0\)/, 'Renewal next-year should be max of filing-based and paid-ahead baseline');
+has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
 
 console.log('userscript regression checks passed');

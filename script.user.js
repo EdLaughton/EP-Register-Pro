@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.9
+// @version      7.0.20
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
-// @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
-// @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
+// @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
+// @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @match        https://register.epo.org/*
 // @run-at       document-idle
 // @grant        GM_addStyle
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.9';
+  const VERSION = '7.0.20';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -483,8 +483,8 @@
     const statusText = `${mainData.statusRaw || ''} ${mainData.title || ''} ${mainData.priorityText || ''} ${mainData.parentCase || ''}`;
     const priorities = mainData.priorities || [];
 
-    if (/PCT|WO\d+/i.test(statusText) || priorities.some((p) => /^WO/i.test(p.no))) {
-      return 'Euro-PCT regional phase';
+    if (mainData.isEuroPct || /PCT|WO\d+/i.test(statusText) || priorities.some((p) => /^WO/i.test(p.no))) {
+      return 'E/PCT regional phase';
     }
     if (mainData.isDivisional || mainData.parentCase) return 'Divisional';
     if (priorities.length > 0) return 'EP convention filing';
@@ -500,12 +500,56 @@
     return v;
   }
 
+  function pickApplicantLine(raw) {
+    const out = [];
+    const lines = dedupeMultiline(raw)
+      .split('\n')
+      .map((line) => normalize(line))
+      .filter(Boolean);
+
+    for (let line of lines) {
+      if (/^for all designated states$/i.test(line)) continue;
+      if (/^\[[^\]]+\]$/.test(line)) continue;
+
+      if (/^for all designated states\b/i.test(line)) {
+        line = line.replace(/^for all designated states\b[:\s-]*/i, '').trim();
+        if (!line) continue;
+      }
+
+      if (/^(applicant|for applicant)\s*[:\-]?\s*$/i.test(line)) continue;
+      out.push(line);
+    }
+
+    return out[0] || '';
+  }
+
+  function formatDaysHuman(days) {
+    if (!Number.isFinite(days)) return '—';
+    const sign = days < 0 ? '-' : '';
+    const abs = Math.abs(days);
+    const years = Math.floor(abs / 365);
+    const rem = abs % 365;
+    if (years <= 0) return `${sign}${rem}d`;
+    return `${sign}${years}y ${rem}d`;
+  }
+
   function extractTitle(doc) {
     const rawTitle = dedupeMultiline(fieldByLabel(doc, [/^Title$/i]));
+    const page = bodyText(doc);
     if (rawTitle) {
       const englishLine = rawTitle.split('\n').map((x) => x.trim()).find((line) => /^English\s*:/i.test(line));
       if (englishLine) return cleanTitle(englishLine.replace(/^English\s*:\s*/i, ''));
 
+      const englishFromPage = page.match(/\bEnglish\s*:\s*([^\n\r\[]+)/i);
+      if (englishFromPage?.[1]) return cleanTitle(englishFromPage[1]);
+    }
+
+    for (const el of [...doc.querySelectorAll('h1,h2,h3,strong,b,a')].slice(0, 120)) {
+      const m = text(el).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
+      if (m?.[1]) return cleanTitle(m[1]);
+    }
+
+    if (rawTitle) {
       const cleanedLines = rawTitle
         .split('\n')
         .map((line) => line.trim())
@@ -513,10 +557,6 @@
       if (cleanedLines.length) return cleanTitle(cleanedLines[0]);
     }
 
-    for (const el of [...doc.querySelectorAll('h1,h2,h3,strong,b,a')].slice(0, 120)) {
-      const m = text(el).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
-      if (m?.[1]) return cleanTitle(m[1]);
-    }
     const fromBody = bodyText(doc).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
     return cleanTitle(fromBody?.[1] || '');
   }
@@ -533,17 +573,28 @@
     const status = summarizeStatus(statusField);
 
     const pageText = bodyText(doc);
-    const parentMatch = pageText.match(/\bdivisional(?:\s+application)?(?:\s+of|\s+from)?\s*(EP\d{6,12})\b/i);
-    const parentCase = parentMatch ? parentMatch[1].toUpperCase() : '';
+    const parentField = dedupeMultiline(fieldByLabel(doc, [/^Parent application/i, /^Parent applications/i]));
+    const parentCandidates = [...parentField.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
+    const parentMatch = pageText.match(/\bparent\s+application(?:\(s\))?[^\n]{0,140}\b(EP\d{6,12})\b/i);
+    const parentCase = parentCandidates[0] || (parentMatch ? parentMatch[1].toUpperCase() : '');
+
+    const divisionalField = dedupeMultiline(fieldByLabel(doc, [/^Divisional application/i, /^Divisional applications/i]));
+    const divisionalChildren = dedupe([...divisionalField.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase()), (x) => x);
+
+    const woMatch = String(appField || '').match(/\b(WO\d{4}[A-Z]{2}\d{4,})\b/i);
+    const internationalAppNo = woMatch ? woMatch[1].toUpperCase() : '';
+    const isEuroPct = !!internationalAppNo || /\bPCT\b/i.test(String(appField || ''));
 
     const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
     const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
     const representativeField = normalize(fieldByLabel(doc, [/^Representative/i]));
 
+    const fallbackApplicant = normalize((pageText.match(/\bApplicant\s*(?:\n|:)\s*([^\n]+)/i)?.[1]) || '');
+
     const result = {
       appNo: caseNo,
-      title: cleanTitle(titleField || extractTitle(doc)),
-      applicant: normalize(applicantField.split('\n').find(Boolean) || ''),
+      title: extractTitle(doc) || cleanTitle(titleField),
+      applicant: pickApplicantLine(applicantField) || normalize(applicantField.split('\n').find(Boolean) || '') || fallbackApplicant,
       representative: normalize(representativeField.split('\n').find(Boolean) || ''),
       filingDate: appInfo.filingDate,
       checksum: appInfo.checksum,
@@ -555,8 +606,12 @@
       designatedStates: dedupeMultiline(fieldByLabel(doc, [/^Designated/i])),
       recentEvents: parseRecentEvents(recentEventField),
       publications: parsePublications(publicationField, 'EP (this file)'),
-      isDivisional: priorities.some((p) => /^EP/i.test(p.no)) || !!parentCase || /\bdivisional\b/i.test(pageText),
+      internationalAppNo,
+      isEuroPct,
+      isDivisional: !!parentCase || priorities.some((p) => /^EP/i.test(p.no)),
       parentCase,
+      divisionalChildren,
+      hasDivisionals: divisionalChildren.length > 0,
     };
     result.applicationType = parseApplicationType(result);
     return result;
@@ -636,33 +691,108 @@
     return { docs: dedupe(docs, (d) => `${d.dateStr}|${d.title}|${d.url}`).sort(compareDateDesc) };
   }
 
+  function applyDoclistFilter(table, query) {
+    const q = normalize(query).toLowerCase();
+    const rows = [...table.querySelectorAll('tr')];
+
+    for (const row of rows) {
+      if (row.classList.contains('epoRP-docgrp')) continue;
+      if (!row.querySelector("input[type='checkbox']")) continue;
+      const txt = text(row).toLowerCase();
+      row.classList.toggle('epoRP-filter-hidden', !!q && !txt.includes(q));
+    }
+
+    table.querySelectorAll('tr.epoRP-docgrp').forEach((groupHeader) => {
+      const group = groupHeader.querySelector('.epoRP-docgrp-btn')?.getAttribute('data-group');
+      if (!group) return;
+      const groupRows = [...table.querySelectorAll(`tr[data-eporp-group='${group}']`)];
+      const visibleCount = groupRows.filter((r) => !r.classList.contains('epoRP-filter-hidden')).length;
+      groupHeader.classList.toggle('epoRP-filter-hidden', visibleCount === 0);
+      const label = groupHeader.querySelector('.epoRP-docgrp-label');
+      if (label) {
+        const base = label.getAttribute('data-bundle') || 'Group';
+        label.textContent = `${base} (${visibleCount}/${groupRows.length})`;
+      }
+    });
+  }
+
   function enhanceDoclistGrouping() {
     if (tabSlug() !== 'doclist') return;
 
     const table = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
     if (!table) return;
 
+    let filterWrap = document.getElementById('epoRP-doclist-filter-wrap');
+    if (!filterWrap) {
+      filterWrap = document.createElement('div');
+      filterWrap.id = 'epoRP-doclist-filter-wrap';
+      filterWrap.className = 'epoRP-doclist-filter-wrap';
+      filterWrap.innerHTML = `<input id="epoRP-doclist-filter" class="epoRP-doclist-filter" placeholder="Filter documents by name…" />`;
+      table.parentElement?.insertBefore(filterWrap, table);
+      filterWrap.querySelector('#epoRP-doclist-filter')?.addEventListener('input', (event) => {
+        const liveTable = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
+        if (!liveTable) return;
+        applyDoclistFilter(liveTable, event.target.value || '');
+      });
+    }
+
     table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
+    table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
+      row.classList.remove('epoRP-docgrp-item', 'collapsed', 'epoRP-filter-hidden');
+      row.removeAttribute('data-eporp-group');
+    });
 
     const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
-    let prevBundle = '';
+    const groupable = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings']);
+
+    const runs = [];
+    let run = null;
 
     for (const row of rows) {
       const cells = [...row.querySelectorAll('td')];
       if (!cells.length) continue;
       const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[1] || cells[0] || row);
       const bundle = classifyDocument(title).bundle || 'Other';
-      if (bundle === prevBundle) continue;
+
+      if (!run || run.bundle !== bundle) {
+        run = { bundle, rows: [row] };
+        runs.push(run);
+      } else {
+        run.rows.push(row);
+      }
+    }
+
+    let gid = 0;
+    for (const r of runs) {
+      if (!groupable.has(r.bundle) || r.rows.length < 2) continue;
+      gid += 1;
+      const groupId = `g${gid}`;
+      const firstRow = r.rows[0];
+      const cells = [...firstRow.querySelectorAll('td')];
 
       const headerRow = document.createElement('tr');
       headerRow.className = 'epoRP-docgrp';
       const td = document.createElement('td');
       td.colSpan = Math.max(1, cells.length);
-      td.textContent = bundle;
+      td.innerHTML = `<button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" aria-expanded="false"><span class="epoRP-docgrp-label" data-bundle="${esc(r.bundle)}">${esc(r.bundle)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button>`;
       headerRow.appendChild(td);
-      row.parentElement?.insertBefore(headerRow, row);
-      prevBundle = bundle;
+      firstRow.parentElement?.insertBefore(headerRow, firstRow);
+
+      for (const row of r.rows) {
+        row.setAttribute('data-eporp-group', groupId);
+        row.classList.add('epoRP-docgrp-item', 'collapsed');
+      }
+
+      td.querySelector('button')?.addEventListener('click', (event) => {
+        const btn = event.currentTarget;
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        for (const row of r.rows) row.classList.toggle('collapsed', expanded);
+      });
     }
+
+    const currentQuery = (filterWrap.querySelector('#epoRP-doclist-filter')?.value || '');
+    applyDoclistFilter(table, currentQuery);
   }
 
   function parseDatedRows(doc, url) {
@@ -817,27 +947,50 @@
     if (/no results found/.test(t)) {
       return { patentNumber, optedOut: false, status: 'No opt-out found', source: 'UPC registry' };
     }
-    if (/opt-?out/.test(t) && (t.includes((patentNumber || '').toLowerCase()) || /results/.test(t))) {
+
+    const pn = String(patentNumber || '').toLowerCase();
+    const hasPatentRef = pn && t.includes(pn);
+    if (!hasPatentRef) return null;
+
+    const hasOptOutToken = /\bopt(?:ed)?[\s-]*out\b/.test(t);
+    const positiveSignal =
+      /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+(?:register(?:ed)?|enter(?:ed)?|effective)\b/.test(t)
+      || /\b(?:register(?:ed)?|enter(?:ed)?|effective)(?:\s+\w+){0,8}\s+opt(?:ed)?[\s-]*out\b/.test(t);
+    const withdrawnSignal = /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+(?:withdrawn|removed|revoked)\b/.test(t);
+    const negativeSignal =
+      /\bnot\s+opt(?:ed)?[\s-]*out\b/.test(t)
+      || /\bno\s+opt(?:ed)?[\s-]*out\b/.test(t)
+      || /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+not\s+(?:been\s+)?(?:register(?:ed)?|enter(?:ed)?|effective)\b/.test(t);
+
+    if (withdrawnSignal) {
+      return { patentNumber, optedOut: false, status: 'Opt-out withdrawn', source: 'UPC registry' };
+    }
+
+    if (hasOptOutToken && positiveSignal && !negativeSignal) {
       return { patentNumber, optedOut: true, status: 'Opted out', source: 'UPC registry' };
     }
+
     return null;
   }
 
   function upcCandidateNumbers(caseNo) {
     const c = getCase(caseNo);
     const main = c.sources.main?.data || {};
-    const family = c.sources.family?.data || {};
     const picks = [];
 
-    for (const p of [...(main.publications || []), ...(family.publications || [])]) {
+    // Use case-specific publication numbers only (avoid family-wide false positives).
+    for (const p of (main.publications || [])) {
       const m = String(p.no || '').toUpperCase().match(/^(EP\d{6,})/);
       if (m?.[1]) picks.push(m[1]);
     }
 
-    if (/^EP\d{6,}$/i.test(main.parentCase || '')) picks.push(main.parentCase.toUpperCase());
-    if (/^EP\d{6,}$/i.test(caseNo || '')) picks.push(caseNo.toUpperCase());
+    // Conservative fallback only for published/granted status and EP-like number.
+    const statusText = String(main.statusRaw || '').toLowerCase();
+    if (!picks.length && /^EP\d{6,}$/i.test(caseNo || '') && /(published|granted)/.test(statusText)) {
+      picks.push(String(caseNo).toUpperCase());
+    }
 
-    return [...new Set(picks)].slice(0, 8);
+    return [...new Set(picks)].slice(0, 4);
   }
 
   async function refreshUpcRegistry(caseNo, signal) {
@@ -1113,6 +1266,8 @@
       statusLevel: main.statusLevel || 'warn',
       applicationType: main.applicationType || parseApplicationType(main),
       parentCase: main.parentCase || '',
+      divisionalChildren: main.divisionalChildren || [],
+      hasDivisionals: !!main.hasDivisionals,
       recentMainEvent: main.recentEvents?.[0] || (legal.events || [])[0] || null,
       latestEpo,
       latestApplicant,
@@ -1125,7 +1280,7 @@
       renewal,
       upcUe: {
         ueStatus: ue.ueStatus || 'Unknown',
-        upcOptOut: upcRegistry ? (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found') : (ue.upcOptOut || 'Unknown'),
+        upcOptOut: upcRegistry ? (upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')) : (ue.upcOptOut || 'Unknown'),
         note: upcRegistry
           ? `UPC opt-out checked against registry for ${upcRegistry.patentNumber}.`
           : (ue.ueStatus
@@ -1166,6 +1321,7 @@
         detail: [e.detail, 'Main page'].filter(Boolean).join('\n'),
         source: 'Main',
         level: 'info',
+        actor: 'EPO',
         url: sourceUrl(caseNo, 'main'),
       });
     }
@@ -1181,16 +1337,17 @@
           detail: [d.procedure, 'All documents'].filter(Boolean).join(' · '),
           source: 'Documents',
           level: d.level || 'info',
+          actor: d.actor || 'Other',
           url: d.url,
         });
         continue;
       }
       const key = `${d.dateStr}|${d.bundle}`;
       if (!grouped.has(key)) {
-        grouped.set(key, { type: 'group', dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', items: [] });
+        grouped.set(key, { type: 'group', dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor: d.actor || 'Other', items: [] });
       }
       const g = grouped.get(key);
-      g.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', url: d.url });
+      g.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', actor: d.actor || 'Other', url: d.url });
       g.level = topLevel([g.level, d.level || 'info']);
     }
 
@@ -1198,7 +1355,7 @@
       g.items.sort(compareDateDesc);
       if (g.items.length === 1) {
         const first = g.items[0];
-        items.push({ type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${g.title}`, source: 'Documents', level: first.level, url: first.url });
+        items.push({ type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${g.title}`, source: 'Documents', level: first.level, actor: first.actor || g.actor || 'Other', url: first.url });
       } else {
         items.push(g);
       }
@@ -1206,19 +1363,19 @@
 
     if (opts.showEventHistory) {
       for (const e of eventHistory.events || []) {
-        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Event history'].filter(Boolean).join('\n'), source: 'Event history', level: opts.timelineEventLevel || 'info', url: e.url || sourceUrl(caseNo, 'event') });
+        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Event history'].filter(Boolean).join('\n'), source: 'Event history', level: opts.timelineEventLevel || 'info', actor: 'EPO', url: e.url || sourceUrl(caseNo, 'event') });
       }
     }
 
     if (opts.showLegalStatusRows) {
       for (const e of legal.events || []) {
-        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Legal status'].filter(Boolean).join('\n'), source: 'Legal status', level: opts.timelineLegalLevel || 'warn', url: e.url || sourceUrl(caseNo, 'legal') });
+        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Legal status'].filter(Boolean).join('\n'), source: 'Legal status', level: opts.timelineLegalLevel || 'warn', actor: 'EPO', url: e.url || sourceUrl(caseNo, 'legal') });
       }
     }
 
     if (opts.showPublications) {
       for (const p of dedupe([...(main.publications || []), ...(family.publications || [])], (x) => `${x.no}${x.kind}|${x.dateStr}|${x.role}`)) {
-        items.push({ type: 'item', dateStr: p.dateStr, title: `${p.no}${p.kind || ''} publication`, detail: p.role || 'Publication', source: 'Publications', level: 'info', url: sourceUrl(caseNo, 'main') });
+        items.push({ type: 'item', dateStr: p.dateStr, title: `${p.no}${p.kind || ''} publication`, detail: p.role || 'Publication', source: 'Publications', level: 'info', actor: 'EPO', url: sourceUrl(caseNo, 'main') });
       }
     }
 
@@ -1248,8 +1405,8 @@
       <div class="epoRP-l">Filing date</div><div class="epoRP-v">${esc(m.filingDate)}</div>
       <div class="epoRP-l">Priority</div><div class="epoRP-v">${esc(m.priority)}</div>
       <div class="epoRP-l">Type</div><div class="epoRP-v">${esc(m.applicationType)}${m.parentCase ? ` (<a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>)` : ''}</div>
+      ${m.divisionalChildren?.length ? `<div class="epoRP-l">Divisionals</div><div class="epoRP-v">${m.divisionalChildren.map((ep) => `<a class="epoRP-a" href="${esc(sourceUrl(ep, 'main'))}">${esc(ep)}</a>`).join(', ')}</div>` : ''}
       <div class="epoRP-l">Stage</div><div class="epoRP-v">${esc(m.stage)}</div>
-      <div class="epoRP-l">Status</div><div class="epoRP-v"><span class="epoRP-bdg ${esc(m.statusLevel)}">${esc(m.statusSimple)}</span></div>
       <div class="epoRP-l">Representative</div><div class="epoRP-v">${esc(m.representative)}</div>
     </div></div>`;
 
@@ -1259,7 +1416,7 @@
         const ds = formatDate(d.date);
         const dd = Math.ceil((d.date.getTime() - Date.now()) / 86400000);
         const proximity = dd < 0 ? 'bad' : dd <= 14 ? 'bad' : dd <= 45 ? 'warn' : 'ok';
-        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? `${dd}d` : `${Math.abs(dd)}d overdue`}` : ''}</span></div></div>`;
+        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span></div></div>`;
       }
       html += `</div><div class="epoRP-m">Heuristic dates from available Register documents.</div></div>`;
     }
@@ -1268,18 +1425,22 @@
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}` : '—'}</div>
       <div class="epoRP-l">EPO last action</div><div class="epoRP-v">${m.latestEpo ? `${esc(m.latestEpo.dateStr)} · ${esc(m.latestEpo.title)}` : '—'}</div>
       <div class="epoRP-l">Applicant last filing</div><div class="epoRP-v">${m.latestApplicant ? `${esc(m.latestApplicant.dateStr)} · ${esc(m.latestApplicant.title)}` : '—'}</div>
-      <div class="epoRP-l">${m.waitingOn === 'EPO' ? 'Days since applicant response' : 'Days to next deadline'}</div><div class="epoRP-v">${m.waitingOn === 'EPO' ? (m.waitingDays != null ? `<span class="epoRP-bdg ${m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok'}">${m.waitingDays} days</span>` : '—') : (m.daysToDeadline != null ? `<span class="epoRP-bdg ${m.daysToDeadline < 0 ? 'bad' : m.daysToDeadline <= 14 ? 'bad' : m.daysToDeadline <= 45 ? 'warn' : 'ok'}">${m.daysToDeadline >= 0 ? `${m.daysToDeadline} days` : `${Math.abs(m.daysToDeadline)} days overdue`}</span>` : '—')}</div>
+      <div class="epoRP-l">${m.waitingOn === 'EPO' ? 'Days since applicant response' : 'Days to next deadline'}</div><div class="epoRP-v">${m.waitingOn === 'EPO' ? (m.waitingDays != null ? `<span class="epoRP-bdg ${m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok'}">${formatDaysHuman(m.waitingDays)}</span>` : '—') : (m.daysToDeadline != null ? `<span class="epoRP-bdg ${m.daysToDeadline < 0 ? 'bad' : m.daysToDeadline <= 14 ? 'bad' : m.daysToDeadline <= 45 ? 'warn' : 'ok'}">${m.daysToDeadline >= 0 ? formatDaysHuman(m.daysToDeadline) : `${formatDaysHuman(m.daysToDeadline).slice(1)} overdue`}</span>` : '—')}</div>
       <div class="epoRP-l">Most recent event</div><div class="epoRP-v">${m.recentMainEvent ? `${esc(m.recentMainEvent.dateStr)} · ${esc(m.recentMainEvent.title)}` : '—'}</div>
     </div></div>`;
 
     if (opts.showRenewals) {
-      const nextRenewalYear = (m.renewal.highestYear || 2) + 1;
+      const filingDateObj = parseDateString(m.filingDate);
+      const yearsFromFiling = filingDateObj ? Math.max(0, Math.floor((Date.now() - filingDateObj.getTime()) / (365.25 * 86400000))) : null;
+      const patentYearFromFiling = yearsFromFiling != null ? yearsFromFiling + 1 : null;
+      const filingBasedNextYear = patentYearFromFiling != null ? Math.max(3, patentYearFromFiling + 1) : null;
+      const highestPaidNextYear = m.renewal.highestYear ? (m.renewal.highestYear + 1) : null;
+      const nextRenewalYear = Math.max(3, filingBasedNextYear || 0, highestPaidNextYear || 0);
       const nextDueDays = m.renewal.nextDue ? Math.ceil((m.renewal.nextDue.getTime() - Date.now()) / 86400000) : null;
       const dueLevel = nextDueDays == null ? 'info' : (nextDueDays < 0 ? 'bad' : nextDueDays <= 30 ? 'bad' : nextDueDays <= 75 ? 'warn' : 'ok');
       html += `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
-        <div class="epoRP-l">Patent year status</div><div class="epoRP-v">${m.renewal.highestYear ? `Paid through Year ${m.renewal.highestYear}` : 'No renewal payment captured yet'}</div>
-        <div class="epoRP-l">Expected next fee year</div><div class="epoRP-v">Year ${nextRenewalYear}</div>
-        <div class="epoRP-l">Next due (est.)</div><div class="epoRP-v">${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${esc(formatDate(m.renewal.nextDue))}${nextDueDays != null ? ` · ${nextDueDays >= 0 ? `${nextDueDays}d` : `${Math.abs(nextDueDays)}d overdue`}` : ''}</span>` : 'Unknown'}</div>
+        <div class="epoRP-l">Patent year status</div><div class="epoRP-v">${patentYearFromFiling ? `Current year ${patentYearFromFiling}${m.renewal.highestYear ? ` · paid through Year ${m.renewal.highestYear}` : ''}` : (m.renewal.highestYear ? `Paid through Year ${m.renewal.highestYear}` : 'No renewal payment captured yet')}</div>
+        <div class="epoRP-l">Next fee year / due</div><div class="epoRP-v">Year ${nextRenewalYear} · ${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${esc(formatDate(m.renewal.nextDue))}${nextDueDays != null ? ` · ${nextDueDays >= 0 ? formatDaysHuman(nextDueDays) : `${formatDaysHuman(nextDueDays).slice(1)} overdue`}` : ''}</span>` : 'Unknown'}</div>
         <div class="epoRP-l">Latest renewal</div><div class="epoRP-v">${m.renewal.latest ? `${esc(m.renewal.latest.dateStr)} · ${esc(m.renewal.latest.title)}` : 'No renewal events cached.'}</div>
         ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Mention of grant</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
       </div><div class="epoRP-m">${esc(m.renewal.explanatoryBasis)}</div></div>`;
@@ -1309,12 +1470,13 @@
   }
 
   function timelineItemHtml(item, compact = false) {
+    const actorClass = item.actor === 'Applicant' ? 'actor-applicant' : item.actor === 'EPO' ? 'actor-epo' : item.actor === 'Third party' ? 'actor-third' : '';
     return `<div class="epoRP-it ${compact ? 'compact' : ''}">
-      <div class="epoRP-dot ${esc(item.level || 'info')}"></div>
+      <div class="epoRP-dot ${esc(item.level || 'info')} ${esc(actorClass)}"></div>
       <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
       <div>
         <div class="epoRP-mn">${item.url ? `<a class="epoRP-a" href="${esc(item.url)}">${esc(item.title)}</a>` : esc(item.title)}</div>
-        <div class="epoRP-sb">${esc([item.detail, item.source].filter(Boolean).join(' · '))}</div>
+        <div class="epoRP-sb">${esc([item.detail, item.source, item.actor].filter(Boolean).join(' · '))}</div>
       </div>
     </div>`;
   }
@@ -1343,13 +1505,14 @@
       }
 
       if (item.type === 'group') {
+        const actorClass = item.actor === 'Applicant' ? 'actor-applicant' : item.actor === 'EPO' ? 'actor-epo' : item.actor === 'Third party' ? 'actor-third' : '';
         out.push(`<details class="epoRP-grp">
           <summary class="epoRP-grph">
-            <div class="epoRP-dot ${esc(item.level || 'info')}"></div>
+            <div class="epoRP-dot ${esc(item.level || 'info')} ${esc(actorClass)}"></div>
             <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
             <div>
               <div class="epoRP-mn">${esc(item.title)} (${(item.items || []).length})</div>
-              <div class="epoRP-sb">Grouped items · ${esc(item.source || 'Documents')}</div>
+              <div class="epoRP-sb">Grouped items · ${esc(item.source || 'Documents')} · ${esc(item.actor || 'Mixed')}</div>
             </div>
             <div class="epoRP-garrow">▸</div>
           </summary>
@@ -1361,6 +1524,14 @@
     }
 
     if (!insertedToday) out.unshift(`<div class="epoRP-today"><span>Today · ${esc(today)}</span></div>`);
+
+    const model = overviewModel(caseNo);
+    if (model.nextDeadline) {
+      const days = Math.ceil((model.nextDeadline.date.getTime() - Date.now()) / 86400000);
+      const level = days < 0 ? 'bad' : days <= 14 ? 'bad' : days <= 45 ? 'warn' : 'ok';
+      out.unshift(`<div class="epoRP-deadlineRow"><div class="epoRP-dot dotted ${level}"></div><div class="epoRP-d">${esc(formatDate(model.nextDeadline.date))}</div><div><div class="epoRP-mn">Next deadline</div><div class="epoRP-sb">${esc(model.nextDeadline.label)} · ${days >= 0 ? formatDaysHuman(days) : `${formatDaysHuman(days).slice(1)} overdue`}</div></div></div>`);
+    }
+
     if (verbose) out.unshift(`<div class="epoRP-m">Verbose mode shows extended source labels and grouped event bodies.</div>`);
 
     return `<div class="epoRP-c">${out.join('')}</div>`;
@@ -1422,7 +1593,7 @@
     panel.id = 'epoRP-panel';
     panel.className = 'epoRP';
     panel.innerHTML = `<div class="epoRP-hd">
-      <div class="epoRP-row"><div><div class="epoRP-t">EP Register Pro</div><div class="epoRP-st" id="epoRP-sub"></div></div><div class="epoRP-acts"><button class="epoRP-btn" id="epoRP-refresh">↻</button><button class="epoRP-btn" id="epoRP-collapse">−</button></div></div>
+      <div class="epoRP-row"><div><div class="epoRP-t">EP Register Pro <span class="epoRP-ver">v${VERSION}</span></div><div class="epoRP-st" id="epoRP-sub"></div></div><div class="epoRP-acts"><button class="epoRP-btn" id="epoRP-refresh">↻</button><button class="epoRP-btn" id="epoRP-collapse">−</button></div></div>
       <div class="epoRP-badges"><div id="epoRP-badge-left"></div><div id="epoRP-badge-right"></div></div>
       <div class="epoRP-tabs">
         <button class="epoRP-tab" data-view="overview">Overview</button>
@@ -1607,6 +1778,7 @@
     .epoRP-hd{padding:8px 10px;border-bottom:1px solid #e2e8f0;background:linear-gradient(180deg,#f8fafc,#f1f5f9)}
     .epoRP-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
     .epoRP-t{font-size:14px;font-weight:800}
+    .epoRP-ver{font-size:11px;font-weight:700;color:#64748b;margin-left:4px}
     .epoRP-st{font-size:11px;color:#475569}
     .epoRP-tabs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
     .epoRP-tab,.epoRP-btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer}
@@ -1631,18 +1803,26 @@
     .epoRP-pm{font-size:11px;color:#64748b}
     .epoRP-a{color:#1d4ed8;text-decoration:none}
     .epoRP-a:hover{text-decoration:underline}
-    .epoRP-it{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #f1f5f9}
+    .epoRP-it{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #f1f5f9;align-items:center}
     .epoRP-it.compact{padding:4px 2px}
     .epoRP-it:last-child{border-bottom:0}
-    .epoRP-dot{width:9px;height:9px;border-radius:999px;margin-top:4px;background:#94a3b8}
+    .epoRP-dot{width:9px;height:9px;border-radius:999px;margin-top:0;background:#94a3b8}
+    .epoRP-dot.dotted{background:transparent;border:2px dotted #94a3b8;width:10px;height:10px}
     .epoRP-dot.ok{background:#16a34a}
     .epoRP-dot.warn{background:#d97706}
     .epoRP-dot.bad{background:#dc2626}
     .epoRP-dot.info{background:#2563eb}
+    .epoRP-dot.actor-epo{background:#2563eb}
+    .epoRP-dot.actor-applicant{background:#16a34a}
+    .epoRP-dot.actor-third{background:#9333ea}
+    .epoRP-dot.dotted.ok{border-color:#16a34a}
+    .epoRP-dot.dotted.warn{border-color:#d97706}
+    .epoRP-dot.dotted.bad{border-color:#dc2626}
+    .epoRP-dot.dotted.info{border-color:#2563eb}
     .epoRP-mn{font-weight:700}
     .epoRP-sb{font-size:11px;color:#64748b;white-space:pre-wrap}
     .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:5px;background:#f8fafc;margin-bottom:7px}
-    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:4px;cursor:pointer;list-style:none;align-items:start}
+    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:4px;cursor:pointer;list-style:none;align-items:center}
     .epoRP-grph::-webkit-details-marker{display:none}
     .epoRP-garrow{font-size:16px;font-weight:700;color:#334155;justify-self:end;transition:transform .15s ease}
     .epoRP-grp[open] .epoRP-garrow{transform:rotate(90deg)}
@@ -1665,7 +1845,15 @@
     .epoRP-lr{display:grid;grid-template-columns:80px 11px 1fr;gap:6px;padding:5px 2px;border-bottom:1px solid #f1f5f9}
     .epoRP-lt{font-variant-numeric:tabular-nums;font-size:10px;color:#64748b}
     .epoRP-lm{font-size:11px;color:#0f172a}
-    tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:6px 8px}
+    .epoRP-deadlineRow{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px dashed #cbd5e1;align-items:start;background:#f8fafc}
+    tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:4px 8px}
+    .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent;border:0;padding:0;box-shadow:none}
+    .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}
+    .epoRP-docgrp-btn[aria-expanded="true"] .epoRP-docgrp-arrow{transform:rotate(90deg)}
+    tr.epoRP-docgrp-item.collapsed{display:none}
+    .epoRP-doclist-filter-wrap{margin:8px 0}
+    .epoRP-doclist-filter{width:100%;max-width:420px;border:1px solid #cbd5e1;border-radius:8px;padding:7px 10px;font:13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    .epoRP-filter-hidden{display:none !important}
   `);
 
   setInterval(() => {
