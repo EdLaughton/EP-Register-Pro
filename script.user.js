@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.14
+// @version      7.0.15
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.14';
+  const VERSION = '7.0.15';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -573,8 +573,10 @@
     const status = summarizeStatus(statusField);
 
     const pageText = bodyText(doc);
+    const parentField = dedupeMultiline(fieldByLabel(doc, [/^Parent application/i, /^Parent applications/i]));
+    const parentCandidates = [...parentField.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
     const parentMatch = pageText.match(/\bdivisional(?:\s+application)?(?:\s+of|\s+from)?\s*(EP\d{6,12})\b/i);
-    const parentCase = parentMatch ? parentMatch[1].toUpperCase() : '';
+    const parentCase = parentCandidates[0] || (parentMatch ? parentMatch[1].toUpperCase() : '');
 
     const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
     const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
@@ -597,7 +599,7 @@
       designatedStates: dedupeMultiline(fieldByLabel(doc, [/^Designated/i])),
       recentEvents: parseRecentEvents(recentEventField),
       publications: parsePublications(publicationField, 'EP (this file)'),
-      isDivisional: priorities.some((p) => /^EP/i.test(p.no)) || !!parentCase || /\bdivisional\b/i.test(pageText),
+      isDivisional: priorities.some((p) => /^EP/i.test(p.no)) || !!parentCase || /\bparent application\b/i.test(pageText) || /\bdivisional\b/i.test(pageText),
       parentCase,
     };
     result.applicationType = parseApplicationType(result);
