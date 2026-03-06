@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.3
+// @version      7.0.4
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -17,7 +17,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.3';
+  const VERSION = '7.0.4';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -96,6 +96,27 @@
 
   function normalize(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function dedupeMultiline(value) {
+    const raw = normalize(value);
+    if (!raw) return '';
+
+    const lines = raw.split('\n').map((v) => normalize(v)).filter(Boolean);
+    const uniqueLines = [];
+    for (const line of lines) {
+      if (uniqueLines[uniqueLines.length - 1] === line) continue;
+      uniqueLines.push(line);
+    }
+
+    if (uniqueLines.length % 2 === 0) {
+      const half = uniqueLines.length / 2;
+      const a = uniqueLines.slice(0, half).join('\n');
+      const b = uniqueLines.slice(half).join('\n');
+      if (a && a === b) return a;
+    }
+
+    return uniqueLines.join('\n');
   }
 
   function esc(value) {
@@ -451,7 +472,7 @@
 
   function parseMain(doc, caseNo) {
     const appField = fieldByLabel(doc, [/^Application number/i]);
-    const statusField = fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]);
+    const statusField = dedupeMultiline(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
     const priorityField = fieldByLabel(doc, [/^Priority\b/i]);
     const publicationField = fieldByLabel(doc, [/^Publication$/i]);
     const recentEventField = fieldByLabel(doc, [/^Most recent event$/i]);
@@ -476,7 +497,7 @@
       statusRaw: normalize(statusField),
       statusSimple: status.simple,
       statusLevel: status.level,
-      designatedStates: normalize(fieldByLabel(doc, [/^Designated/i])),
+      designatedStates: dedupeMultiline(fieldByLabel(doc, [/^Designated/i])),
       recentEvents: parseRecentEvents(recentEventField),
       publications: parsePublications(publicationField, 'EP (this file)'),
       isDivisional: priorities.some((p) => /^EP/i.test(p.no)),
@@ -1131,14 +1152,17 @@
       }
 
       if (item.type === 'group') {
-        out.push(`<div class="epoRP-grp"><div class="epoRP-grph">
-          <div class="epoRP-dot ${esc(item.level || 'info')}"></div>
-          <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
-          <div>
-            <div class="epoRP-mn">${esc(item.title)} (${(item.items || []).length})</div>
-            <div class="epoRP-sb">Grouped items · ${esc(item.source || 'Documents')}</div>
-          </div>
-        </div><div class="epoRP-grpi">${(item.items || []).map((x) => timelineItemHtml(x, compact)).join('')}</div></div>`);
+        out.push(`<details class="epoRP-grp" open>
+          <summary class="epoRP-grph">
+            <div class="epoRP-dot ${esc(item.level || 'info')}"></div>
+            <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
+            <div>
+              <div class="epoRP-mn">${esc(item.title)} (${(item.items || []).length})</div>
+              <div class="epoRP-sb">Grouped items · ${esc(item.source || 'Documents')}</div>
+            </div>
+          </summary>
+          <div class="epoRP-grpi">${(item.items || []).map((x) => timelineItemHtml(x, compact)).join('')}</div>
+        </details>`);
       } else {
         out.push(timelineItemHtml(item, compact));
       }
@@ -1430,8 +1454,10 @@
     .epoRP-mn{font-weight:700}
     .epoRP-sb{font-size:11px;color:#64748b;white-space:pre-wrap}
     .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:5px;background:#f8fafc;margin-bottom:7px}
-    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:4px}
-    .epoRP-grpi{margin-left:12px;border-left:2px dotted #cbd5e1;padding-left:8px}
+    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:4px;cursor:pointer;list-style:none;align-items:start}
+    .epoRP-grph::-webkit-details-marker{display:none}
+    .epoRP-grp .epoRP-grpi{margin-left:12px;border-left:2px dotted #cbd5e1;padding-left:8px}
+    .epoRP-grp:not([open]) .epoRP-grpi{display:none}
     .epoRP-today{border-top:2px solid #1d4ed8;margin:10px 0 8px;padding-top:4px;font-size:11px;color:#1e40af;font-weight:700}
     .epoRP-dl{display:flex;flex-direction:column;gap:4px}
     .epoRP-dr{display:grid;grid-template-columns:1fr auto;gap:8px;padding:4px 0;border-bottom:1px solid #edf2f7}
