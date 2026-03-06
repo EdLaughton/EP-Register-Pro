@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.16
+// @version      7.0.17
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.16';
+  const VERSION = '7.0.17';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -483,8 +483,8 @@
     const statusText = `${mainData.statusRaw || ''} ${mainData.title || ''} ${mainData.priorityText || ''} ${mainData.parentCase || ''}`;
     const priorities = mainData.priorities || [];
 
-    if (/PCT|WO\d+/i.test(statusText) || priorities.some((p) => /^WO/i.test(p.no))) {
-      return 'Euro-PCT regional phase';
+    if (mainData.isEuroPct || /PCT|WO\d+/i.test(statusText) || priorities.some((p) => /^WO/i.test(p.no))) {
+      return 'E/PCT regional phase';
     }
     if (mainData.isDivisional || mainData.parentCase) return 'Divisional';
     if (priorities.length > 0) return 'EP convention filing';
@@ -575,8 +575,15 @@
     const pageText = bodyText(doc);
     const parentField = dedupeMultiline(fieldByLabel(doc, [/^Parent application/i, /^Parent applications/i]));
     const parentCandidates = [...parentField.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
-    const parentMatch = pageText.match(/\bdivisional(?:\s+application)?(?:\s+of|\s+from)?\s*(EP\d{6,12})\b/i);
+    const parentMatch = pageText.match(/\bparent\s+application(?:\(s\))?[^\n]{0,140}\b(EP\d{6,12})\b/i);
     const parentCase = parentCandidates[0] || (parentMatch ? parentMatch[1].toUpperCase() : '');
+
+    const divisionalField = dedupeMultiline(fieldByLabel(doc, [/^Divisional application/i, /^Divisional applications/i]));
+    const divisionalChildren = dedupe([...divisionalField.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase()), (x) => x);
+
+    const woMatch = String(appField || '').match(/\b(WO\d{4}[A-Z]{2}\d{4,})\b/i);
+    const internationalAppNo = woMatch ? woMatch[1].toUpperCase() : '';
+    const isEuroPct = !!internationalAppNo || /\bPCT\b/i.test(String(appField || ''));
 
     const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
     const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
@@ -599,8 +606,12 @@
       designatedStates: dedupeMultiline(fieldByLabel(doc, [/^Designated/i])),
       recentEvents: parseRecentEvents(recentEventField),
       publications: parsePublications(publicationField, 'EP (this file)'),
-      isDivisional: priorities.some((p) => /^EP/i.test(p.no)) || !!parentCase || /\bparent application\b/i.test(pageText) || /\bdivisional\b/i.test(pageText),
+      internationalAppNo,
+      isEuroPct,
+      isDivisional: !!parentCase || priorities.some((p) => /^EP/i.test(p.no)),
       parentCase,
+      divisionalChildren,
+      hasDivisionals: divisionalChildren.length > 0,
     };
     result.applicationType = parseApplicationType(result);
     return result;
@@ -1238,6 +1249,8 @@
       statusLevel: main.statusLevel || 'warn',
       applicationType: main.applicationType || parseApplicationType(main),
       parentCase: main.parentCase || '',
+      divisionalChildren: main.divisionalChildren || [],
+      hasDivisionals: !!main.hasDivisionals,
       recentMainEvent: main.recentEvents?.[0] || (legal.events || [])[0] || null,
       latestEpo,
       latestApplicant,
@@ -1375,6 +1388,7 @@
       <div class="epoRP-l">Filing date</div><div class="epoRP-v">${esc(m.filingDate)}</div>
       <div class="epoRP-l">Priority</div><div class="epoRP-v">${esc(m.priority)}</div>
       <div class="epoRP-l">Type</div><div class="epoRP-v">${esc(m.applicationType)}${m.parentCase ? ` (<a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>)` : ''}</div>
+      ${m.divisionalChildren?.length ? `<div class="epoRP-l">Divisionals</div><div class="epoRP-v">${m.divisionalChildren.map((ep) => `<a class="epoRP-a" href="${esc(sourceUrl(ep, 'main'))}">${esc(ep)}</a>`).join(', ')}</div>` : ''}
       <div class="epoRP-l">Stage</div><div class="epoRP-v">${esc(m.stage)}</div>
       <div class="epoRP-l">Representative</div><div class="epoRP-v">${esc(m.representative)}</div>
     </div></div>`;
