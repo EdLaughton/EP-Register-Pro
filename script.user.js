@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.1
+// @version      7.0.2
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -17,7 +17,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.1';
+  const VERSION = '7.0.2';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -294,12 +294,33 @@
     return SOURCES.find((s) => s.key === key)?.title || key;
   }
 
+  function normalizeOptions(raw) {
+    const merged = { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
+
+    for (const key of Object.keys(DEFAULTS)) {
+      if (typeof DEFAULTS[key] === 'boolean') {
+        const value = merged[key];
+        if (typeof value === 'string') {
+          const lowered = value.trim().toLowerCase();
+          merged[key] = !(lowered === 'false' || lowered === '0' || lowered === 'no' || lowered === 'off' || lowered === '');
+        } else {
+          merged[key] = !!value;
+        }
+      }
+    }
+
+    const density = String(merged.timelineDensity || DEFAULTS.timelineDensity).toLowerCase();
+    merged.timelineDensity = ['compact', 'standard', 'verbose'].includes(density) ? density : DEFAULTS.timelineDensity;
+
+    return merged;
+  }
+
   function options() {
-    return { ...DEFAULTS, ...loadJson(OPTIONS_KEY, {}) };
+    return normalizeOptions(loadJson(OPTIONS_KEY, {}));
   }
 
   function setOptions(patch) {
-    const next = { ...options(), ...patch };
+    const next = normalizeOptions({ ...options(), ...patch });
     saveJson(OPTIONS_KEY, next);
     return next;
   }
@@ -1214,8 +1235,10 @@
     const wireToggle = (id, key) => {
       const el = b.querySelector(`#${id}`);
       if (!el) return;
+      el.checked = !!options()[key];
       el.addEventListener('change', () => {
-        setOptions({ [key]: !!el.checked });
+        const next = setOptions({ [key]: !!el.checked });
+        el.checked = !!next[key];
         applyBodyShift();
         renderPanel();
       });
