@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.24
+// @version      7.0.25
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.24';
+  const VERSION = '7.0.25';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -421,7 +421,12 @@
     const values = [];
 
     for (const tr of doc.querySelectorAll('tr')) {
-      const headers = [...tr.querySelectorAll('th')];
+      const headers = [...tr.querySelectorAll('th,td')].filter((cell) => {
+        const tag = String(cell.tagName || '').toUpperCase();
+        if (tag === 'TH') return true;
+        const cls = String(cell.className || '').toLowerCase();
+        return /\bth\b/.test(cls) || cls.includes('header');
+      });
       const th = headers.find((h) => headerRegex.test(text(h)));
       if (!th) continue;
 
@@ -460,10 +465,24 @@
       out.push(parsed);
     }
 
+    if (!out.length) {
+      // fallback matcher (some pages format priority ids less strictly)
+      for (const line of rawLines) {
+        const m = String(line || '').match(/\b([A-Z]{2}[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i);
+        if (!m) continue;
+        out.push({ no: String(m[1] || '').replace(/\s+/g, '').toUpperCase(), dateStr: String(m[2] || '') });
+      }
+    }
+
     if (!out.length && pageText) {
       const section = String(pageText).match(/Priority\s+number,\s*date[\s\S]{0,420}/i)?.[0] || '';
       for (const m of section.matchAll(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
         out.push({ no: String(m[1] || '').replace(/\s+/g, '').toUpperCase(), dateStr: String(m[2] || '') });
+      }
+      if (!out.length) {
+        for (const m of section.matchAll(/\b([A-Z]{2}[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
+          out.push({ no: String(m[1] || '').replace(/\s+/g, '').toUpperCase(), dateStr: String(m[2] || '') });
+        }
       }
     }
 
@@ -1411,41 +1430,54 @@
       });
     }
 
-    const grouped = new Map();
-    for (const d of doclist.docs || []) {
-      const shouldGroup = ['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings'].includes(d.bundle);
+    const docsSorted = [...(doclist.docs || [])].sort(compareDateDesc);
+    const groupableBundles = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings']);
+
+    const docItems = [];
+    let run = null;
+    const flushRun = () => {
+      if (!run) return;
+      if (run.items.length === 1) {
+        const first = run.items[0];
+        docItems.push({ type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${run.title}`, source: 'Documents', level: first.level, actor: first.actor || run.actor || 'Other', url: first.url });
+      } else {
+        docItems.push(run);
+      }
+      run = null;
+    };
+
+    for (const d of docsSorted) {
+      const actor = d.actor || 'Other';
+      const shouldGroup = groupableBundles.has(d.bundle);
       if (!shouldGroup) {
-        items.push({
+        flushRun();
+        docItems.push({
           type: 'item',
           dateStr: d.dateStr,
           title: d.title,
           detail: [d.procedure, 'All documents'].filter(Boolean).join(' · '),
           source: 'Documents',
           level: d.level || 'info',
-          actor: d.actor || 'Other',
+          actor,
           url: d.url,
         });
         continue;
       }
+
       const monthBucket = String(d.dateStr || '').split('.').slice(1).join('.');
-      const key = `${d.bundle}|${monthBucket || 'nodate'}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, { type: 'group', dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor: d.actor || 'Other', items: [] });
+      const runKey = `${d.bundle}|${actor}|${monthBucket || 'nodate'}`;
+
+      if (!run || run._key !== runKey) {
+        flushRun();
+        run = { type: 'group', _key: runKey, dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor, items: [] };
       }
-      const g = grouped.get(key);
-      g.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', actor: d.actor || 'Other', url: d.url });
-      g.level = topLevel([g.level, d.level || 'info']);
+
+      run.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', actor, url: d.url });
+      run.level = topLevel([run.level, d.level || 'info']);
     }
 
-    for (const g of grouped.values()) {
-      g.items.sort(compareDateDesc);
-      if (g.items.length === 1) {
-        const first = g.items[0];
-        items.push({ type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${g.title}`, source: 'Documents', level: first.level, actor: first.actor || g.actor || 'Other', url: first.url });
-      } else {
-        items.push(g);
-      }
-    }
+    flushRun();
+    items.push(...docItems);
 
     if (opts.showEventHistory) {
       for (const e of eventHistory.events || []) {
@@ -1698,16 +1730,19 @@
       const el = b.querySelector(`#${id}`);
       if (!el) return;
       el.checked = !!options()[key];
+      let last = el.checked;
 
       const commit = () => {
+        if (el.checked === last && !!options()[key] === el.checked) return;
         const next = setOptions({ [key]: !!el.checked });
-        el.checked = !!next[key];
+        last = !!next[key];
+        el.checked = last;
         applyBodyShift();
         renderPanel();
       };
 
       el.addEventListener('change', commit);
-      el.addEventListener('input', commit);
+      el.addEventListener('click', () => setTimeout(commit, 0));
     };
 
     wireToggle('epoRP-opt-shift', 'shiftBody');
