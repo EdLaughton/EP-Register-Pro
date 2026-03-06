@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.5
+// @version      7.0.6
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -17,7 +17,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.5';
+  const VERSION = '7.0.6';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -52,6 +52,8 @@
     showRenewals: true,
     showUpcUe: true,
     timelineDensity: 'standard',
+    timelineEventLevel: 'info',
+    timelineLegalLevel: 'warn',
   };
 
   const runtime = {
@@ -333,6 +335,12 @@
     const density = String(merged.timelineDensity || DEFAULTS.timelineDensity).toLowerCase();
     merged.timelineDensity = ['compact', 'standard', 'verbose'].includes(density) ? density : DEFAULTS.timelineDensity;
 
+    const eventLevel = String(merged.timelineEventLevel || DEFAULTS.timelineEventLevel).toLowerCase();
+    merged.timelineEventLevel = ['info', 'warn', 'bad', 'ok'].includes(eventLevel) ? eventLevel : DEFAULTS.timelineEventLevel;
+
+    const legalLevel = String(merged.timelineLegalLevel || DEFAULTS.timelineLegalLevel).toLowerCase();
+    merged.timelineLegalLevel = ['info', 'warn', 'bad', 'ok'].includes(legalLevel) ? legalLevel : DEFAULTS.timelineLegalLevel;
+
     return merged;
   }
 
@@ -455,37 +463,55 @@
   }
 
   function summarizeStatus(raw) {
-    const t = normalize(raw).toLowerCase();
+    const normalized = dedupeMultiline(raw);
+    const t = normalize(normalized).toLowerCase();
     if (!t) return { simple: 'Unknown', level: 'warn' };
-    if (/grant of patent is intended|rule\s*71\(3\)/i.test(raw)) return { simple: 'Grant intended (R71(3))', level: 'warn' };
+    if (/grant of patent is intended|rule\s*71\(3\)/i.test(normalized)) return { simple: 'Grant intended (R71(3))', level: 'warn' };
+    if (/application has been published|has been published/.test(t)) return { simple: 'Published', level: 'info' };
     if (/granted|patent has been granted/.test(t)) return { simple: 'Granted', level: 'ok' };
-    if (/revoked|refused|withdrawn|deemed to be withdrawn|expired|lapsed/.test(t)) return { simple: normalize(raw), level: 'bad' };
+    if (/revoked|refused|withdrawn|deemed to be withdrawn|expired|lapsed/.test(t)) return { simple: 'Withdrawn/closed', level: 'bad' };
     if (/examination/.test(t)) return { simple: 'Examination', level: 'info' };
     if (/search/.test(t)) return { simple: 'Search', level: 'info' };
-    return { simple: normalize(raw), level: 'info' };
+    const oneLine = normalize(normalized.split('\n')[0] || normalized);
+    return { simple: oneLine || 'Unknown', level: 'info' };
   }
 
   function parseApplicationType(mainData) {
     const appNo = mainData.appNo || '';
-    const statusText = `${mainData.statusRaw || ''} ${mainData.title || ''} ${mainData.priorityText || ''}`;
+    const statusText = `${mainData.statusRaw || ''} ${mainData.title || ''} ${mainData.priorityText || ''} ${mainData.parentCase || ''}`;
     const priorities = mainData.priorities || [];
 
     if (/PCT|WO\d+/i.test(statusText) || priorities.some((p) => /^WO/i.test(p.no))) {
       return 'Euro-PCT regional phase';
     }
-    if (mainData.isDivisional) return 'Divisional';
+    if (mainData.isDivisional || mainData.parentCase) return 'Divisional';
     if (priorities.length > 0) return 'EP convention filing';
     if (/^EP\d+$/i.test(appNo)) return 'EP direct first filing';
     return 'Unknown';
   }
 
+  function cleanTitle(raw) {
+    const v = dedupeMultiline(raw)
+      .replace(/^\s*(?:English|German|French)\s*:\s*/i, '')
+      .replace(/\s*\[[^\]]+\]\s*$/g, '')
+      .trim();
+    return v;
+  }
+
   function extractTitle(doc) {
+    const explicitTitle = cleanTitle(fieldByLabel(doc, [/^Title$/i]));
+    if (explicitTitle) {
+      const firstLine = explicitTitle.split('\n').find((line) => !/^(English|German|French)\s*:/i.test(line.trim()) && line.trim());
+      if (firstLine) return cleanTitle(firstLine);
+      return cleanTitle(explicitTitle);
+    }
+
     for (const el of [...doc.querySelectorAll('h1,h2,h3,strong,b,a')].slice(0, 120)) {
       const m = text(el).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
-      if (m?.[1]) return m[1].trim();
+      if (m?.[1]) return cleanTitle(m[1]);
     }
     const fromBody = bodyText(doc).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
-    return fromBody?.[1]?.trim() || '';
+    return cleanTitle(fromBody?.[1] || '');
   }
 
   function parseMain(doc, caseNo) {
@@ -499,13 +525,17 @@
     const priorities = parsePriority(priorityField);
     const status = summarizeStatus(statusField);
 
+    const pageText = bodyText(doc);
+    const parentMatch = pageText.match(/\bdivisional(?:\s+application)?(?:\s+of|\s+from)?\s*(EP\d{6,12})\b/i);
+    const parentCase = parentMatch ? parentMatch[1].toUpperCase() : '';
+
     const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
     const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
     const representativeField = normalize(fieldByLabel(doc, [/^Representative/i]));
 
     const result = {
       appNo: caseNo,
-      title: titleField || extractTitle(doc),
+      title: cleanTitle(titleField || extractTitle(doc)),
       applicant: normalize(applicantField.split('\n').find(Boolean) || ''),
       representative: normalize(representativeField.split('\n').find(Boolean) || ''),
       filingDate: appInfo.filingDate,
@@ -518,7 +548,8 @@
       designatedStates: dedupeMultiline(fieldByLabel(doc, [/^Designated/i])),
       recentEvents: parseRecentEvents(recentEventField),
       publications: parsePublications(publicationField, 'EP (this file)'),
-      isDivisional: priorities.some((p) => /^EP/i.test(p.no)),
+      isDivisional: priorities.some((p) => /^EP/i.test(p.no)) || !!parentCase,
+      parentCase,
     };
     result.applicationType = parseApplicationType(result);
     return result;
@@ -558,6 +589,7 @@
     if (/article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
     if (/renewal|annual fee/.test(t)) return { bundle: 'Renewal', level: 'ok', actor: 'Applicant' };
     if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
+    if (/acknowledgement of receipt|receipt of electronic submission|auto-acknowledgement/.test(t)) return { bundle: 'Other', level: 'info', actor: 'System' };
     if (/reply|response|arguments|observations|letter|filed by applicant|submission|request/.test(t)) return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
     if (/opposition|third party/.test(t)) return { bundle: 'Opposition', level: 'warn', actor: 'Third party' };
     return { bundle: 'Other', level: 'info', actor: 'Other' };
@@ -605,11 +637,13 @@
       const dateCell = cells.find((v) => DATE_RE.test(v));
       if (!dateCell) continue;
       const dateStr = dateCell.match(DATE_RE)[1];
-      const payload = cells.filter((value, idx) => {
+      let payload = cells.filter((value, idx) => {
         if (idx === 0 && DATE_RE.test(value)) return false;
         return !/^(date|event|status|publication|document|document type)$/i.test(value);
       });
       if (!payload[0]) continue;
+      if (/^event\s*date\s*:?$/i.test(payload[0]) && payload[1]) payload = payload.slice(1);
+      if (!payload[0] || /^\d{2}\.\d{2}\.\d{4}$/.test(payload[0])) continue;
       rows.push({ dateStr, title: payload[0], detail: payload.slice(1).join(' · '), url });
     }
     return dedupe(rows, (r) => `${r.dateStr}|${r.title}|${r.detail}`).sort(compareDateDesc);
@@ -864,12 +898,14 @@
     const renewals = legal.renewals || [];
     const mentionGrant = (legal.events || []).find((e) => /mention of grant|granted/i.test(`${e.title} ${e.detail}`));
     const ueRegistered = /unitary effect registered/i.test(ue.ueStatus || ue.statusRaw || '');
+    const filingDate = parseDateString(main.filingDate);
+    const nextDue = filingDate ? addMonths(filingDate, 24) : null;
 
     const mode = ueRegistered
-      ? 'Unitary patent central renewal fees at EPO after UE registration.'
+      ? 'Unitary patent renewal fees become centrally payable at EPO after UE registration.'
       : mentionGrant
         ? 'Post-grant national renewals generally due in designated states after grant.'
-        : 'Pre-grant EP renewal fees generally payable centrally at EPO.';
+        : 'Pre-grant EP renewal fees start from patent year 3 (about 2 years from filing date).';
 
     return {
       count: renewals.length,
@@ -878,6 +914,7 @@
       explanatoryBasis: mode,
       mentionGrantDate: mentionGrant?.dateStr || '',
       isUnitary: ueRegistered,
+      nextDue,
     };
   }
 
@@ -925,6 +962,12 @@
 
     const renewal = inferRenewalModel(main, legal, ue);
 
+    const latestEpoDate = parseDateString(latestEpo?.dateStr);
+    const latestApplicantDate = parseDateString(latestApplicant?.dateStr);
+    const waitingOn = latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant';
+    const waitingDays = waitingOn === 'EPO' && latestApplicantDate ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000) : null;
+    const nextDeadline = deadlines.find((d) => d.date > new Date()) || deadlines[0] || null;
+
     return {
       title: main.title || '—',
       applicant: main.applicant || '—',
@@ -933,16 +976,17 @@
       filingDate: main.filingDate || '—',
       priority: main.priorityText || '—',
       stage,
-      status: main.statusRaw || '—',
+      status: (main.statusRaw || '—').split('\n')[0],
       statusSimple: main.statusSimple || 'Unknown',
       statusLevel: main.statusLevel || 'warn',
       applicationType: main.applicationType || parseApplicationType(main),
-      designatedStates: main.designatedStates || '',
-      ipc: main.ipc || '',
+      parentCase: main.parentCase || '',
       recentMainEvent: main.recentEvents?.[0] || (legal.events || [])[0] || null,
       latestEpo,
       latestApplicant,
-      waitingDays: latestApplicant?.dateStr ? Math.floor((Date.now() - parseDateString(latestApplicant.dateStr).getTime()) / 86400000) : null,
+      waitingOn,
+      waitingDays,
+      nextDeadline,
       publications,
       deadlines: deadlines.sort((a, b) => a.date - b.date),
       renewal,
@@ -1028,13 +1072,13 @@
 
     if (opts.showEventHistory) {
       for (const e of eventHistory.events || []) {
-        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Event history'].filter(Boolean).join('\n'), source: 'Event history', level: 'info', url: e.url || sourceUrl(caseNo, 'event') });
+        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Event history'].filter(Boolean).join('\n'), source: 'Event history', level: opts.timelineEventLevel || 'info', url: e.url || sourceUrl(caseNo, 'event') });
       }
     }
 
     if (opts.showLegalStatusRows) {
       for (const e of legal.events || []) {
-        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Legal status'].filter(Boolean).join('\n'), source: 'Legal status', level: 'warn', url: e.url || sourceUrl(caseNo, 'legal') });
+        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Legal status'].filter(Boolean).join('\n'), source: 'Legal status', level: opts.timelineLegalLevel || 'warn', url: e.url || sourceUrl(caseNo, 'legal') });
       }
     }
 
@@ -1069,17 +1113,16 @@
       <div class="epoRP-l">Application #</div><div class="epoRP-v">${esc(m.appNo)}</div>
       <div class="epoRP-l">Filing date</div><div class="epoRP-v">${esc(m.filingDate)}</div>
       <div class="epoRP-l">Priority</div><div class="epoRP-v">${esc(m.priority)}</div>
-      <div class="epoRP-l">Type</div><div class="epoRP-v">${esc(m.applicationType)}</div>
+      <div class="epoRP-l">Type</div><div class="epoRP-v">${esc(m.applicationType)}${m.parentCase ? ` (<a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>)` : ''}</div>
       <div class="epoRP-l">Stage</div><div class="epoRP-v">${esc(m.stage)}</div>
-      <div class="epoRP-l">Status</div><div class="epoRP-v"><span class="epoRP-bdg ${esc(m.statusLevel)}">${esc(m.statusSimple)}</span> ${esc(m.status)}</div>
+      <div class="epoRP-l">Status</div><div class="epoRP-v"><span class="epoRP-bdg ${esc(m.statusLevel)}">${esc(m.statusSimple)}</span></div>
       <div class="epoRP-l">Representative</div><div class="epoRP-v">${esc(m.representative)}</div>
-      ${m.designatedStates ? `<div class="epoRP-l">Designated states</div><div class="epoRP-v">${esc(m.designatedStates)}</div>` : ''}
     </div></div>`;
 
     html += `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
       <div class="epoRP-l">EPO last action</div><div class="epoRP-v">${m.latestEpo ? `${esc(m.latestEpo.dateStr)} · ${esc(m.latestEpo.title)}` : '—'}</div>
       <div class="epoRP-l">Applicant last filing</div><div class="epoRP-v">${m.latestApplicant ? `${esc(m.latestApplicant.dateStr)} · ${esc(m.latestApplicant.title)}` : '—'}</div>
-      <div class="epoRP-l">Waiting on EPO</div><div class="epoRP-v">${m.waitingDays != null ? `<span class="epoRP-bdg ${m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok'}">${m.waitingDays} days</span>` : '—'}</div>
+      <div class="epoRP-l">${m.waitingOn === 'EPO' ? 'Waiting on EPO' : 'Next deadline'}</div><div class="epoRP-v">${m.waitingOn === 'EPO' ? (m.waitingDays != null ? `<span class="epoRP-bdg ${m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok'}">${m.waitingDays} days</span>` : '—') : (m.nextDeadline ? `${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}` : '—')}</div>
       <div class="epoRP-l">Most recent event</div><div class="epoRP-v">${m.recentMainEvent ? `${esc(m.recentMainEvent.dateStr)} · ${esc(m.recentMainEvent.title)}` : '—'}</div>
     </div></div>`;
 
@@ -1102,6 +1145,7 @@
     if (opts.showRenewals) {
       html += `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
         <div class="epoRP-l">Mode</div><div class="epoRP-v">${esc(m.renewal.explanatoryBasis)}</div>
+        <div class="epoRP-l">Next due (est.)</div><div class="epoRP-v">${m.renewal.nextDue ? esc(formatDate(m.renewal.nextDue)) : 'Unknown'}</div>
         <div class="epoRP-l">Latest renewal</div><div class="epoRP-v">${m.renewal.latest ? `${esc(m.renewal.latest.dateStr)} · ${esc(m.renewal.latest.title)}` : 'No renewal events cached.'}</div>
         <div class="epoRP-l">Highest year</div><div class="epoRP-v">${m.renewal.highestYear ? `Year ${m.renewal.highestYear}` : 'Unknown'}</div>
         ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Mention of grant</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
@@ -1112,8 +1156,7 @@
       html += `<div class="epoRP-c"><h4>UPC / UE</h4><div class="epoRP-g">
         <div class="epoRP-l">UE status</div><div class="epoRP-v">${esc(m.upcUe.ueStatus)}</div>
         <div class="epoRP-l">UPC opt-out</div><div class="epoRP-v">${esc(m.upcUe.upcOptOut)}${/Unitary effect registered/i.test(m.upcUe.ueStatus) ? ' (opt-out typically not applicable to UP)' : ''}</div>
-        ${m.upcUe.memberStates ? `<div class="epoRP-l">Member states</div><div class="epoRP-v">${esc(m.upcUe.memberStates)}</div>` : ''}
-      </div><div class="epoRP-m">${esc(m.upcUe.note)}</div></div>`;
+      </div><div class="epoRP-m">${esc(m.upcUe.note)} Unitary effect is only possible after grant/publication milestones.</div></div>`;
     }
 
     html += `<div class="epoRP-c"><h4>Publications (${m.publications.length})</h4>`;
@@ -1128,11 +1171,6 @@
       html += `<div class="epoRP-m">No publication entries yet. Family/main source may still be loading.</div>`;
     }
     html += `</div>`;
-
-    html += `<div class="epoRP-c"><h4>Document index</h4>
-      <input id="epoRP-docSearch" class="epoRP-in" placeholder="Search documents..." />
-      <div id="epoRP-docList" class="epoRP-docIdx"></div>
-    </div>`;
 
     return html;
   }
@@ -1172,7 +1210,7 @@
       }
 
       if (item.type === 'group') {
-        out.push(`<details class="epoRP-grp" open>
+        out.push(`<details class="epoRP-grp">
           <summary class="epoRP-grph">
             <div class="epoRP-dot ${esc(item.level || 'info')}"></div>
             <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
@@ -1180,6 +1218,7 @@
               <div class="epoRP-mn">${esc(item.title)} (${(item.items || []).length})</div>
               <div class="epoRP-sb">Grouped items · ${esc(item.source || 'Documents')}</div>
             </div>
+            <div class="epoRP-garrow">▸</div>
           </summary>
           <div class="epoRP-grpi">${(item.items || []).map((x) => timelineItemHtml(x, compact)).join('')}</div>
         </details>`);
@@ -1191,7 +1230,14 @@
     if (!insertedToday) out.unshift(`<div class="epoRP-today"><span>Today · ${esc(today)}</span></div>`);
     if (verbose) out.unshift(`<div class="epoRP-m">Verbose mode shows extended source labels and grouped event bodies.</div>`);
 
-    return `<div class="epoRP-c">${out.join('')}</div>`;
+    const controls = `<div class="epoRP-c epoRP-tlControls"><div class="epoRP-g">
+      <div class="epoRP-l">Include event history</div><div><input id="epoRP-tl-events" type="checkbox" ${opts.showEventHistory ? 'checked' : ''}></div>
+      <div class="epoRP-l">Include legal status</div><div><input id="epoRP-tl-legal" type="checkbox" ${opts.showLegalStatusRows ? 'checked' : ''}></div>
+      <div class="epoRP-l">Event importance</div><div><select id="epoRP-tl-event-level" class="epoRP-in"><option value="info" ${opts.timelineEventLevel === 'info' ? 'selected' : ''}>Info</option><option value="warn" ${opts.timelineEventLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="bad" ${opts.timelineEventLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${opts.timelineEventLevel === 'ok' ? 'selected' : ''}>Low</option></select></div>
+      <div class="epoRP-l">Legal importance</div><div><select id="epoRP-tl-legal-level" class="epoRP-in"><option value="warn" ${opts.timelineLegalLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="info" ${opts.timelineLegalLevel === 'info' ? 'selected' : ''}>Info</option><option value="bad" ${opts.timelineLegalLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${opts.timelineLegalLevel === 'ok' ? 'selected' : ''}>Low</option></select></div>
+    </div></div>`;
+
+    return `${controls}<div class="epoRP-c">${out.join('')}</div>`;
   }
 
   function renderOptions() {
@@ -1319,25 +1365,29 @@
     });
   }
 
-  function wireOverview(caseNo) {
+  function wireTimeline() {
     const b = runtime.body;
     if (!b) return;
 
-    const input = b.querySelector('#epoRP-docSearch');
-    const list = b.querySelector('#epoRP-docList');
-    if (!input || !list) return;
+    b.querySelector('#epoRP-tl-events')?.addEventListener('change', (event) => {
+      setOptions({ showEventHistory: !!event.target.checked });
+      renderPanel();
+    });
 
-    const drawDocs = (q) => {
-      const docs = documentIndexModel(caseNo, q);
-      if (!docs.length) {
-        list.innerHTML = `<div class="epoRP-m">No matching documents.</div>`;
-        return;
-      }
-      list.innerHTML = docs.map((d) => `<div class="epoRP-doc"><div><a class="epoRP-a" href="${esc(d.url)}">${esc(d.title)}</a><div class="epoRP-sb">${esc(d.bundle)}${d.procedure ? ` · ${esc(d.procedure)}` : ''}</div></div><div class="epoRP-d">${esc(d.dateStr)}</div></div>`).join('');
-    };
+    b.querySelector('#epoRP-tl-legal')?.addEventListener('change', (event) => {
+      setOptions({ showLegalStatusRows: !!event.target.checked });
+      renderPanel();
+    });
 
-    drawDocs('');
-    input.addEventListener('input', () => drawDocs(input.value));
+    b.querySelector('#epoRP-tl-event-level')?.addEventListener('change', (event) => {
+      setOptions({ timelineEventLevel: event.target.value || 'info' });
+      renderPanel();
+    });
+
+    b.querySelector('#epoRP-tl-legal-level')?.addEventListener('change', (event) => {
+      setOptions({ timelineLegalLevel: event.target.value || 'warn' });
+      renderPanel();
+    });
   }
 
   function wireLogs() {
@@ -1388,6 +1438,7 @@
 
     if (runtime.activeView === 'timeline') {
       body.innerHTML = renderTimeline(caseNo);
+      wireTimeline();
       return;
     }
     if (runtime.activeView === 'options') {
@@ -1396,7 +1447,6 @@
       return;
     }
     body.innerHTML = renderOverview(caseNo);
-    wireOverview(caseNo);
   }
 
   function init(force = false) {
@@ -1474,8 +1524,10 @@
     .epoRP-mn{font-weight:700}
     .epoRP-sb{font-size:11px;color:#64748b;white-space:pre-wrap}
     .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:5px;background:#f8fafc;margin-bottom:7px}
-    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:4px;cursor:pointer;list-style:none;align-items:start}
+    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:4px;cursor:pointer;list-style:none;align-items:start}
     .epoRP-grph::-webkit-details-marker{display:none}
+    .epoRP-garrow{font-size:12px;color:#64748b;justify-self:end;transition:transform .15s ease}
+    .epoRP-grp[open] .epoRP-garrow{transform:rotate(90deg)}
     .epoRP-grp .epoRP-grpi{margin-left:12px;border-left:2px dotted #cbd5e1;padding-left:8px}
     .epoRP-grp:not([open]) .epoRP-grpi{display:none}
     .epoRP-today{border-top:2px solid #1d4ed8;margin:10px 0 8px;padding-top:4px;font-size:11px;color:#1e40af;font-weight:700}
