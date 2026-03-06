@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.21
+// @version      7.0.22
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.21';
+  const VERSION = '7.0.22';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -72,6 +72,7 @@
   };
 
   let memory = null;
+  let optionsShadow = null;
   let dirty = false;
   let flushTimer = null;
   let renderTimer = null;
@@ -87,10 +88,27 @@
   }
 
   function saveJson(key, value) {
+    const payload = JSON.stringify(value);
     try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // ignore quota errors
+      localStorage.setItem(key, payload);
+      return true;
+    } catch (error) {
+      const msg = `${error?.name || ''} ${error?.message || ''}`.toLowerCase();
+      const isQuota = msg.includes('quota') || msg.includes('exceeded');
+      if (!isQuota) return false;
+
+      // Try to free room by compacting cache before giving up on options/UI writes.
+      if (key !== CACHE_KEY) {
+        try {
+          evictOldCases();
+          if (memory) localStorage.setItem(CACHE_KEY, JSON.stringify(memory));
+          localStorage.setItem(key, payload);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      return false;
     }
   }
 
@@ -347,11 +365,13 @@
   }
 
   function options() {
-    return normalizeOptions(loadJson(OPTIONS_KEY, {}));
+    if (!optionsShadow) optionsShadow = normalizeOptions(loadJson(OPTIONS_KEY, {}));
+    return normalizeOptions(optionsShadow);
   }
 
   function setOptions(patch) {
     const next = normalizeOptions({ ...options(), ...patch });
+    optionsShadow = next;
     saveJson(OPTIONS_KEY, next);
     return next;
   }
@@ -433,13 +453,23 @@
     return dedupe(values, (x) => x);
   }
 
-  function parsePriority(raw) {
+  function parsePriority(raw, pageText = '') {
     const out = [];
-    for (const line of String(raw || '').split('\n').map((v) => v.trim()).filter(Boolean)) {
-      const m = line.match(/\b([A-Z]{2}[A-Z0-9\/\-]{4,})\b[\s\S]{0,50}?\b(\d{2}\.\d{2}\.\d{4})\b/i);
+    const rawLines = String(raw || '').split('\n').map((v) => v.trim()).filter(Boolean);
+
+    for (const line of rawLines) {
+      const m = line.match(/\b([A-Z]{2}[A-Z0-9\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i);
       if (!m) continue;
       out.push({ no: m[1].replace(/\s+/g, '').toUpperCase(), dateStr: m[2] });
     }
+
+    if (!out.length && pageText) {
+      const section = String(pageText).match(/Priority\s+number,\s*date[\s\S]{0,350}/i)?.[0] || '';
+      for (const m of section.matchAll(/\b([A-Z]{2}[A-Z0-9\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
+        out.push({ no: String(m[1] || '').replace(/\s+/g, '').toUpperCase(), dateStr: String(m[2] || '') });
+      }
+    }
+
     return dedupe(out, (i) => `${i.no}|${i.dateStr}`);
   }
 
@@ -595,16 +625,18 @@
     const recentEventField = fieldByLabel(doc, [/^Most recent event$/i]);
 
     const appInfo = parseApplicationField(appField);
-    const priorities = parsePriority(priorityField);
-    const status = summarizeStatus(statusField);
-
     const pageText = bodyText(doc);
+    const priorities = parsePriority(priorityField, pageText);
+    const status = summarizeStatus(statusField);
 
     const parentCandidates = extractEpNumbersByHeader(doc, /\bParent application(?:\(s\))?\b/i);
     const parentMatch = pageText.match(/\bparent\s+application(?:\(s\))?[^\n]{0,140}\b(EP\d{6,12})\b/i);
     const parentCase = parentCandidates[0] || (parentMatch ? parentMatch[1].toUpperCase() : '');
 
-    const divisionalChildren = extractEpNumbersByHeader(doc, /\bDivisional application(?:\(s\))?\b/i);
+    const divisionalChildrenFromHeader = extractEpNumbersByHeader(doc, /\bDivisional application(?:\(s\))?\b/i);
+    const divisionalSection = String(pageText).match(/Divisional\s+application(?:\(s\))?[\s\S]{0,400}/i)?.[0] || '';
+    const divisionalChildrenFromText = [...divisionalSection.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
+    const divisionalChildren = dedupe([...divisionalChildrenFromHeader, ...divisionalChildrenFromText], (x) => x);
 
     const woMatch = `${String(appField || '')}\n${pageText}`.match(/\b(WO\d{4}[A-Z]{2}\d{3,})\b/i);
     const internationalAppNo = woMatch ? woMatch[1].toUpperCase() : '';
@@ -635,8 +667,8 @@
       isEuroPct,
       isDivisional: !!parentCase || priorities.some((p) => /^EP/i.test(p.no)),
       parentCase,
-      divisionalChildren,
-      hasDivisionals: divisionalChildren.length > 0,
+      divisionalChildren: divisionalChildren.filter((ep) => ep !== caseNo),
+      hasDivisionals: divisionalChildren.some((ep) => ep !== caseNo),
     };
     result.applicationType = parseApplicationType(result);
     return result;
@@ -669,16 +701,30 @@
     return map;
   }
 
-  function classifyDocument(title) {
-    const t = title.toLowerCase();
+  function classifyDocument(title, procedure = '') {
+    const t = String(title || '').toLowerCase();
+    const p = String(procedure || '').toLowerCase();
+
+    if (/by applicant|amendment by applicant|filed by applicant|from applicant/.test(p)) {
+      if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) {
+        return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
+      }
+      return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
+    }
+
+    if (/acknowledgement of receipt|receipt of electronic submission|auto-acknowledgement/.test(t) || /acknowledgement/.test(p)) {
+      return { bundle: 'Other', level: 'info', actor: 'System' };
+    }
+
     if (/search report|search opinion|written opinion|search strategy|esr/.test(t)) return { bundle: 'Search package', level: 'info', actor: 'EPO' };
     if (/rule\s*71\(3\)|intention to grant|text intended for grant|mention of grant/.test(t)) return { bundle: 'Grant package', level: 'warn', actor: 'EPO' };
     if (/article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
     if (/renewal|annual fee/.test(t)) return { bundle: 'Renewal', level: 'ok', actor: 'Applicant' };
     if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
-    if (/acknowledgement of receipt|receipt of electronic submission|auto-acknowledgement/.test(t)) return { bundle: 'Other', level: 'info', actor: 'System' };
     if (/reply|response|arguments|observations|letter|filed by applicant|submission|request/.test(t)) return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
-    if (/opposition|third party/.test(t)) return { bundle: 'Opposition', level: 'warn', actor: 'Third party' };
+    if (/opposition|third party/.test(t) || /third party/.test(p)) return { bundle: 'Opposition', level: 'warn', actor: 'Third party' };
+
+    if (/examining division|epo|office/.test(p)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
     return { bundle: 'Other', level: 'info', actor: 'Other' };
   }
 
@@ -702,11 +748,12 @@
       if (!title) continue;
 
       const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || sourceUrl(caseNo, 'doclist');
-      const cls = classifyDocument(title);
+      const procedure = getCell(map.procedure);
+      const cls = classifyDocument(title, procedure);
       docs.push({
         dateStr,
         title,
-        procedure: getCell(map.procedure),
+        procedure,
         url,
         ...cls,
         source: 'All documents',
@@ -777,7 +824,7 @@
       const cells = [...row.querySelectorAll('td')];
       if (!cells.length) continue;
       const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[1] || cells[0] || row);
-      const bundle = classifyDocument(title).bundle || 'Other';
+      const bundle = classifyDocument(title, text(row)).bundle || 'Other';
 
       if (!run || run.bundle !== bundle) {
         run = { bundle, rows: [row] };
@@ -1265,7 +1312,19 @@
     const reminderPeriod = docs.find((d) => /reminder period for payment of examination fee\/designation fee|correction of deficiencies in written opinion/i.test(d.title));
     if (reminderPeriod) {
       const d = parseDateString(reminderPeriod.dateStr);
-      if (d) deadlines.push({ label: 'Exam/designation fee reminder period (approx.)', date: addMonths(d, 6), level: 'bad' });
+      const reminderTs = d?.getTime() || 0;
+      const hasLaterApplicantActivity = reminderTs > 0 && docs.some((x) => {
+        const ts = parseDateString(x.dateStr)?.getTime() || 0;
+        return x.actor === 'Applicant' && ts > reminderTs;
+      });
+      const hasLaterFeePaymentSignal = reminderTs > 0 && docs.some((x) => {
+        const ts = parseDateString(x.dateStr)?.getTime() || 0;
+        const txt = `${x.title || ''} ${x.procedure || ''}`;
+        return ts >= reminderTs && /payment.*examination fee|payment.*designation fee|designation fee paid|examination fee paid|fee payment received/i.test(txt);
+      });
+      if (d && !hasLaterApplicantActivity && !hasLaterFeePaymentSignal) {
+        deadlines.push({ label: 'Exam/designation fee reminder period (approx.)', date: addMonths(d, 6), level: 'bad' });
+      }
     }
     if (filingDate) deadlines.push({ label: '20-year term from filing (reference)', date: addMonths(filingDate, 12 * 20), level: 'info' });
 
@@ -1367,7 +1426,7 @@
         });
         continue;
       }
-      const key = `${d.dateStr}|${d.bundle}`;
+      const key = `${d.bundle}`;
       if (!grouped.has(key)) {
         grouped.set(key, { type: 'group', dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor: d.actor || 'Other', items: [] });
       }
@@ -1655,12 +1714,16 @@
       const el = b.querySelector(`#${id}`);
       if (!el) return;
       el.checked = !!options()[key];
-      el.addEventListener('change', () => {
+
+      const commit = () => {
         const next = setOptions({ [key]: !!el.checked });
         el.checked = !!next[key];
         applyBodyShift();
         renderPanel();
-      });
+      };
+
+      el.addEventListener('change', commit);
+      el.addEventListener('input', commit);
     };
 
     wireToggle('epoRP-opt-shift', 'shiftBody');
@@ -1891,6 +1954,7 @@
   addEventListener('storage', (event) => {
     if (![CACHE_KEY, OPTIONS_KEY, UI_KEY].includes(event.key)) return;
     if (event.key === CACHE_KEY) memory = null;
+    if (event.key === OPTIONS_KEY) optionsShadow = null;
     if (isCasePage()) renderPanel();
   });
 
