@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.9
+// @version      7.0.10
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.9';
+  const VERSION = '7.0.10';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -502,9 +502,13 @@
 
   function extractTitle(doc) {
     const rawTitle = dedupeMultiline(fieldByLabel(doc, [/^Title$/i]));
+    const page = bodyText(doc);
     if (rawTitle) {
       const englishLine = rawTitle.split('\n').map((x) => x.trim()).find((line) => /^English\s*:/i.test(line));
       if (englishLine) return cleanTitle(englishLine.replace(/^English\s*:\s*/i, ''));
+
+      const englishFromPage = page.match(/\bEnglish\s*:\s*([^\n\r\[]+)/i);
+      if (englishFromPage?.[1]) return cleanTitle(englishFromPage[1]);
 
       const cleanedLines = rawTitle
         .split('\n')
@@ -643,25 +647,58 @@
     if (!table) return;
 
     table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
+    table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
+      row.classList.remove('epoRP-docgrp-item', 'collapsed');
+      row.removeAttribute('data-eporp-group');
+    });
 
     const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
-    let prevBundle = '';
+    const groupable = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings']);
+
+    const runs = [];
+    let run = null;
 
     for (const row of rows) {
       const cells = [...row.querySelectorAll('td')];
       if (!cells.length) continue;
       const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[1] || cells[0] || row);
       const bundle = classifyDocument(title).bundle || 'Other';
-      if (bundle === prevBundle) continue;
+
+      if (!run || run.bundle !== bundle) {
+        run = { bundle, rows: [row] };
+        runs.push(run);
+      } else {
+        run.rows.push(row);
+      }
+    }
+
+    let gid = 0;
+    for (const r of runs) {
+      if (!groupable.has(r.bundle) || r.rows.length < 2) continue;
+      gid += 1;
+      const groupId = `g${gid}`;
+      const firstRow = r.rows[0];
+      const cells = [...firstRow.querySelectorAll('td')];
 
       const headerRow = document.createElement('tr');
       headerRow.className = 'epoRP-docgrp';
       const td = document.createElement('td');
       td.colSpan = Math.max(1, cells.length);
-      td.textContent = bundle;
+      td.innerHTML = `<button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" aria-expanded="false"><span>${esc(r.bundle)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button>`;
       headerRow.appendChild(td);
-      row.parentElement?.insertBefore(headerRow, row);
-      prevBundle = bundle;
+      firstRow.parentElement?.insertBefore(headerRow, firstRow);
+
+      for (const row of r.rows) {
+        row.setAttribute('data-eporp-group', groupId);
+        row.classList.add('epoRP-docgrp-item', 'collapsed');
+      }
+
+      td.querySelector('button')?.addEventListener('click', (event) => {
+        const btn = event.currentTarget;
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        for (const row of r.rows) row.classList.toggle('collapsed', expanded);
+      });
     }
   }
 
@@ -817,9 +854,14 @@
     if (/no results found/.test(t)) {
       return { patentNumber, optedOut: false, status: 'No opt-out found', source: 'UPC registry' };
     }
-    if (/opt-?out/.test(t) && (t.includes((patentNumber || '').toLowerCase()) || /results/.test(t))) {
+
+    const pn = String(patentNumber || '').toLowerCase();
+    const hasPatentRef = pn && t.includes(pn);
+    const positiveSignal = /opted out|opt-?out\s+registered|opt-?out\s+entered|opt-?out\s+effective/.test(t);
+    if (hasPatentRef && positiveSignal) {
       return { patentNumber, optedOut: true, status: 'Opted out', source: 'UPC registry' };
     }
+
     return null;
   }
 
@@ -1166,6 +1208,7 @@
         detail: [e.detail, 'Main page'].filter(Boolean).join('\n'),
         source: 'Main',
         level: 'info',
+        actor: 'EPO',
         url: sourceUrl(caseNo, 'main'),
       });
     }
@@ -1181,16 +1224,17 @@
           detail: [d.procedure, 'All documents'].filter(Boolean).join(' · '),
           source: 'Documents',
           level: d.level || 'info',
+          actor: d.actor || 'Other',
           url: d.url,
         });
         continue;
       }
       const key = `${d.dateStr}|${d.bundle}`;
       if (!grouped.has(key)) {
-        grouped.set(key, { type: 'group', dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', items: [] });
+        grouped.set(key, { type: 'group', dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor: d.actor || 'Other', items: [] });
       }
       const g = grouped.get(key);
-      g.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', url: d.url });
+      g.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', actor: d.actor || 'Other', url: d.url });
       g.level = topLevel([g.level, d.level || 'info']);
     }
 
@@ -1198,7 +1242,7 @@
       g.items.sort(compareDateDesc);
       if (g.items.length === 1) {
         const first = g.items[0];
-        items.push({ type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${g.title}`, source: 'Documents', level: first.level, url: first.url });
+        items.push({ type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${g.title}`, source: 'Documents', level: first.level, actor: first.actor || g.actor || 'Other', url: first.url });
       } else {
         items.push(g);
       }
@@ -1206,19 +1250,19 @@
 
     if (opts.showEventHistory) {
       for (const e of eventHistory.events || []) {
-        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Event history'].filter(Boolean).join('\n'), source: 'Event history', level: opts.timelineEventLevel || 'info', url: e.url || sourceUrl(caseNo, 'event') });
+        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Event history'].filter(Boolean).join('\n'), source: 'Event history', level: opts.timelineEventLevel || 'info', actor: 'EPO', url: e.url || sourceUrl(caseNo, 'event') });
       }
     }
 
     if (opts.showLegalStatusRows) {
       for (const e of legal.events || []) {
-        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Legal status'].filter(Boolean).join('\n'), source: 'Legal status', level: opts.timelineLegalLevel || 'warn', url: e.url || sourceUrl(caseNo, 'legal') });
+        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Legal status'].filter(Boolean).join('\n'), source: 'Legal status', level: opts.timelineLegalLevel || 'warn', actor: 'EPO', url: e.url || sourceUrl(caseNo, 'legal') });
       }
     }
 
     if (opts.showPublications) {
       for (const p of dedupe([...(main.publications || []), ...(family.publications || [])], (x) => `${x.no}${x.kind}|${x.dateStr}|${x.role}`)) {
-        items.push({ type: 'item', dateStr: p.dateStr, title: `${p.no}${p.kind || ''} publication`, detail: p.role || 'Publication', source: 'Publications', level: 'info', url: sourceUrl(caseNo, 'main') });
+        items.push({ type: 'item', dateStr: p.dateStr, title: `${p.no}${p.kind || ''} publication`, detail: p.role || 'Publication', source: 'Publications', level: 'info', actor: 'EPO', url: sourceUrl(caseNo, 'main') });
       }
     }
 
@@ -1309,12 +1353,13 @@
   }
 
   function timelineItemHtml(item, compact = false) {
+    const actorClass = item.actor === 'Applicant' ? 'actor-applicant' : item.actor === 'EPO' ? 'actor-epo' : item.actor === 'Third party' ? 'actor-third' : '';
     return `<div class="epoRP-it ${compact ? 'compact' : ''}">
-      <div class="epoRP-dot ${esc(item.level || 'info')}"></div>
+      <div class="epoRP-dot ${esc(item.level || 'info')} ${esc(actorClass)}"></div>
       <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
       <div>
         <div class="epoRP-mn">${item.url ? `<a class="epoRP-a" href="${esc(item.url)}">${esc(item.title)}</a>` : esc(item.title)}</div>
-        <div class="epoRP-sb">${esc([item.detail, item.source].filter(Boolean).join(' · '))}</div>
+        <div class="epoRP-sb">${esc([item.detail, item.source, item.actor].filter(Boolean).join(' · '))}</div>
       </div>
     </div>`;
   }
@@ -1343,13 +1388,14 @@
       }
 
       if (item.type === 'group') {
+        const actorClass = item.actor === 'Applicant' ? 'actor-applicant' : item.actor === 'EPO' ? 'actor-epo' : item.actor === 'Third party' ? 'actor-third' : '';
         out.push(`<details class="epoRP-grp">
           <summary class="epoRP-grph">
-            <div class="epoRP-dot ${esc(item.level || 'info')}"></div>
+            <div class="epoRP-dot ${esc(item.level || 'info')} ${esc(actorClass)}"></div>
             <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
             <div>
               <div class="epoRP-mn">${esc(item.title)} (${(item.items || []).length})</div>
-              <div class="epoRP-sb">Grouped items · ${esc(item.source || 'Documents')}</div>
+              <div class="epoRP-sb">Grouped items · ${esc(item.source || 'Documents')} · ${esc(item.actor || 'Mixed')}</div>
             </div>
             <div class="epoRP-garrow">▸</div>
           </summary>
@@ -1361,6 +1407,14 @@
     }
 
     if (!insertedToday) out.unshift(`<div class="epoRP-today"><span>Today · ${esc(today)}</span></div>`);
+
+    const model = overviewModel(caseNo);
+    if (model.nextDeadline) {
+      const days = Math.ceil((model.nextDeadline.date.getTime() - Date.now()) / 86400000);
+      const level = days < 0 ? 'bad' : days <= 14 ? 'bad' : days <= 45 ? 'warn' : 'ok';
+      out.unshift(`<div class="epoRP-deadlineRow"><div class="epoRP-dot dotted ${level}"></div><div class="epoRP-d">${esc(formatDate(model.nextDeadline.date))}</div><div><div class="epoRP-mn">Next deadline</div><div class="epoRP-sb">${esc(model.nextDeadline.label)} · ${days >= 0 ? `${days}d` : `${Math.abs(days)}d overdue`}</div></div></div>`);
+    }
+
     if (verbose) out.unshift(`<div class="epoRP-m">Verbose mode shows extended source labels and grouped event bodies.</div>`);
 
     return `<div class="epoRP-c">${out.join('')}</div>`;
@@ -1631,14 +1685,22 @@
     .epoRP-pm{font-size:11px;color:#64748b}
     .epoRP-a{color:#1d4ed8;text-decoration:none}
     .epoRP-a:hover{text-decoration:underline}
-    .epoRP-it{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #f1f5f9}
+    .epoRP-it{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #f1f5f9;align-items:start}
     .epoRP-it.compact{padding:4px 2px}
     .epoRP-it:last-child{border-bottom:0}
     .epoRP-dot{width:9px;height:9px;border-radius:999px;margin-top:4px;background:#94a3b8}
+    .epoRP-dot.dotted{background:transparent;border:2px dotted #94a3b8;width:10px;height:10px}
     .epoRP-dot.ok{background:#16a34a}
     .epoRP-dot.warn{background:#d97706}
     .epoRP-dot.bad{background:#dc2626}
     .epoRP-dot.info{background:#2563eb}
+    .epoRP-dot.actor-epo{background:#2563eb}
+    .epoRP-dot.actor-applicant{background:#16a34a}
+    .epoRP-dot.actor-third{background:#9333ea}
+    .epoRP-dot.dotted.ok{border-color:#16a34a}
+    .epoRP-dot.dotted.warn{border-color:#d97706}
+    .epoRP-dot.dotted.bad{border-color:#dc2626}
+    .epoRP-dot.dotted.info{border-color:#2563eb}
     .epoRP-mn{font-weight:700}
     .epoRP-sb{font-size:11px;color:#64748b;white-space:pre-wrap}
     .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:5px;background:#f8fafc;margin-bottom:7px}
@@ -1665,7 +1727,12 @@
     .epoRP-lr{display:grid;grid-template-columns:80px 11px 1fr;gap:6px;padding:5px 2px;border-bottom:1px solid #f1f5f9}
     .epoRP-lt{font-variant-numeric:tabular-nums;font-size:10px;color:#64748b}
     .epoRP-lm{font-size:11px;color:#0f172a}
-    tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:6px 8px}
+    .epoRP-deadlineRow{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px dashed #cbd5e1;align-items:start;background:#f8fafc}
+    tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:4px 8px}
+    .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a}
+    .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}
+    .epoRP-docgrp-btn[aria-expanded="true"] .epoRP-docgrp-arrow{transform:rotate(90deg)}
+    tr.epoRP-docgrp-item.collapsed{display:none}
   `);
 
   setInterval(() => {
