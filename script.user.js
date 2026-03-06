@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.13
+// @version      7.0.14
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/epregisterpro/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.13';
+  const VERSION = '7.0.14';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -501,13 +501,26 @@
   }
 
   function pickApplicantLine(raw) {
+    const out = [];
     const lines = dedupeMultiline(raw)
       .split('\n')
       .map((line) => normalize(line))
-      .filter(Boolean)
-      .filter((line) => !/^for all designated states$/i.test(line))
-      .filter((line) => !/^\[[^\]]+\]$/.test(line));
-    return lines[0] || '';
+      .filter(Boolean);
+
+    for (let line of lines) {
+      if (/^for all designated states$/i.test(line)) continue;
+      if (/^\[[^\]]+\]$/.test(line)) continue;
+
+      if (/^for all designated states\b/i.test(line)) {
+        line = line.replace(/^for all designated states\b[:\s-]*/i, '').trim();
+        if (!line) continue;
+      }
+
+      if (/^(applicant|for applicant)\s*[:\-]?\s*$/i.test(line)) continue;
+      out.push(line);
+    }
+
+    return out[0] || '';
   }
 
   function formatDaysHuman(days) {
@@ -567,10 +580,12 @@
     const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
     const representativeField = normalize(fieldByLabel(doc, [/^Representative/i]));
 
+    const fallbackApplicant = normalize((pageText.match(/\bApplicant\s*(?:\n|:)\s*([^\n]+)/i)?.[1]) || '');
+
     const result = {
       appNo: caseNo,
-      title: cleanTitle(titleField || extractTitle(doc)),
-      applicant: pickApplicantLine(applicantField) || normalize(applicantField.split('\n').find(Boolean) || ''),
+      title: extractTitle(doc) || cleanTitle(titleField),
+      applicant: pickApplicantLine(applicantField) || normalize(applicantField.split('\n').find(Boolean) || '') || fallbackApplicant,
       representative: normalize(representativeField.split('\n').find(Boolean) || ''),
       filingDate: appInfo.filingDate,
       checksum: appInfo.checksum,
@@ -931,18 +946,21 @@
   function upcCandidateNumbers(caseNo) {
     const c = getCase(caseNo);
     const main = c.sources.main?.data || {};
-    const family = c.sources.family?.data || {};
     const picks = [];
 
-    for (const p of [...(main.publications || []), ...(family.publications || [])]) {
+    // Use case-specific publication numbers only (avoid family-wide false positives).
+    for (const p of (main.publications || [])) {
       const m = String(p.no || '').toUpperCase().match(/^(EP\d{6,})/);
       if (m?.[1]) picks.push(m[1]);
     }
 
-    if (/^EP\d{6,}$/i.test(main.parentCase || '')) picks.push(main.parentCase.toUpperCase());
-    if (/^EP\d{6,}$/i.test(caseNo || '')) picks.push(caseNo.toUpperCase());
+    // Conservative fallback only for published/granted status and EP-like number.
+    const statusText = String(main.statusRaw || '').toLowerCase();
+    if (!picks.length && /^EP\d{6,}$/i.test(caseNo || '') && /(published|granted)/.test(statusText)) {
+      picks.push(String(caseNo).toUpperCase());
+    }
 
-    return [...new Set(picks)].slice(0, 8);
+    return [...new Set(picks)].slice(0, 4);
   }
 
   async function refreshUpcRegistry(caseNo, signal) {
