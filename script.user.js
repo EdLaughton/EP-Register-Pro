@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.27
+// @version      7.0.28
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.27';
+  const VERSION = '7.0.28';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -451,38 +451,53 @@
 
   function parsePriority(raw, pageText = '') {
     const out = [];
-    const rawLines = String(raw || '').split('\n').map((v) => v.trim()).filter(Boolean);
+    const rawText = dedupeMultiline(raw);
+    const rawLines = String(rawText || '').split('\n').map((v) => v.trim()).filter(Boolean);
+
+    const push = (no, dateStr) => {
+      const n = String(no || '').replace(/\s+/g, '').toUpperCase();
+      const d = String(dateStr || '').trim();
+      if (!n || !d) return;
+      out.push({ no: n, dateStr: d });
+    };
 
     // Priority IDs are usually country-code + numeric-ish body (e.g. GB20230019788).
-    const parseLine = (line) => {
-      const m = String(line || '').match(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i);
+    const parseLine = (line, loose = false) => {
+      const re = loose
+        ? /\b([A-Z]{2}[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i
+        : /\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i;
+      const m = String(line || '').match(re);
       if (!m) return null;
-      return { no: m[1].replace(/\s+/g, '').toUpperCase(), dateStr: m[2] };
+      return { no: m[1], dateStr: m[2] };
     };
 
     for (const line of rawLines) {
-      const parsed = parseLine(line);
+      const parsed = parseLine(line, false) || parseLine(line, true);
       if (!parsed) continue;
-      out.push(parsed);
+      push(parsed.no, parsed.dateStr);
     }
 
-    if (!out.length) {
-      // fallback matcher (some pages format priority ids less strictly)
-      for (const line of rawLines) {
-        const m = String(line || '').match(/\b([A-Z]{2}[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i);
-        if (!m) continue;
-        out.push({ no: String(m[1] || '').replace(/\s+/g, '').toUpperCase(), dateStr: String(m[2] || '') });
+    if (!out.length && rawText) {
+      for (const m of rawText.matchAll(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,120}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
+        push(m[1], m[2]);
+      }
+
+      // Last-resort pairing for layouts where number/date are split across cells/lines.
+      if (!out.length) {
+        const ids = [...rawText.matchAll(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b/gi)].map((m) => String(m[1] || ''));
+        const dates = [...rawText.matchAll(/\b(\d{2}\.\d{2}\.\d{4})\b/g)].map((m) => String(m[1] || ''));
+        if (ids[0] && dates[0]) push(ids[0], dates[0]);
       }
     }
 
     if (!out.length && pageText) {
-      const section = String(pageText).match(/Priority\s+number,\s*date[\s\S]{0,420}/i)?.[0] || '';
+      const section = String(pageText).match(/Priority\s+number,\s*date([\s\S]{0,500}?)(?=\b(?:Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event)\b|$)/i)?.[1] || '';
       for (const m of section.matchAll(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
-        out.push({ no: String(m[1] || '').replace(/\s+/g, '').toUpperCase(), dateStr: String(m[2] || '') });
+        push(m[1], m[2]);
       }
       if (!out.length) {
         for (const m of section.matchAll(/\b([A-Z]{2}[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
-          out.push({ no: String(m[1] || '').replace(/\s+/g, '').toUpperCase(), dateStr: String(m[2] || '') });
+          push(m[1], m[2]);
         }
       }
     }
