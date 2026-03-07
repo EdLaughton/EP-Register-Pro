@@ -24,9 +24,19 @@ hasText("upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out
 hasText('opt(?:ed)?[\\s-]*out(?:\\s+\\w+){0,8}\\s+(?:register', 'UPC positive matcher should allow words between opt-out and registered/entered/effective');
 
 // Timeline grouped items UX (collapsible + arrow)
-has(/<details class="epoRP-grp">/, 'Timeline groups should render as collapsed <details> by default');
+has(/<details class="epoRP-grp" data-group-key=/, 'Timeline groups should render as keyed <details> for persisted collapse state');
 has(/class="epoRP-garrow"/, 'Timeline group arrow indicator missing');
 has(/\.epoRP-grp\[open\]\s+\.epoRP-garrow\{transform:rotate\(90deg\)/, 'Timeline arrow rotation style missing');
+has(/timelineItemHtml\(item, compact = false, inGroup = false\)/, 'Timeline item renderer should support in-group styling');
+has(/\.epoRP-it\.in-group\{/, 'Grouped timeline items should have dedicated styling hook');
+has(/\.epoRP-grph::marker\{content:''\}/, 'Timeline group summary should hide default marker to avoid native grey button artefacts');
+has(/function\s+timelineGroupKey\s*\(/, 'Timeline group key helper missing');
+has(/data-group-key="\$\{esc\(groupKey\)\}"/, 'Timeline groups should render stable key attributes for open-state persistence');
+has(/function\s+wireTimeline\s*\(caseNo\)/, 'Timeline wire-up should persist group expansion state');
+has(/function\s+persistLiveTimelineGroups\s*\(/, 'Timeline open-group persistence helper missing');
+has(/function\s+persistLiveDoclistGroups\s*\(/, 'Doclist open-group persistence helper missing');
+has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
+has(/function\s+timelineCacheKey\s*\(/, 'Timeline model should expose a cache key for memoization');
 
 // Timeline controls (include/exclude + importance)
 has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
@@ -43,10 +53,36 @@ notHas(/IPC\/CPC/, 'IPC/CPC should be removed from UI');
 has(/dedupeMultiline/, 'dedupeMultiline helper missing');
 has(/parentCase/, 'Divisional parent case tracking missing');
 has(/cleanTitle/, 'Title cleanup helper missing');
+notHas(/isDivisional:\s*!!parentCase\s*\|\|\s*priorities\.some\(\(p\)\s*=>\s*\/\^EP\/i\.test\(p\.no\)\)/, 'Divisional detection should not rely on EP priority numbers alone');
+has(/function\s+extractEpNumbersByHeader\s*\(/, 'Header-based EP number extraction helper missing');
+has(/extractEpNumbersByHeader\(doc,\s*\/\\bParent application/, 'Parent application extraction should use header-scoped helper');
+has(/extractEpNumbersByHeader\(doc,\s*\/\\bDivisional application/, 'Divisional child extraction should use header-scoped helper');
+hasText('[A-Z]{2}\\d[0-9A-Z\\/\\-]{4,}', 'Priority parser should require numeric body after country code (prevents LANGUAGE false matches)');
+hasText('Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event', 'Priority page-text fallback should stop at known next labels to avoid pulling publication rows');
+hasText('priority document|annex', 'Annex filings should be classed with the filing package');
+has(/const\s+internationalField\s*=\s*dedupeMultiline\(fieldByLabel\(doc,\s*\[\/\^International application\\b\/i,\s*\/\^International publication\\b\/i,\s*\/\^PCT application\\b\/i\]\)\);/, 'E/PCT detection should use international-application scoped fields');
+notHas(/const\s+isEuroPct\s*=\s*!!internationalAppNo\s*\|\|\s*\/\\bPCT\\b\/i/, 'E/PCT detection should not rely on broad page-wide PCT token matching');
 has(/function\s+enhanceDoclistGrouping\s*\(/, 'All-documents grouping enhancer missing');
 has(/epoRP-docgrp/, 'All-documents grouping row class missing');
-has(/const\s+highestPaidNextYear\s*=\s*m\.renewal\.highestYear\s*\?\s*\(m\.renewal\.highestYear\s*\+\s*1\)\s*:\s*null;/, 'Renewal next-year should account for paid-ahead highest year');
-has(/Math\.max\(3,\s*filingBasedNextYear\s*\|\|\s*0,\s*highestPaidNextYear\s*\|\|\s*0\)/, 'Renewal next-year should be max of filing-based and paid-ahead baseline');
+has(/headerRow\.classList\.toggle\('open',\s*nextExpanded\)/, 'All-documents group header should mark expanded state for styling');
+has(/epoRP-docgrp-open/, 'All-documents grouped rows should get expanded-state class for background differentiation');
+has(/function\s+getDoclistOpenGroups\s*\(/, 'All-documents open-state persistence helper missing');
+has(/epoRP-docgrp-check/, 'All-documents group header should include a select-all checkbox');
+has(/dispatchEvent\(new Event\('change',\s*\{ bubbles: true \}\)\)/, 'Group select-all should emit row checkbox change events');
+has(/epoRP-docgrp-item\.epoRP-docgrp-last\.epoRP-docgrp-open td\{border-bottom:2px solid #bfdbfe\}/, 'All-documents grouped rows should draw a bottom boundary line when expanded');
+has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-documents group header control should suppress native button chrome');
+has(/function\s+epRenewalDueDate\s*\(/, 'Renewal model should compute EP due dates from filing-anniversary month');
+has(/feeForum\s*=\s*'EPO central \(Unitary Patent\)'/, 'Renewal model should distinguish UP central-fee forum');
+has(/graceUntil\s*=\s*nextDue\s*\?\s*addMonths\(nextDue,\s*6\)\s*:\s*null;/, 'Renewal model should include 6-month grace-period calculation');
+has(/return 'Post-publication';/, 'Stage mapping should avoid using "Published" as a stage label');
+has(/return 'Closed';/, 'Stage mapping should classify withdrawn/refused/revoked outcomes as Closed');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
+has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute a structural signature for change detection');
+has(/runtime\.doclistGroupSigByCase\[caseNo\]\s*===\s*signature/, 'Doclist grouping should skip full regroup when table signature is unchanged');
+has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
+has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
+has(/function\s+persistCurrentPanelScroll\s*\(/, 'Panel scroll persistence helper missing');
+has(/restorePanelScroll\(caseNo,\s*activeView\)/, 'Panel scroll should be restored after rerender');
+has(/el\.addEventListener\('input',\s*commit\)/, 'Options toggles should react on input events for reliable checkbox commits');
 
 console.log('userscript regression checks passed');
