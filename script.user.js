@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.30
+// @version      7.0.31
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.30';
+  const VERSION = '7.0.31';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -376,6 +376,40 @@
     saveJson(UI_KEY, next);
     runtime.activeView = next.activeView;
     runtime.collapsed = !!next.collapsed;
+  }
+
+  function timelineGroupKey(caseNo, item, idx = 0) {
+    const first = (item.items || [])[0] || {};
+    const parts = [
+      caseNo,
+      item.dateStr || '',
+      item.title || '',
+      item.actor || '',
+      String((item.items || []).length || 0),
+      first.title || '',
+      String(idx),
+    ];
+    return parts.map((v) => normalize(String(v))).join('|');
+  }
+
+  function getTimelineOpenGroups(caseNo) {
+    const byCase = uiState().timelineOpenByCase || {};
+    const arr = Array.isArray(byCase[caseNo]) ? byCase[caseNo] : [];
+    return new Set(arr.map((v) => String(v)));
+  }
+
+  function setTimelineOpenGroups(caseNo, groupSet) {
+    const state = uiState();
+    const byCase = { ...(state.timelineOpenByCase || {}) };
+    byCase[caseNo] = [...groupSet].slice(0, 250);
+
+    const keys = Object.keys(byCase);
+    if (keys.length > 20) {
+      const keep = new Set(keys.slice(-20));
+      for (const k of keys) if (!keep.has(k)) delete byCase[k];
+    }
+
+    setUiState({ timelineOpenByCase: byCase });
   }
 
   function scheduleRender() {
@@ -1640,8 +1674,9 @@
 
     let insertedToday = false;
     const out = [];
+    const openGroups = getTimelineOpenGroups(caseNo);
 
-    for (const item of items) {
+    for (const [idx, item] of items.entries()) {
       if (!insertedToday) {
         const itemDate = parseDateString(item.dateStr);
         const midnight = new Date();
@@ -1654,7 +1689,9 @@
 
       if (item.type === 'group') {
         const actorClass = item.actor === 'Applicant' ? 'actor-applicant' : item.actor === 'EPO' ? 'actor-epo' : item.actor === 'Third party' ? 'actor-third' : '';
-        out.push(`<details class="epoRP-grp">
+        const groupKey = timelineGroupKey(caseNo, item, idx);
+        const openAttr = openGroups.has(groupKey) ? ' open' : '';
+        out.push(`<details class="epoRP-grp" data-group-key="${esc(groupKey)}"${openAttr}>
           <summary class="epoRP-grph">
             <div class="epoRP-dot ${esc(item.level || 'info')} ${esc(actorClass)}"></div>
             <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
@@ -1734,10 +1771,10 @@
     panel.innerHTML = `<div class="epoRP-hd">
       <div class="epoRP-row"><div><div class="epoRP-t">EP Register Pro <span class="epoRP-ver">v${VERSION}</span></div><div class="epoRP-st" id="epoRP-sub"></div></div><div class="epoRP-acts"><button class="epoRP-btn" id="epoRP-refresh">↻</button><button class="epoRP-btn" id="epoRP-collapse">−</button></div></div>
       <div class="epoRP-badges"><div id="epoRP-badge-left"></div><div id="epoRP-badge-right"></div></div>
-      <div class="epoRP-tabs">
-        <button class="epoRP-tab" data-view="overview">Overview</button>
-        <button class="epoRP-tab" data-view="timeline">Timeline</button>
-        <button class="epoRP-tab" data-view="options">Options</button>
+      <div class="epoRP-tabs" role="tablist" aria-label="Sidebar views">
+        <button class="epoRP-tab" data-view="overview" role="tab" aria-selected="false"><span class="epoRP-tab-ico">▦</span><span>Overview</span></button>
+        <button class="epoRP-tab" data-view="timeline" role="tab" aria-selected="false"><span class="epoRP-tab-ico">◷</span><span>Timeline</span></button>
+        <button class="epoRP-tab" data-view="options" role="tab" aria-selected="false"><span class="epoRP-tab-ico">⚙</span><span>Options</span></button>
       </div>
     </div><div class="epoRP-body" id="epoRP-body"></div>`;
 
@@ -1759,6 +1796,22 @@
     runtime.panel = panel;
     runtime.body = panel.querySelector('#epoRP-body');
     return panel;
+  }
+
+  function wireTimeline(caseNo) {
+    const b = runtime.body;
+    if (!b) return;
+
+    const openGroups = getTimelineOpenGroups(caseNo);
+    b.querySelectorAll('details.epoRP-grp[data-group-key]').forEach((el) => {
+      el.addEventListener('toggle', () => {
+        const key = String(el.getAttribute('data-group-key') || '');
+        if (!key) return;
+        if (el.open) openGroups.add(key);
+        else openGroups.delete(key);
+        setTimelineOpenGroups(caseNo, openGroups);
+      });
+    });
   }
 
   function wireOptions() {
@@ -1850,7 +1903,11 @@
     panel.querySelector('#epoRP-badge-left').innerHTML = badges.left;
     panel.querySelector('#epoRP-badge-right').innerHTML = badges.right;
 
-    panel.querySelectorAll('.epoRP-tab').forEach((btn) => btn.classList.toggle('on', btn.dataset.view === runtime.activeView));
+    panel.querySelectorAll('.epoRP-tab').forEach((btn) => {
+      const active = btn.dataset.view === runtime.activeView;
+      btn.classList.toggle('on', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
 
     const body = runtime.body;
     if (!body) return;
@@ -1861,6 +1918,7 @@
 
     if (runtime.activeView === 'timeline') {
       body.innerHTML = renderTimeline(caseNo);
+      wireTimeline(caseNo);
       return;
     }
     if (runtime.activeView === 'options') {
@@ -1915,9 +1973,13 @@
     .epoRP-t{font-size:14px;font-weight:800}
     .epoRP-ver{font-size:11px;font-weight:700;color:#64748b;margin-left:4px}
     .epoRP-st{font-size:11px;color:#475569}
-    .epoRP-tabs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
-    .epoRP-tab,.epoRP-btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer}
-    .epoRP-tab.on{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+    .epoRP-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px;padding:4px;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:10px}
+    .epoRP-tab{display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid transparent;background:transparent;color:#334155;border-radius:8px;padding:5px 6px;font-size:11px;font-weight:700;cursor:pointer;line-height:1}
+    .epoRP-tab:hover{background:#f8fafc;border-color:#cbd5e1}
+    .epoRP-tab.on{background:#1d4ed8;color:#fff;border-color:#1d4ed8;box-shadow:0 1px 0 rgba(15,23,42,.15)}
+    .epoRP-tab-ico{font-size:11px;opacity:.9}
+    .epoRP-tab.on .epoRP-tab-ico{opacity:1}
+    .epoRP-btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer}
     .epoRP-acts{display:flex;gap:6px}
     .epoRP-badges{display:flex;justify-content:space-between;gap:6px;margin-top:6px}
     .epoRP-body{padding:8px;overflow:auto;display:flex;flex-direction:column;gap:8px}
@@ -1941,9 +2003,9 @@
     .epoRP-it{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #f1f5f9;align-items:center}
     .epoRP-it.compact{padding:4px 2px}
     .epoRP-it:last-child{border-bottom:0}
-    .epoRP-it.in-group{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px;margin:4px 0;border-bottom:1px solid #e2e8f0}
-    .epoRP-it.in-group.compact{padding:4px}
-    .epoRP-it.in-group:last-child{border-bottom:1px solid #e2e8f0}
+    .epoRP-it.in-group{background:transparent;border:0;border-radius:0;padding:5px 2px;margin:0}
+    .epoRP-it.in-group.compact{padding:3px 2px}
+    .epoRP-it.in-group:last-child{border-bottom:0}
     .epoRP-dot{width:9px;height:9px;border-radius:999px;margin-top:0;background:#94a3b8}
     .epoRP-dot.dotted{background:transparent;border:2px dotted #94a3b8;width:10px;height:10px}
     .epoRP-dot.ok{background:#16a34a}
@@ -1959,15 +2021,15 @@
     .epoRP-dot.dotted.info{border-color:#2563eb}
     .epoRP-mn{font-weight:700}
     .epoRP-sb{font-size:11px;color:#64748b;white-space:pre-wrap}
-    .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:5px;background:#f8fafc;margin-bottom:7px}
+    .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:0;background:#f8fafc;margin-bottom:7px;overflow:hidden}
     .epoRP-grp[open]{background:#eef6ff;border-color:#bfdbfe;box-shadow:inset 0 0 0 1px #dbeafe}
-    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:6px;cursor:pointer;list-style:none;align-items:center;background:transparent;border:0;border-radius:8px;appearance:none;-webkit-appearance:none}
-    .epoRP-grp[open] .epoRP-grph{background:#e2efff;border:1px solid #c7dcff}
+    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:6px 4px;cursor:pointer;list-style:none;align-items:center;background:transparent;border:0;border-radius:0;appearance:none;-webkit-appearance:none}
+    .epoRP-grp[open] .epoRP-grph{background:#e2efff;border-bottom:1px solid #c7dcff}
     .epoRP-grph::marker{content:''}
     .epoRP-grph::-webkit-details-marker{display:none}
     .epoRP-garrow{font-size:16px;font-weight:700;color:#334155;justify-self:end;transition:transform .15s ease}
     .epoRP-grp[open] .epoRP-garrow{transform:rotate(90deg)}
-    .epoRP-grp .epoRP-grpi{margin-left:12px;border-left:2px dotted #93c5fd;padding-left:10px;padding-top:4px}
+    .epoRP-grp .epoRP-grpi{margin-left:12px;border-left:2px dotted #93c5fd;padding:4px 0 2px 10px;background:transparent}
     .epoRP-grp:not([open]) .epoRP-grpi{display:none}
     .epoRP-today{border-top:2px solid #1d4ed8;margin:10px 0 8px;padding-top:4px;font-size:11px;color:#1e40af;font-weight:700}
     .epoRP-dl{display:flex;flex-direction:column;gap:4px}
@@ -2012,16 +2074,20 @@
 
   addEventListener('focus', () => {
     if (!isCasePage()) return;
-    renderPanel();
     enhanceDoclistGrouping();
     const needsRefresh = SOURCES.some((s) => !isFresh(getCase(runtime.appNo).sources[s.key], options().refreshHours));
-    if (needsRefresh) prefetchCase(runtime.appNo, false);
+    if (needsRefresh) {
+      renderPanel();
+      prefetchCase(runtime.appNo, false);
+      return;
+    }
+    if (runtime.activeView !== 'timeline') renderPanel();
   });
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || !isCasePage()) return;
-    renderPanel();
     enhanceDoclistGrouping();
+    if (runtime.activeView !== 'timeline') renderPanel();
   });
 
   addEventListener('pageshow', () => init(false));

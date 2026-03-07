@@ -24,12 +24,15 @@ hasText("upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out
 hasText('opt(?:ed)?[\\s-]*out(?:\\s+\\w+){0,8}\\s+(?:register', 'UPC positive matcher should allow words between opt-out and registered/entered/effective');
 
 // Timeline grouped items UX (collapsible + arrow)
-has(/<details class="epoRP-grp">/, 'Timeline groups should render as collapsed <details> by default');
+has(/<details class="epoRP-grp" data-group-key=/, 'Timeline groups should render as keyed <details> for persisted collapse state');
 has(/class="epoRP-garrow"/, 'Timeline group arrow indicator missing');
 has(/\.epoRP-grp\[open\]\s+\.epoRP-garrow\{transform:rotate\(90deg\)/, 'Timeline arrow rotation style missing');
 has(/timelineItemHtml\(item, compact = false, inGroup = false\)/, 'Timeline item renderer should support in-group styling');
-has(/\.epoRP-it\.in-group\{/, 'Grouped timeline items should have dedicated background styling');
+has(/\.epoRP-it\.in-group\{/, 'Grouped timeline items should have dedicated styling hook');
 has(/\.epoRP-grph::marker\{content:''\}/, 'Timeline group summary should hide default marker to avoid native grey button artefacts');
+has(/function\s+timelineGroupKey\s*\(/, 'Timeline group key helper missing');
+has(/data-group-key="\$\{esc\(groupKey\)\}"/, 'Timeline groups should render stable key attributes for open-state persistence');
+has(/function\s+wireTimeline\s*\(caseNo\)/, 'Timeline wire-up should persist group expansion state');
 
 // Timeline controls (include/exclude + importance)
 has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
@@ -62,5 +65,6 @@ has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-do
 has(/const\s+highestPaidNextYear\s*=\s*m\.renewal\.highestYear\s*\?\s*\(m\.renewal\.highestYear\s*\+\s*1\)\s*:\s*null;/, 'Renewal next-year should account for paid-ahead highest year');
 has(/Math\.max\(3,\s*filingBasedNextYear\s*\|\|\s*0,\s*highestPaidNextYear\s*\|\|\s*0\)/, 'Renewal next-year should be max of filing-based and paid-ahead baseline');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
+has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 
 console.log('userscript regression checks passed');
