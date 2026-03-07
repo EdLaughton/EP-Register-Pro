@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.39
+// @version      7.0.40
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.39';
+  const VERSION = '7.0.40';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1942,6 +1942,7 @@
         confidence,
         sourceDate: rec.dateStr,
         resolved,
+        method: `Heuristic: +${months} month(s) from ${rec.source.toLowerCase()} trigger`,
       });
     };
 
@@ -1954,6 +1955,7 @@
         sourceDate: String(hint.sourceDate || ''),
         resolved: !!hint.resolved,
         fromPdf: true,
+        method: String(hint.evidence || 'PDF parse'),
       });
     }
 
@@ -2005,6 +2007,7 @@
             confidence: 'high',
             sourceDate: esrMention.dateStr,
             resolved: hasFeeSignalAfter(anchor, /request for examination|examination fee|designation fee|extension fee|validation fee|fee payment received/i) || hasApplicantResponseAfter(anchor),
+            method: 'Rule-based: +6 months from ESR publication mention',
           });
         }
       }
@@ -2029,6 +2032,7 @@
         confidence: 'high',
         sourceDate: priorityDate ? main.priorities?.[0]?.dateStr || '' : main.filingDate || '',
         resolved: hasFeeSignalAfter(base31Date, /translation|entry into european phase|rule 159|filing fee|page fee|request for examination/i),
+        method: 'Rule-based: priority/filing date +31 months',
       });
 
       push({
@@ -2038,6 +2042,7 @@
         confidence: isrDate ? 'high' : 'medium',
         sourceDate: isrDate ? `${formatDate(base31Date)} / ${isr?.dateStr || ''}` : formatDate(base31Date),
         resolved: hasFeeSignalAfter(base31Date, /request for examination|examination fee|designation fee|extension fee|validation fee/i),
+        method: isrDate ? 'Rule-based: max(31 months from priority/filing, ISR +6 months)' : 'Rule-based: 31 months from priority/filing (ISR date unavailable)',
       });
     }
 
@@ -2053,6 +2058,7 @@
           confidence: 'high',
           sourceDate: grantMention.dateStr,
           resolved: false,
+          method: 'Rule-based: grant mention +9 months',
         });
         push({
           label: 'Unitary effect request window',
@@ -2061,6 +2067,7 @@
           confidence: 'high',
           sourceDate: grantMention.dateStr,
           resolved: hasAfter(anchor, (r) => /unitary effect/i.test(`${r.title} ${r.detail}`)),
+          method: 'Rule-based: grant mention +1 month',
         });
       }
     }
@@ -2077,6 +2084,7 @@
           confidence: 'high',
           sourceDate: decision.dateStr,
           resolved: hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)),
+          method: 'Rule-based: decision date +2 months',
         });
         push({
           label: 'Appeal grounds',
@@ -2085,6 +2093,7 @@
           confidence: 'high',
           sourceDate: decision.dateStr,
           resolved: hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)),
+          method: 'Rule-based: decision date +4 months',
         });
       }
     }
@@ -2100,6 +2109,7 @@
           confidence: 'high',
           sourceDate: main.priorities?.[0]?.dateStr || '',
           resolved: false,
+          method: 'Rule-based: earliest priority date +12 months',
         });
       }
     }
@@ -2112,6 +2122,7 @@
         confidence: 'high',
         reference: true,
         resolved: false,
+        method: 'Rule-based: filing date +20 years',
       });
     }
 
@@ -2335,23 +2346,12 @@
     const groupableBundles = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings']);
 
     const docItems = [];
-    let run = null;
-    const flushRun = () => {
-      if (!run) return;
-      if (run.items.length === 1) {
-        const first = run.items[0];
-        docItems.push({ type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${run.title}`, source: 'Documents', level: first.level, actor: first.actor || run.actor || 'Other', url: first.url });
-      } else {
-        docItems.push(run);
-      }
-      run = null;
-    };
+    const groupedByKey = new Map();
 
     for (const d of docsSorted) {
       const actor = d.actor || 'Other';
       const shouldGroup = groupableBundles.has(d.bundle);
       if (!shouldGroup) {
-        flushRun();
         docItems.push({
           type: 'item',
           dateStr: d.dateStr,
@@ -2365,20 +2365,27 @@
         continue;
       }
 
-      const monthBucket = String(d.dateStr || '').split('.').slice(1).join('.');
-      const runKey = `${d.bundle}|${actor}|${monthBucket || 'nodate'}`;
-
-      if (!run || run._key !== runKey) {
-        flushRun();
-        run = { type: 'group', _key: runKey, dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor, items: [] };
+      // Group by exact document date + bundle + actor to avoid fragmented filing-package rows.
+      const groupKey = `${d.dateStr || 'nodate'}|${d.bundle}|${actor}`;
+      if (!groupedByKey.has(groupKey)) {
+        const group = { type: 'group', _key: groupKey, dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor, items: [] };
+        groupedByKey.set(groupKey, group);
+        docItems.push(group);
       }
 
-      run.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', actor, url: d.url });
-      run.level = topLevel([run.level, d.level || 'info']);
+      const group = groupedByKey.get(groupKey);
+      group.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', actor, url: d.url });
+      group.level = topLevel([group.level, d.level || 'info']);
     }
 
-    flushRun();
-    items.push(...docItems);
+    const normalizedDocItems = docItems.map((item) => {
+      if (item.type !== 'group') return item;
+      if ((item.items || []).length !== 1) return item;
+      const first = item.items[0];
+      return { type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${item.title}`, source: 'Documents', level: first.level, actor: first.actor || item.actor || 'Other', url: first.url };
+    });
+
+    items.push(...normalizedDocItems);
 
     if (opts.showEventHistory) {
       for (const e of eventHistory.events || []) {
@@ -2429,15 +2436,28 @@
         const ds = formatDate(d.date);
         const dd = Math.ceil((d.date.getTime() - Date.now()) / 86400000);
         const proximity = dd < 0 ? 'bad' : dd <= 14 ? 'bad' : dd <= 45 ? 'warn' : 'ok';
-        const confidence = d.confidence ? ` · ${d.confidence} confidence` : '';
-        const resolved = d.resolved ? ' · responded' : '';
-        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span>${!d.reference ? `<div class="epoRP-m">${esc(`From ${d.sourceDate || 'procedural event'}${confidence}${resolved}`)}</div>` : ''}</div></div>`;
+        const metaParts = [
+          `From ${d.sourceDate || 'procedural event'}`,
+          d.confidence ? `${d.confidence} confidence` : '',
+          d.method || '',
+          d.resolved ? 'responded' : '',
+        ].filter(Boolean);
+        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span>${!d.reference ? `<div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div>` : ''}</div></div>`;
       }
       html += `</div><div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.</div></div>`;
     }
 
+    const nextDeadlineMeta = m.nextDeadline
+      ? [
+        `From ${m.nextDeadline.sourceDate || 'procedural event'}`,
+        m.nextDeadline.confidence ? `${m.nextDeadline.confidence} confidence` : '',
+        m.nextDeadline.method || '',
+        m.nextDeadline.resolved ? 'responded' : '',
+      ].filter(Boolean).join(' · ')
+      : '';
+
     html += `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
-      <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}` : '—'}</div>
+      <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineMeta ? `<div class="epoRP-m">${esc(`(${nextDeadlineMeta})`)}</div>` : ''}` : '—'}</div>
       <div class="epoRP-l">EPO last action</div><div class="epoRP-v">${m.latestEpo ? `${esc(m.latestEpo.dateStr)} · ${esc(m.latestEpo.title)}` : '—'}</div>
       <div class="epoRP-l">Applicant last filing</div><div class="epoRP-v">${m.latestApplicant ? `${esc(m.latestApplicant.dateStr)} · ${esc(m.latestApplicant.title)}` : '—'}</div>
       <div class="epoRP-l">${m.waitingOn === 'EPO' ? 'Days since applicant response' : 'Days to next deadline'}</div><div class="epoRP-v">${m.waitingOn === 'EPO' ? (m.waitingDays != null ? `<span class="epoRP-bdg ${m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok'}">${formatDaysHuman(m.waitingDays)}</span>` : '—') : (m.daysToDeadline != null ? `<span class="epoRP-bdg ${m.daysToDeadline < 0 ? 'bad' : m.daysToDeadline <= 14 ? 'bad' : m.daysToDeadline <= 45 ? 'warn' : 'ok'}">${m.daysToDeadline >= 0 ? formatDaysHuman(m.daysToDeadline) : `${formatDaysHuman(m.daysToDeadline).slice(1)} overdue`}</span>` : '—')}</div>
