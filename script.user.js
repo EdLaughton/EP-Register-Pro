@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.38
+// @version      7.0.39
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -10,6 +10,7 @@
 // @grant        GM_addStyle
 // @grant        GM_xmlhttpRequest
 // @connect      unifiedpatentcourt.org
+// @connect      cdnjs.cloudflare.com
 // ==/UserScript==
 
 (() => {
@@ -19,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.38';
+  const VERSION = '7.0.39';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -72,6 +73,7 @@
     scrollSaveTimer: null,
     timelineCache: { key: '', items: [] },
     doclistGroupSigByCase: {},
+    pdfjsPromise: null,
   };
 
   let memory = null;
@@ -1271,6 +1273,88 @@
     }
   }
 
+  async function fetchBinaryWithTimeout(url, signal) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const onAbort = () => controller.abort();
+    signal?.addEventListener('abort', onAbort);
+    try {
+      const response = await fetch(url, { credentials: 'same-origin', signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.arrayBuffer();
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    }
+  }
+
+  function fetchBinaryCrossOrigin(url, signal) {
+    if (typeof GM_xmlhttpRequest !== 'function') return fetchBinaryWithRetry(url, signal);
+    return new Promise((resolve, reject) => {
+      const req = GM_xmlhttpRequest({
+        method: 'GET',
+        url,
+        responseType: 'arraybuffer',
+        timeout: FETCH_TIMEOUT_MS,
+        onload: (res) => {
+          if (res.status >= 200 && res.status < 400 && res.response) resolve(res.response);
+          else reject(new Error(`HTTP ${res.status}`));
+        },
+        onerror: () => reject(new Error('Cross-origin binary request failed')),
+        ontimeout: () => reject(new Error('Cross-origin binary request timed out')),
+      });
+
+      const onAbort = () => {
+        try { req?.abort?.(); } catch {}
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  function loadExternalScriptText(url, signal) {
+    if (typeof GM_xmlhttpRequest !== 'function') return Promise.reject(new Error('GM_xmlhttpRequest unavailable'));
+    return new Promise((resolve, reject) => {
+      const req = GM_xmlhttpRequest({
+        method: 'GET',
+        url,
+        timeout: FETCH_TIMEOUT_MS * 2,
+        onload: (res) => {
+          if (res.status >= 200 && res.status < 400) resolve(String(res.responseText || ''));
+          else reject(new Error(`HTTP ${res.status}`));
+        },
+        onerror: () => reject(new Error(`Failed to load script: ${url}`)),
+        ontimeout: () => reject(new Error(`Timed out loading script: ${url}`)),
+      });
+      const onAbort = () => {
+        try { req?.abort?.(); } catch {}
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  async function ensurePdfJs(signal) {
+    if (window.pdfjsLib?.getDocument) return window.pdfjsLib;
+    if (runtime.pdfjsPromise) return runtime.pdfjsPromise;
+
+    runtime.pdfjsPromise = (async () => {
+      const pdfJsUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+      const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+      const code = await loadExternalScriptText(pdfJsUrl, signal);
+      // eslint-disable-next-line no-new-func
+      Function(code)();
+      if (!window.pdfjsLib?.getDocument) throw new Error('pdf.js global not available after load');
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+      return window.pdfjsLib;
+    })().catch((error) => {
+      runtime.pdfjsPromise = null;
+      throw error;
+    });
+
+    return runtime.pdfjsPromise;
+  }
+
   function fetchCrossOrigin(url, signal) {
     if (typeof GM_xmlhttpRequest !== 'function') return fetchWithRetry(url, signal);
     return new Promise((resolve, reject) => {
@@ -1375,6 +1459,220 @@
     }
   }
 
+  function normalizeDateString(raw) {
+    const t = String(raw || '').trim();
+    if (!t) return '';
+    const m = t.match(/(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})/);
+    if (!m) return '';
+    const d = String(m[1] || '').padStart(2, '0');
+    const mo = String(m[2] || '').padStart(2, '0');
+    const yRaw = String(m[3] || '');
+    const y = yRaw.length === 2 ? `20${yRaw}` : yRaw;
+    return `${d}.${mo}.${y}`;
+  }
+
+  function monthNumber(name) {
+    const n = String(name || '').toLowerCase();
+    if (!n) return 0;
+    const m = {
+      january: 1, jan: 1,
+      february: 2, feb: 2,
+      march: 3, mar: 3,
+      april: 4, apr: 4,
+      may: 5,
+      june: 6, jun: 6,
+      july: 7, jul: 7,
+      august: 8, aug: 8,
+      september: 9, sep: 9, sept: 9,
+      october: 10, oct: 10,
+      november: 11, nov: 11,
+      december: 12, dec: 12,
+    };
+    return m[n] || 0;
+  }
+
+  function extractDateCandidates(textBlock) {
+    const out = [];
+    const t = String(textBlock || '');
+
+    for (const m of t.matchAll(/\b(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})\b/g)) {
+      const d = normalizeDateString(m[1]);
+      if (d) out.push(d);
+    }
+
+    for (const m of t.matchAll(/\b(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})\b/gi)) {
+      const day = String(m[1] || '').padStart(2, '0');
+      const mon = String(monthNumber(m[2] || '')).padStart(2, '0');
+      const year = String(m[3] || '');
+      if (mon !== '00') out.push(`${day}.${mon}.${year}`);
+    }
+
+    return dedupe(out, (d) => d);
+  }
+
+  function parsePdfDeadlineHints(pdfText, context = {}) {
+    const textRaw = String(pdfText || '');
+    const textLower = textRaw.toLowerCase();
+    if (!textLower) return [];
+
+    const hints = [];
+    const docDateStr = normalizeDateString(context.docDateStr || '');
+    const docDate = parseDateString(docDateStr);
+
+    const pushHint = (hint) => {
+      const date = parseDateString(hint?.dateStr || '');
+      if (!date) return;
+      hints.push({
+        label: hint.label,
+        dateStr: formatDate(date),
+        sourceDate: docDateStr || hint.sourceDate || '',
+        confidence: hint.confidence || 'high',
+        level: hint.level || 'bad',
+        resolved: false,
+        source: 'PDF parse',
+        evidence: hint.evidence || '',
+      });
+    };
+
+    const category = /rule\s*71\(3\)|intention to grant/.test(textLower)
+      ? 'R71(3) response period'
+      : /rule\s*116|summons to oral proceedings/.test(textLower)
+        ? 'Rule 116 final date'
+        : /article\s*94\(3\)|art\.\s*94\(3\)/.test(textLower)
+          ? 'Art. 94(3) response period'
+          : /rule\s*161|rule\s*162/.test(textLower)
+            ? 'Rule 161/162 response period'
+            : '';
+
+    const dateRegion = textRaw.match(/(?:final date|time limit|within)[\s\S]{0,260}/i)?.[0] || textRaw.slice(0, 1200);
+    const dateCandidates = extractDateCandidates(dateRegion);
+
+    // Prefer explicit final dates near deadline language.
+    if (category && dateCandidates.length) {
+      const explicitDate = dateCandidates
+        .map((d) => ({ d, ts: parseDateString(d)?.getTime() || 0 }))
+        .filter((x) => x.ts)
+        .sort((a, b) => b.ts - a.ts)[0]?.d;
+
+      if (explicitDate) {
+        pushHint({
+          label: category,
+          dateStr: explicitDate,
+          confidence: 'high',
+          level: /rule\s*116/i.test(category) ? 'warn' : 'bad',
+          evidence: 'Explicit date found in PDF communication text',
+        });
+      }
+    }
+
+    // Fallback: "within X months" from document date.
+    const monthMatch = textLower.match(/within\s+(\d{1,2})\s+months?/i);
+    if (category && monthMatch?.[1] && docDate) {
+      const months = Number(monthMatch[1]);
+      if (Number.isFinite(months) && months > 0 && months <= 12) {
+        const due = addMonths(docDate, months);
+        const already = hints.some((h) => h.label === category && h.dateStr === formatDate(due));
+        if (!already) {
+          pushHint({
+            label: category,
+            dateStr: formatDate(due),
+            confidence: 'medium',
+            level: 'bad',
+            evidence: `Derived from "within ${months} months" in PDF text`,
+          });
+        }
+      }
+    }
+
+    return dedupe(hints, (h) => `${h.label}|${h.dateStr}`);
+  }
+
+  async function resolvePdfUrl(url, signal) {
+    if (!url) return '';
+    if (/\.pdf(?:\?|$)/i.test(url)) return url;
+
+    try {
+      const html = await fetchWithRetry(url, signal);
+      const doc = parseHtml(html);
+      const links = [...doc.querySelectorAll('a[href]')].map((a) => a.getAttribute('href') || '');
+      const pdfHref = links.find((href) => /\.pdf(?:\?|$)/i.test(href));
+      if (!pdfHref) return '';
+      return new URL(pdfHref, url).toString();
+    } catch {
+      return '';
+    }
+  }
+
+  async function extractPdfText(url, signal) {
+    const pdfjs = await ensurePdfJs(signal);
+    const binary = await fetchBinaryWithRetry(url, signal);
+    const data = new Uint8Array(binary);
+    const loadingTask = pdfjs.getDocument({ data, disableWorker: true, useWorkerFetch: false, isEvalSupported: false });
+    const pdf = await loadingTask.promise;
+
+    try {
+      const maxPages = Math.min(pdf.numPages || 0, 8);
+      const chunks = [];
+      for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const txt = (content.items || []).map((it) => String(it.str || '')).join(' ');
+        if (txt) chunks.push(txt);
+      }
+      return chunks.join('\n');
+    } finally {
+      try { await pdf.destroy(); } catch {}
+    }
+  }
+
+  async function refreshPdfDeadlines(caseNo, signal, force = false) {
+    if (!caseNo) return;
+    const c = getCase(caseNo);
+    const cached = c.sources.pdfDeadlines;
+    if (!force && isFresh(cached, options().refreshHours)) return;
+
+    const docs = [...(c.sources.doclist?.data?.docs || [])].sort(compareDateDesc);
+    if (!docs.length) return;
+
+    const candidates = docs.filter((d) => /rule\s*71\(3\)|rule\s*116|summons to oral proceedings|article\s*94\(3\)|art\.\s*94\(3\)|rule\s*161|rule\s*162|communication from the examining/i.test(`${d.title || ''} ${d.procedure || ''}`)).slice(0, 5);
+    if (!candidates.length) return;
+
+    const hints = [];
+    const scanned = [];
+
+    for (const doc of candidates) {
+      if (signal?.aborted) return;
+      try {
+        const resolvedUrl = await resolvePdfUrl(doc.url, signal);
+        if (!resolvedUrl) continue;
+        const text = await extractPdfText(resolvedUrl, signal);
+        if (!text) continue;
+
+        const parsedHints = parsePdfDeadlineHints(text, { docDateStr: doc.dateStr });
+        if (parsedHints.length) {
+          hints.push(...parsedHints);
+          scanned.push({ title: doc.title, dateStr: doc.dateStr, url: resolvedUrl, hintCount: parsedHints.length });
+        }
+      } catch (error) {
+        addLog(caseNo, 'warn', `PDF deadline parse skipped: ${error?.message || error}`, { source: 'pdfDeadlines', doc: doc.title || '' });
+      }
+    }
+
+    patchCase(caseNo, (entry) => {
+      entry.sources.pdfDeadlines = {
+        key: 'pdfDeadlines',
+        title: 'PDF-derived deadlines',
+        status: hints.length ? 'ok' : 'empty',
+        fetchedAt: Date.now(),
+        parserVersion: VERSION,
+        transport: 'fetch+pdfjs',
+        data: { hints: dedupe(hints, (h) => `${h.label}|${h.dateStr}`), scanned },
+      };
+    });
+
+    addLog(caseNo, hints.length ? 'ok' : 'info', `PDF deadline parse ${hints.length ? `found ${hints.length} hint(s)` : 'found no explicit hints'}`, { source: 'pdfDeadlines' });
+  }
+
   async function fetchWithRetry(url, signal) {
     let lastError;
     for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
@@ -1383,6 +1681,23 @@
       }
       try {
         return await fetchWithTimeout(url, signal);
+      } catch (error) {
+        lastError = error;
+        if (signal?.aborted || error?.name === 'AbortError') throw error;
+        if (attempt >= FETCH_RETRIES) throw error;
+      }
+    }
+    throw lastError;
+  }
+
+  async function fetchBinaryWithRetry(url, signal) {
+    let lastError;
+    for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      try {
+        return await fetchBinaryWithTimeout(url, signal);
       } catch (error) {
         lastError = error;
         if (signal?.aborted || error?.name === 'AbortError') throw error;
@@ -1511,6 +1826,12 @@
           // non-blocking
         }
 
+        try {
+          await refreshPdfDeadlines(caseNo, controller.signal, force);
+        } catch {
+          // non-blocking
+        }
+
         const c = getCase(caseNo);
         const okCount = SOURCES.filter((s) => c.sources[s.key]?.status === 'ok').length;
         addLog(caseNo, 'ok', `Background prefetch finish (${okCount}/${SOURCES.length} sources ok)`);
@@ -1547,7 +1868,7 @@
     return endOfMonth(anniversaryYear, filingDate.getMonth());
   }
 
-  function inferProceduralDeadlines(main, docs, eventHistory = {}, legal = {}) {
+  function inferProceduralDeadlines(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
     const out = [];
     const sortedDocs = [...(docs || [])].sort(compareDateDesc);
     const sortedEvents = dedupe([...(eventHistory.events || []), ...(legal.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}`).sort(compareDateDesc);
@@ -1572,6 +1893,15 @@
     const isEuroPct = /e\/pct/.test(appType);
     const isDivisional = /divisional/.test(appType);
 
+    const pdfHints = (Array.isArray(pdfData?.hints) ? pdfData.hints : [])
+      .map((h) => ({
+        ...h,
+        date: parseDateString(h.dateStr),
+      }))
+      .filter((h) => h.date);
+
+    const hasPdfHint = (regex) => pdfHints.some((h) => regex.test(String(h.label || '')));
+
     const push = (entry) => {
       if (!entry?.date || Number.isNaN(entry.date.getTime())) return;
       out.push(entry);
@@ -1595,6 +1925,7 @@
       hasAfter(anchorDate, (r) => regex.test(`${r.title} ${r.detail}`));
 
     const addMonthsDeadline = ({ triggerRegex, label, months, level, confidence = 'medium', resolvedBy }) => {
+      if (hasPdfHint(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) return;
       const rec = latestRecord(triggerRegex);
       if (!rec) return;
       const anchor = parseDateString(rec.dateStr);
@@ -1613,6 +1944,18 @@
         resolved,
       });
     };
+
+    for (const hint of pdfHints) {
+      push({
+        label: String(hint.label || 'PDF-derived deadline'),
+        date: hint.date,
+        level: String(hint.level || 'bad'),
+        confidence: String(hint.confidence || 'high'),
+        sourceDate: String(hint.sourceDate || ''),
+        resolved: !!hint.resolved,
+        fromPdf: true,
+      });
+    }
 
     // Core prosecution communications (notification-based, computed as calendar-month periods)
     addMonthsDeadline({
@@ -1854,6 +2197,7 @@
     const eventHistory = c.sources.event?.data || {};
     const ue = c.sources.ueMain?.data || {};
     const upcRegistry = c.sources.upcRegistry?.data || null;
+    const pdfDeadlines = c.sources.pdfDeadlines?.data || {};
 
     const docs = [...(doclist.docs || [])].sort(compareDateDesc);
     const latestEpo = docs.find((d) => d.actor === 'EPO' && d.bundle !== 'Other') || docs.find((d) => d.actor === 'EPO') || null;
@@ -1878,7 +2222,7 @@
               ? 'Filing'
               : 'Unknown');
 
-    const deadlines = inferProceduralDeadlines(main, docs, eventHistory, legal);
+    const deadlines = inferProceduralDeadlines(main, docs, eventHistory, legal, pdfDeadlines);
 
     const renewal = inferRenewalModel(main, legal, ue);
 

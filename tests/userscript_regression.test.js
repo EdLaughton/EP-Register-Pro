@@ -37,6 +37,9 @@ has(/function\s+persistLiveTimelineGroups\s*\(/, 'Timeline open-group persistenc
 has(/function\s+persistLiveDoclistGroups\s*\(/, 'Doclist open-group persistence helper missing');
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
 has(/function\s+timelineCacheKey\s*\(/, 'Timeline model should expose a cache key for memoization');
+has(/function\s+ensurePdfJs\s*\(/, 'PDF parser loader helper missing');
+has(/function\s+refreshPdfDeadlines\s*\(/, 'PDF deadline refresh pipeline missing');
+has(/inferProceduralDeadlines\(main,\s*docs,\s*eventHistory,\s*legal,\s*pdfDeadlines\)/, 'Overview deadline model should include PDF-derived hints');
 
 // Timeline controls (include/exclude + importance)
 has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
