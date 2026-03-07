@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.37
+// @version      7.0.38
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.37';
+  const VERSION = '7.0.38';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1547,82 +1547,206 @@
     return endOfMonth(anniversaryYear, filingDate.getMonth());
   }
 
-  function inferProceduralDeadlines(main, docs) {
+  function inferProceduralDeadlines(main, docs, eventHistory = {}, legal = {}) {
     const out = [];
     const sortedDocs = [...(docs || [])].sort(compareDateDesc);
+    const sortedEvents = dedupe([...(eventHistory.events || []), ...(legal.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}`).sort(compareDateDesc);
+    const records = dedupe([
+      ...sortedDocs.map((d) => ({
+        dateStr: d.dateStr,
+        title: d.title || '',
+        detail: d.procedure || d.detail || '',
+        actor: d.actor || 'Other',
+        source: 'Documents',
+      })),
+      ...sortedEvents.map((e) => ({
+        dateStr: e.dateStr,
+        title: e.title || '',
+        detail: e.detail || '',
+        actor: /applicant|filed by applicant|by applicant/i.test(`${e.title || ''} ${e.detail || ''}`) ? 'Applicant' : 'EPO',
+        source: 'Event',
+      })),
+    ], (r) => `${r.dateStr}|${r.title}|${r.detail}|${r.source}`).sort(compareDateDesc);
+
+    const appType = normalize(main.applicationType || '').toLowerCase();
+    const isEuroPct = /e\/pct/.test(appType);
+    const isDivisional = /divisional/.test(appType);
 
     const push = (entry) => {
       if (!entry?.date || Number.isNaN(entry.date.getTime())) return;
       out.push(entry);
     };
 
-    const latestMatching = (regex) => sortedDocs.find((d) => regex.test(`${d.title || ''} ${d.procedure || ''}`));
-    const hasLaterApplicant = (date) => {
-      const ts = date?.getTime?.() || 0;
+    const latestRecord = (regex) => records.find((r) => regex.test(`${r.title || ''} ${r.detail || ''}`));
+
+    const hasAfter = (anchorDate, predicate) => {
+      const ts = anchorDate?.getTime?.() || 0;
       if (!ts) return false;
-      return sortedDocs.some((d) => {
-        const dt = parseDateString(d.dateStr);
-        return d.actor === 'Applicant' && dt && dt.getTime() > ts;
+      return records.some((r) => {
+        const dt = parseDateString(r.dateStr);
+        return dt && dt.getTime() > ts && predicate(r, dt);
       });
     };
 
-    const templates = [
-      {
-        re: /rule\s*71\(3\)|intention to grant|text intended for grant/i,
-        label: 'R71(3) response period',
-        months: 4,
-        level: 'warn',
-        confidence: 'high',
-      },
-      {
-        re: /article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining/i,
-        label: 'Art. 94(3) response period',
-        months: 4,
-        level: 'warn',
-        confidence: 'high',
-      },
-      {
-        re: /rule\s*161|rule\s*162|communication pursuant to rule 161|invitation.*rule 161/i,
-        label: 'Rule 161/162 response period',
-        months: 6,
-        level: 'warn',
-        confidence: 'high',
-      },
-      {
-        re: /reminder period for payment of examination fee\/designation fee|correction of deficiencies in written opinion/i,
-        label: 'Exam/designation fee remedy period',
-        months: 6,
-        level: 'bad',
-        confidence: 'medium',
-      },
-    ];
+    const hasApplicantResponseAfter = (anchorDate, regex = /reply|response|observations|arguments|amended|amendment|claims|request|translation|appeal/i) =>
+      hasAfter(anchorDate, (r) => r.actor === 'Applicant' && regex.test(`${r.title} ${r.detail}`));
 
-    for (const tpl of templates) {
-      const doc = latestMatching(tpl.re);
-      if (!doc) continue;
-      const anchor = parseDateString(doc.dateStr);
-      if (!anchor) continue;
+    const hasFeeSignalAfter = (anchorDate, regex = /payment|fee paid|paid|examination fee|designation fee|grant and publishing fee|grant and publication fee|renewal fee/i) =>
+      hasAfter(anchorDate, (r) => regex.test(`${r.title} ${r.detail}`));
 
-      const due = addMonths(anchor, tpl.months);
-      const feeRemedy = /fee remedy|designation fee|examination fee/i.test(tpl.label);
-      const paidAfter = feeRemedy && sortedDocs.some((d) => {
-        const dt = parseDateString(d.dateStr);
-        const txt = `${d.title || ''} ${d.procedure || ''}`;
-        return dt && dt.getTime() >= anchor.getTime() && /payment.*examination fee|payment.*designation fee|designation fee paid|examination fee paid|fee payment received/i.test(txt);
-      });
-      const resolved = hasLaterApplicant(anchor) || paidAfter;
+    const addMonthsDeadline = ({ triggerRegex, label, months, level, confidence = 'medium', resolvedBy }) => {
+      const rec = latestRecord(triggerRegex);
+      if (!rec) return;
+      const anchor = parseDateString(rec.dateStr);
+      if (!anchor) return;
+
+      const resolved = typeof resolvedBy === 'function'
+        ? !!resolvedBy(anchor, rec)
+        : hasApplicantResponseAfter(anchor);
 
       push({
-        label: tpl.label,
-        date: due,
-        level: tpl.level,
-        confidence: tpl.confidence,
-        sourceDate: doc.dateStr,
+        label,
+        date: addMonths(anchor, months),
+        level,
+        confidence,
+        sourceDate: rec.dateStr,
         resolved,
+      });
+    };
+
+    // Core prosecution communications (notification-based, computed as calendar-month periods)
+    addMonthsDeadline({
+      triggerRegex: /rule\s*71\(3\)|intention to grant|text intended for grant/i,
+      label: 'R71(3) response period',
+      months: 4,
+      level: 'bad',
+      confidence: 'high',
+      resolvedBy: (anchor) => hasFeeSignalAfter(anchor, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections/i) || hasApplicantResponseAfter(anchor),
+    });
+
+    addMonthsDeadline({
+      triggerRegex: /article\s*94\(3\)|art\.\s*94\(3\)|communication from (?:the )?examining/i,
+      label: 'Art. 94(3) response period',
+      months: 4,
+      level: 'warn',
+      confidence: 'medium',
+    });
+
+    addMonthsDeadline({
+      triggerRegex: /rule\s*70\(2\)|confirm.*proceed|wish to proceed|proceed further/i,
+      label: 'Rule 70(2) confirmation/response period',
+      months: 6,
+      level: 'warn',
+      confidence: 'high',
+    });
+
+    addMonthsDeadline({
+      triggerRegex: /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/i,
+      label: 'Rule 161/162 response period',
+      months: 6,
+      level: 'bad',
+      confidence: 'high',
+      resolvedBy: (anchor) => hasApplicantResponseAfter(anchor, /reply|response|amend|claims|observations|arguments/i) || hasFeeSignalAfter(anchor, /claims fee|fee payment received/i),
+    });
+
+    // EP direct/divisional: 6 months from ESR publication mention for exam/designation/search-opinion response bundle.
+    if (!isEuroPct) {
+      const esrMention = latestRecord(/mention of publication of (?:the )?european search report|publication of (?:the )?european search report/i);
+      if (esrMention) {
+        const anchor = parseDateString(esrMention.dateStr);
+        if (anchor) {
+          push({
+            label: `${isDivisional ? 'Divisional ' : ''}exam/designation + search-opinion bundle`,
+            date: addMonths(anchor, 6),
+            level: 'bad',
+            confidence: 'high',
+            sourceDate: esrMention.dateStr,
+            resolved: hasFeeSignalAfter(anchor, /request for examination|examination fee|designation fee|extension fee|validation fee|fee payment received/i) || hasApplicantResponseAfter(anchor),
+          });
+        }
+      }
+    }
+
+    // Euro-PCT later-of formula for exam/designation and core 31-month entry stop.
+    const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
+    const filingDate = parseDateString(main.filingDate);
+    const base31Date = priorityDate || filingDate;
+
+    if (isEuroPct && base31Date) {
+      const due31 = addMonths(base31Date, 31);
+      const isr = latestRecord(/international search report|\bisr\b|written opinion/i);
+      const isrDate = parseDateString(isr?.dateStr || '');
+      const isrPlus6 = isrDate ? addMonths(isrDate, 6) : null;
+      const dueLater = isrPlus6 && isrPlus6 > due31 ? isrPlus6 : due31;
+
+      push({
+        label: 'Euro-PCT entry acts (31-month stop)',
+        date: due31,
+        level: 'bad',
+        confidence: 'high',
+        sourceDate: priorityDate ? main.priorities?.[0]?.dateStr || '' : main.filingDate || '',
+        resolved: hasFeeSignalAfter(base31Date, /translation|entry into european phase|rule 159|filing fee|page fee|request for examination/i),
+      });
+
+      push({
+        label: 'Euro-PCT exam/designation deadline (later-of formula)',
+        date: dueLater,
+        level: 'bad',
+        confidence: isrDate ? 'high' : 'medium',
+        sourceDate: isrDate ? `${formatDate(base31Date)} / ${isr?.dateStr || ''}` : formatDate(base31Date),
+        resolved: hasFeeSignalAfter(base31Date, /request for examination|examination fee|designation fee|extension fee|validation fee/i),
       });
     }
 
-    const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
+    // Post-grant monitors.
+    const grantMention = latestRecord(/mention of grant|patent has been granted|granted/i);
+    if (grantMention) {
+      const anchor = parseDateString(grantMention.dateStr);
+      if (anchor) {
+        push({
+          label: 'Opposition period (third-party monitor)',
+          date: addMonths(anchor, 9),
+          level: 'warn',
+          confidence: 'high',
+          sourceDate: grantMention.dateStr,
+          resolved: false,
+        });
+        push({
+          label: 'Unitary effect request window',
+          date: addMonths(anchor, 1),
+          level: 'warn',
+          confidence: 'high',
+          sourceDate: grantMention.dateStr,
+          resolved: hasAfter(anchor, (r) => /unitary effect/i.test(`${r.title} ${r.detail}`)),
+        });
+      }
+    }
+
+    // Appeal windows from decisions.
+    const decision = latestRecord(/\bdecision\b.*(?:refus|grant|revok|maintain)|\bdecision\b/i);
+    if (decision) {
+      const anchor = parseDateString(decision.dateStr);
+      if (anchor) {
+        push({
+          label: 'Appeal notice + fee',
+          date: addMonths(anchor, 2),
+          level: 'bad',
+          confidence: 'high',
+          sourceDate: decision.dateStr,
+          resolved: hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)),
+        });
+        push({
+          label: 'Appeal grounds',
+          date: addMonths(anchor, 4),
+          level: 'bad',
+          confidence: 'high',
+          sourceDate: decision.dateStr,
+          resolved: hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)),
+        });
+      }
+    }
+
+    // Priority + patent-term references.
     if (priorityDate) {
       const due = addMonths(priorityDate, 12);
       if (due > new Date()) {
@@ -1637,7 +1761,6 @@
       }
     }
 
-    const filingDate = parseDateString(main.filingDate);
     if (filingDate) {
       push({
         label: '20-year term from filing (reference)',
@@ -1649,7 +1772,7 @@
       });
     }
 
-    return out;
+    return dedupe(out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}`);
   }
 
   function inferRenewalModel(main, legal, ue) {
@@ -1728,6 +1851,7 @@
     const doclist = c.sources.doclist?.data || {};
     const family = c.sources.family?.data || {};
     const legal = c.sources.legal?.data || {};
+    const eventHistory = c.sources.event?.data || {};
     const ue = c.sources.ueMain?.data || {};
     const upcRegistry = c.sources.upcRegistry?.data || null;
 
@@ -1754,7 +1878,7 @@
               ? 'Filing'
               : 'Unknown');
 
-    const deadlines = inferProceduralDeadlines(main, docs);
+    const deadlines = inferProceduralDeadlines(main, docs, eventHistory, legal);
 
     const renewal = inferRenewalModel(main, legal, ue);
 
