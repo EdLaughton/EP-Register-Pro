@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.29
+// @version      7.0.30
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.29';
+  const VERSION = '7.0.30';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -856,7 +856,7 @@
 
     table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
     table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
-      row.classList.remove('epoRP-docgrp-item', 'collapsed', 'epoRP-filter-hidden');
+      row.classList.remove('epoRP-docgrp-item', 'collapsed', 'epoRP-filter-hidden', 'epoRP-docgrp-open');
       row.removeAttribute('data-eporp-group');
     });
 
@@ -899,13 +899,19 @@
       for (const row of r.rows) {
         row.setAttribute('data-eporp-group', groupId);
         row.classList.add('epoRP-docgrp-item', 'collapsed');
+        row.classList.remove('epoRP-docgrp-open');
       }
 
       td.querySelector('button')?.addEventListener('click', (event) => {
         const btn = event.currentTarget;
         const expanded = btn.getAttribute('aria-expanded') === 'true';
-        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        for (const row of r.rows) row.classList.toggle('collapsed', expanded);
+        const nextExpanded = !expanded;
+        btn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+        headerRow.classList.toggle('open', nextExpanded);
+        for (const row of r.rows) {
+          row.classList.toggle('collapsed', !nextExpanded);
+          row.classList.toggle('epoRP-docgrp-open', nextExpanded);
+        }
       });
     }
 
@@ -1977,9 +1983,13 @@
     .epoRP-in{border:1px solid #cbd5e1;border-radius:8px;padding:5px 7px;font-size:12px;width:100%}
     .epoRP-deadlineRow{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px dashed #cbd5e1;align-items:start;background:#f8fafc}
     tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:4px 8px}
-    .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent;border:0;padding:0;box-shadow:none}
+    tr.epoRP-docgrp.open td{background:#dbeafe;border-top-color:#93c5fd;border-bottom-color:#bfdbfe}
+    .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent !important;background-image:none !important;border:0 !important;border-radius:0;box-shadow:none !important;padding:0;appearance:none !important;-webkit-appearance:none !important}
+    .epoRP-docgrp-btn::-moz-focus-inner{border:0;padding:0}
+    .epoRP-docgrp-btn:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;border-radius:6px}
     .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}
     .epoRP-docgrp-btn[aria-expanded="true"] .epoRP-docgrp-arrow{transform:rotate(90deg)}
+    tr.epoRP-docgrp-item.epoRP-docgrp-open td{background:#f8fbff;box-shadow:inset 3px 0 0 #bfdbfe}
     tr.epoRP-docgrp-item.collapsed{display:none}
     .epoRP-doclist-filter-wrap{margin:8px 0}
     .epoRP-doclist-filter{width:100%;max-width:420px;border:1px solid #cbd5e1;border-radius:8px;padding:7px 10px;font:13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
