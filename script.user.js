@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.28
+// @version      7.0.29
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.28';
+  const VERSION = '7.0.29';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -748,7 +748,7 @@
     const p = String(procedure || '').toLowerCase();
 
     if (/by applicant|amendment by applicant|filed by applicant|from applicant/.test(p)) {
-      if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) {
+      if (/request for grant|description|claims|drawings|designation of inventor|priority document|annex/.test(t)) {
         return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
       }
       return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
@@ -766,7 +766,7 @@
     if (/rule\s*71\(3\)|intention to grant|text intended for grant|mention of grant/.test(t)) return { bundle: 'Grant package', level: 'warn', actor: 'EPO' };
     if (/article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining|examining division has become responsible/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
     if (/renewal|annual fee/.test(t)) return { bundle: 'Renewal', level: 'ok', actor: 'Applicant' };
-    if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
+    if (/request for grant|description|claims|drawings|designation of inventor|priority document|annex/.test(t)) return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
     if (/reply|response|arguments|observations|letter|filed by applicant|submission|request/.test(t)) return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
     if (/opposition|third party/.test(t) || /third party/.test(p)) return { bundle: 'Opposition', level: 'warn', actor: 'Third party' };
 
@@ -1608,9 +1608,12 @@
     return html;
   }
 
-  function timelineItemHtml(item, compact = false) {
+  function timelineItemHtml(item, compact = false, inGroup = false) {
     const actorClass = item.actor === 'Applicant' ? 'actor-applicant' : item.actor === 'EPO' ? 'actor-epo' : item.actor === 'Third party' ? 'actor-third' : '';
-    return `<div class="epoRP-it ${compact ? 'compact' : ''}">
+    const classes = ['epoRP-it'];
+    if (compact) classes.push('compact');
+    if (inGroup) classes.push('in-group');
+    return `<div class="${classes.join(' ')}">
       <div class="epoRP-dot ${esc(item.level || 'info')} ${esc(actorClass)}"></div>
       <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
       <div>
@@ -1655,7 +1658,7 @@
             </div>
             <div class="epoRP-garrow">▸</div>
           </summary>
-          <div class="epoRP-grpi">${(item.items || []).map((x) => timelineItemHtml(x, compact)).join('')}</div>
+          <div class="epoRP-grpi">${(item.items || []).map((x) => timelineItemHtml(x, compact, true)).join('')}</div>
         </details>`);
       } else {
         out.push(timelineItemHtml(item, compact));
@@ -1932,6 +1935,9 @@
     .epoRP-it{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #f1f5f9;align-items:center}
     .epoRP-it.compact{padding:4px 2px}
     .epoRP-it:last-child{border-bottom:0}
+    .epoRP-it.in-group{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px;margin:4px 0;border-bottom:1px solid #e2e8f0}
+    .epoRP-it.in-group.compact{padding:4px}
+    .epoRP-it.in-group:last-child{border-bottom:1px solid #e2e8f0}
     .epoRP-dot{width:9px;height:9px;border-radius:999px;margin-top:0;background:#94a3b8}
     .epoRP-dot.dotted{background:transparent;border:2px dotted #94a3b8;width:10px;height:10px}
     .epoRP-dot.ok{background:#16a34a}
@@ -1948,11 +1954,14 @@
     .epoRP-mn{font-weight:700}
     .epoRP-sb{font-size:11px;color:#64748b;white-space:pre-wrap}
     .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:5px;background:#f8fafc;margin-bottom:7px}
-    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:4px;cursor:pointer;list-style:none;align-items:center}
+    .epoRP-grp[open]{background:#eef6ff;border-color:#bfdbfe;box-shadow:inset 0 0 0 1px #dbeafe}
+    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:6px;cursor:pointer;list-style:none;align-items:center;background:transparent;border:0;border-radius:8px;appearance:none;-webkit-appearance:none}
+    .epoRP-grp[open] .epoRP-grph{background:#e2efff;border:1px solid #c7dcff}
+    .epoRP-grph::marker{content:''}
     .epoRP-grph::-webkit-details-marker{display:none}
     .epoRP-garrow{font-size:16px;font-weight:700;color:#334155;justify-self:end;transition:transform .15s ease}
     .epoRP-grp[open] .epoRP-garrow{transform:rotate(90deg)}
-    .epoRP-grp .epoRP-grpi{margin-left:12px;border-left:2px dotted #cbd5e1;padding-left:8px}
+    .epoRP-grp .epoRP-grpi{margin-left:12px;border-left:2px dotted #93c5fd;padding-left:10px;padding-top:4px}
     .epoRP-grp:not([open]) .epoRP-grpi{display:none}
     .epoRP-today{border-top:2px solid #1d4ed8;margin:10px 0 8px;padding-top:4px;font-size:11px;color:#1e40af;font-weight:700}
     .epoRP-dl{display:flex;flex-direction:column;gap:4px}

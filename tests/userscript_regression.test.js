@@ -27,6 +27,9 @@ hasText('opt(?:ed)?[\\s-]*out(?:\\s+\\w+){0,8}\\s+(?:register', 'UPC positive ma
 has(/<details class="epoRP-grp">/, 'Timeline groups should render as collapsed <details> by default');
 has(/class="epoRP-garrow"/, 'Timeline group arrow indicator missing');
 has(/\.epoRP-grp\[open\]\s+\.epoRP-garrow\{transform:rotate\(90deg\)/, 'Timeline arrow rotation style missing');
+has(/timelineItemHtml\(item, compact = false, inGroup = false\)/, 'Timeline item renderer should support in-group styling');
+has(/\.epoRP-it\.in-group\{/, 'Grouped timeline items should have dedicated background styling');
+has(/\.epoRP-grph::marker\{content:''\}/, 'Timeline group summary should hide default marker to avoid native grey button artefacts');
 
 // Timeline controls (include/exclude + importance)
 has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
@@ -48,6 +51,7 @@ has(/extractEpNumbersByHeader\(doc,\s*\/\\bParent application/, 'Parent applicat
 has(/extractEpNumbersByHeader\(doc,\s*\/\\bDivisional application/, 'Divisional child extraction should use header-scoped helper');
 hasText('[A-Z]{2}\\d[0-9A-Z\\/\\-]{4,}', 'Priority parser should require numeric body after country code (prevents LANGUAGE false matches)');
 hasText('Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event', 'Priority page-text fallback should stop at known next labels to avoid pulling publication rows');
+hasText('priority document|annex', 'Annex filings should be classed with the filing package');
 has(/const\s+internationalField\s*=\s*dedupeMultiline\(fieldByLabel\(doc,\s*\[\/\^International application\\b\/i,\s*\/\^International publication\\b\/i,\s*\/\^PCT application\\b\/i\]\)\);/, 'E/PCT detection should use international-application scoped fields');
 notHas(/const\s+isEuroPct\s*=\s*!!internationalAppNo\s*\|\|\s*\/\\bPCT\\b\/i/, 'E/PCT detection should not rely on broad page-wide PCT token matching');
 has(/function\s+enhanceDoclistGrouping\s*\(/, 'All-documents grouping enhancer missing');
