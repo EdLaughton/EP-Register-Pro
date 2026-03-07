@@ -66,5 +66,8 @@ has(/const\s+highestPaidNextYear\s*=\s*m\.renewal\.highestYear\s*\?\s*\(m\.renew
 has(/Math\.max\(3,\s*filingBasedNextYear\s*\|\|\s*0,\s*highestPaidNextYear\s*\|\|\s*0\)/, 'Renewal next-year should be max of filing-based and paid-ahead baseline');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
+has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
+has(/function\s+persistCurrentPanelScroll\s*\(/, 'Panel scroll persistence helper missing');
+has(/restorePanelScroll\(caseNo,\s*activeView\)/, 'Panel scroll should be restored after rerender');
 
 console.log('userscript regression checks passed');

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.31
+// @version      7.0.32
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.31';
+  const VERSION = '7.0.32';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -69,6 +69,7 @@
     fetchLabel: 'Idle',
     abortController: null,
     fetchCaseNo: null,
+    scrollSaveTimer: null,
   };
 
   let memory = null;
@@ -410,6 +411,61 @@
     }
 
     setUiState({ timelineOpenByCase: byCase });
+  }
+
+  function panelScrollKey(caseNo, view) {
+    return `${String(caseNo || '').toUpperCase()}|${String(view || 'overview').toLowerCase()}`;
+  }
+
+  function getPanelScroll(caseNo, view) {
+    const key = panelScrollKey(caseNo, view);
+    const map = uiState().panelScrollByView || {};
+    const value = Number(map[key]);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+
+  function setPanelScroll(caseNo, view, scrollTop) {
+    if (!caseNo || !view) return;
+    const key = panelScrollKey(caseNo, view);
+    const state = uiState();
+    const map = { ...(state.panelScrollByView || {}) };
+    const top = Math.max(0, Math.round(Number(scrollTop) || 0));
+    if ((Number(map[key]) || 0) === top) return;
+    map[key] = top;
+
+    const keys = Object.keys(map);
+    const maxEntries = 180;
+    if (keys.length > maxEntries) {
+      for (const oldKey of keys.slice(0, keys.length - maxEntries)) delete map[oldKey];
+    }
+
+    setUiState({ panelScrollByView: map });
+  }
+
+  function persistCurrentPanelScroll() {
+    const b = runtime.body;
+    if (!b || runtime.collapsed || !runtime.appNo) return;
+    setPanelScroll(runtime.appNo, runtime.activeView || 'overview', b.scrollTop || 0);
+  }
+
+  function schedulePanelScrollSave(caseNo, view, scrollTop) {
+    if (runtime.scrollSaveTimer) clearTimeout(runtime.scrollSaveTimer);
+    runtime.scrollSaveTimer = setTimeout(() => {
+      runtime.scrollSaveTimer = null;
+      setPanelScroll(caseNo, view, scrollTop);
+    }, 120);
+  }
+
+  function restorePanelScroll(caseNo, view) {
+    const b = runtime.body;
+    if (!b) return;
+    const top = getPanelScroll(caseNo, view);
+    requestAnimationFrame(() => {
+      if (runtime.body !== b) return;
+      if (runtime.appNo !== caseNo) return;
+      if (runtime.activeView !== view) return;
+      b.scrollTop = top;
+    });
   }
 
   function scheduleRender() {
@@ -1788,6 +1844,7 @@
 
     panel.querySelectorAll('.epoRP-tab').forEach((btn) => {
       btn.addEventListener('click', () => {
+        persistCurrentPanelScroll();
         setUiState({ activeView: btn.dataset.view || 'overview' });
         renderPanel();
       });
@@ -1795,6 +1852,10 @@
 
     runtime.panel = panel;
     runtime.body = panel.querySelector('#epoRP-body');
+    runtime.body?.addEventListener('scroll', () => {
+      if (runtime.collapsed || !runtime.appNo) return;
+      schedulePanelScrollSave(runtime.appNo, runtime.activeView || 'overview', runtime.body.scrollTop || 0);
+    }, { passive: true });
     return panel;
   }
 
@@ -1886,6 +1947,12 @@
       return;
     }
 
+    const previousCaseNo = runtime.appNo;
+    const previousView = runtime.activeView || 'overview';
+    if (runtime.body && previousCaseNo && !runtime.collapsed) {
+      setPanelScroll(previousCaseNo, previousView, runtime.body.scrollTop || 0);
+    }
+
     const caseNo = detectAppNo();
     runtime.appNo = caseNo;
 
@@ -1916,17 +1983,21 @@
       return;
     }
 
-    if (runtime.activeView === 'timeline') {
+    const activeView = runtime.activeView || 'overview';
+    if (activeView === 'timeline') {
       body.innerHTML = renderTimeline(caseNo);
       wireTimeline(caseNo);
+      restorePanelScroll(caseNo, activeView);
       return;
     }
-    if (runtime.activeView === 'options') {
+    if (activeView === 'options') {
       body.innerHTML = renderOptions();
       wireOptions();
+      restorePanelScroll(caseNo, activeView);
       return;
     }
     body.innerHTML = renderOverview(caseNo);
+    restorePanelScroll(caseNo, activeView);
   }
 
   function init(force = false) {
@@ -2091,7 +2162,14 @@
   });
 
   addEventListener('pageshow', () => init(false));
-  addEventListener('beforeunload', flushNow);
+  addEventListener('beforeunload', () => {
+    if (runtime.scrollSaveTimer) {
+      clearTimeout(runtime.scrollSaveTimer);
+      runtime.scrollSaveTimer = null;
+    }
+    persistCurrentPanelScroll();
+    flushNow();
+  });
 
   init(false);
 })();
