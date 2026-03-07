@@ -34,6 +34,7 @@ has(/function\s+timelineGroupKey\s*\(/, 'Timeline group key helper missing');
 has(/data-group-key="\$\{esc\(groupKey\)\}"/, 'Timeline groups should render stable key attributes for open-state persistence');
 has(/function\s+wireTimeline\s*\(caseNo\)/, 'Timeline wire-up should persist group expansion state');
 has(/function\s+persistLiveTimelineGroups\s*\(/, 'Timeline open-group persistence helper missing');
+has(/function\s+persistLiveDoclistGroups\s*\(/, 'Doclist open-group persistence helper missing');
 
 // Timeline controls (include/exclude + importance)
 has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
@@ -69,6 +70,7 @@ has(/epoRP-docgrp-item\.epoRP-docgrp-last\.epoRP-docgrp-open td\{border-bottom:2
 has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-documents group header control should suppress native button chrome');
 has(/const\s+highestPaidNextYear\s*=\s*m\.renewal\.highestYear\s*\?\s*\(m\.renewal\.highestYear\s*\+\s*1\)\s*:\s*null;/, 'Renewal next-year should account for paid-ahead highest year');
 has(/Math\.max\(3,\s*filingBasedNextYear\s*\|\|\s*0,\s*highestPaidNextYear\s*\|\|\s*0\)/, 'Renewal next-year should be max of filing-based and paid-ahead baseline');
+has(/\? 'Post-publication'/, 'Stage mapping should avoid using "Published" as a stage label');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');

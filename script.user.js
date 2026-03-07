@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.34
+// @version      7.0.35
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.34';
+  const VERSION = '7.0.35';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -386,7 +386,6 @@
       item.dateStr || '',
       item.title || '',
       item.actor || '',
-      String((item.items || []).length || 0),
       topTitles,
     ];
     return parts.map((v) => normalize(String(v))).join('|');
@@ -445,11 +444,24 @@
     setUiState({ doclistOpenByCase: byCase });
   }
 
-  function doclistGroupKey(caseNo, bundle, rows) {
-    const firstText = normalize(text(rows?.[0] || '')).slice(0, 160);
-    const lastText = normalize(text(rows?.[rows.length - 1] || '')).slice(0, 160);
-    const parts = [caseNo, bundle || 'Group', String(rows?.length || 0), firstText, lastText];
+  function doclistGroupKey(caseNo, bundle, ordinal = 0) {
+    const parts = [caseNo, bundle || 'Group', String(ordinal || 0)];
     return parts.map((v) => normalize(String(v))).join('|');
+  }
+
+  function persistLiveDoclistGroups(caseNo) {
+    if (!caseNo || tabSlug() !== 'doclist') return;
+    const table = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
+    if (!table) return;
+
+    const openGroups = getDoclistOpenGroups(caseNo);
+    table.querySelectorAll('tr.epoRP-docgrp .epoRP-docgrp-btn[data-group-key]').forEach((btn) => {
+      const key = String(btn.getAttribute('data-group-key') || '');
+      if (!key) return;
+      if (btn.getAttribute('aria-expanded') === 'true') openGroups.add(key);
+      else openGroups.delete(key);
+    });
+    setDoclistOpenGroups(caseNo, openGroups);
   }
 
   function panelScrollKey(caseNo, view) {
@@ -984,14 +996,8 @@
       });
     }
 
+    persistLiveDoclistGroups(caseNo);
     const openGroups = getDoclistOpenGroups(caseNo);
-    table.querySelectorAll('tr.epoRP-docgrp .epoRP-docgrp-btn[data-group-key]').forEach((btn) => {
-      const key = String(btn.getAttribute('data-group-key') || '');
-      if (!key) return;
-      if (btn.getAttribute('aria-expanded') === 'true') openGroups.add(key);
-      else openGroups.delete(key);
-    });
-    if (caseNo) setDoclistOpenGroups(caseNo, openGroups);
 
     table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
     table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
@@ -1024,7 +1030,7 @@
       if (!groupable.has(r.bundle) || r.rows.length < 2) continue;
       gid += 1;
       const groupId = `g${gid}`;
-      const groupKey = doclistGroupKey(caseNo, r.bundle, r.rows);
+      const groupKey = doclistGroupKey(caseNo, r.bundle, gid);
       const isOpen = openGroups.has(groupKey);
       const firstRow = r.rows[0];
       const cells = [...firstRow.querySelectorAll('td')];
@@ -1517,13 +1523,18 @@
     const publicationFallback = publicationsPrimary.length ? [] : inferPublicationsFromDocs(docs);
     const publications = dedupe([...publicationsPrimary, ...publicationFallback], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`).sort(compareDateDesc);
 
-    const stage = docs.some((d) => d.bundle === 'Grant package')
-      ? 'Grant stage'
-      : docs.some((d) => d.bundle === 'Examination')
+    const stageText = normalize(main.statusRaw || '').toLowerCase();
+    const stage = docs.some((d) => d.bundle === 'Grant package') || /rule\s*71\(3\)|intention to grant|mention of grant|granted/.test(stageText)
+      ? 'Grant / post-grant'
+      : docs.some((d) => d.bundle === 'Examination') || /article\s*94\(3\)|art\.\s*94\(3\)|examining division|examination/.test(stageText)
         ? 'Examination'
-        : docs.some((d) => d.bundle === 'Search package')
+        : docs.some((d) => d.bundle === 'Search package') || /search report|search opinion|written opinion|\bsearch\b/.test(stageText)
           ? 'Search'
-          : (main.statusSimple || 'Unknown');
+          : docs.some((d) => d.bundle === 'Filing package') || /filing/.test(stageText)
+            ? 'Filing'
+            : /published|publication/.test(stageText)
+              ? 'Post-publication'
+              : 'Unknown';
 
     const deadlines = [];
     const filingDate = parseDateString(main.filingDate);
@@ -2247,7 +2258,16 @@
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible' || !isCasePage()) return;
+    if (!isCasePage()) return;
+
+    if (document.visibilityState === 'hidden') {
+      persistCurrentPanelScroll();
+      if (runtime.appNo && runtime.activeView === 'timeline') persistLiveTimelineGroups(runtime.appNo);
+      if (runtime.appNo) persistLiveDoclistGroups(runtime.appNo);
+      return;
+    }
+
+    if (document.visibilityState !== 'visible') return;
     enhanceDoclistGrouping();
     if (runtime.activeView !== 'timeline') renderPanel();
   });
@@ -2260,6 +2280,7 @@
     }
     persistCurrentPanelScroll();
     if (runtime.appNo && runtime.activeView === 'timeline') persistLiveTimelineGroups(runtime.appNo);
+    if (runtime.appNo) persistLiveDoclistGroups(runtime.appNo);
     flushNow();
   });
 
