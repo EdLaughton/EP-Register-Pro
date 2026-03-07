@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.42
+// @version      7.0.43
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.42';
+  const VERSION = '7.0.43';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1582,7 +1582,8 @@
     if (category && monthMatch?.[1] && docDate) {
       const months = Number(monthMatch[1]);
       if (Number.isFinite(months) && months > 0 && months <= 12) {
-        const due = addMonths(docDate, months);
+        const calc = addCalendarMonthsDetailed(docDate, months);
+        const due = calc.date;
         const already = hints.some((h) => h.label === category && h.dateStr === formatDate(due));
         if (!already) {
           pushHint({
@@ -1590,7 +1591,9 @@
             dateStr: formatDate(due),
             confidence: 'medium',
             level: 'bad',
-            evidence: `Derived from "within ${months} months" in PDF text`,
+            evidence: `Derived from "within ${months} months" in PDF text${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
+            rolledOver: calc.rolledOver,
+            rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
           });
         }
       }
@@ -1857,10 +1860,30 @@
     }
   }
 
+  function addCalendarMonthsDetailed(date, months) {
+    const src = new Date(date);
+    if (Number.isNaN(src.getTime())) return { date: new Date(NaN), rolledOver: false, fromDay: 0, toDay: 0 };
+
+    const srcDay = src.getDate();
+    const srcMonth = src.getMonth();
+    const srcYear = src.getFullYear();
+    const rawMonth = srcMonth + Number(months || 0);
+
+    const targetYear = srcYear + Math.floor(rawMonth / 12);
+    const targetMonth = ((rawMonth % 12) + 12) % 12;
+    const lastDay = endOfMonth(targetYear, targetMonth).getDate();
+    const targetDay = Math.min(srcDay, lastDay);
+
+    return {
+      date: new Date(targetYear, targetMonth, targetDay),
+      rolledOver: srcDay !== targetDay,
+      fromDay: srcDay,
+      toDay: targetDay,
+    };
+  }
+
   function addMonths(date, months) {
-    const d = new Date(date);
-    d.setMonth(d.getMonth() + months);
-    return d;
+    return addCalendarMonthsDetailed(date, months).date;
   }
 
   function addDays(date, days) {
@@ -1947,14 +1970,17 @@
         ? !!resolvedBy(anchor, rec)
         : hasApplicantResponseAfter(anchor);
 
+      const calc = addCalendarMonthsDetailed(anchor, months);
       push({
         label,
-        date: addMonths(anchor, months),
+        date: calc.date,
         level,
         confidence,
         sourceDate: rec.dateStr,
         resolved,
         method: `Heuristic: +${months} month(s) from ${rec.source.toLowerCase()} trigger`,
+        rolledOver: calc.rolledOver,
+        rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
       });
     };
 
@@ -2012,14 +2038,17 @@
       if (esrMention) {
         const anchor = parseDateString(esrMention.dateStr);
         if (anchor) {
+          const calc = addCalendarMonthsDetailed(anchor, 6);
           push({
             label: `${isDivisional ? 'Divisional ' : ''}exam/designation + search-opinion bundle`,
-            date: addMonths(anchor, 6),
+            date: calc.date,
             level: 'bad',
             confidence: 'high',
             sourceDate: esrMention.dateStr,
             resolved: hasFeeSignalAfter(anchor, /request for examination|examination fee|designation fee|extension fee|validation fee|fee payment received/i) || hasApplicantResponseAfter(anchor),
             method: 'Rule-based: +6 months from ESR publication mention',
+            rolledOver: calc.rolledOver,
+            rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
           });
         }
       }
@@ -2031,11 +2060,17 @@
     const base31Date = priorityDate || filingDate;
 
     if (isEuroPct && base31Date) {
-      const due31 = addMonths(base31Date, 31);
+      const calc31 = addCalendarMonthsDetailed(base31Date, 31);
+      const due31 = calc31.date;
       const isr = latestRecord(/international search report|\bisr\b|written opinion/i);
       const isrDate = parseDateString(isr?.dateStr || '');
-      const isrPlus6 = isrDate ? addMonths(isrDate, 6) : null;
+      const calcIsr = isrDate ? addCalendarMonthsDetailed(isrDate, 6) : null;
+      const isrPlus6 = calcIsr?.date || null;
       const dueLater = isrPlus6 && isrPlus6 > due31 ? isrPlus6 : due31;
+      const dueLaterRolled = isrPlus6 && isrPlus6 > due31 ? !!calcIsr?.rolledOver : calc31.rolledOver;
+      const dueLaterRollNote = isrPlus6 && isrPlus6 > due31
+        ? (calcIsr?.rolledOver ? `day ${calcIsr.fromDay}→${calcIsr.toDay}` : '')
+        : (calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '');
 
       push({
         label: 'Euro-PCT entry acts (31-month stop)',
@@ -2045,6 +2080,8 @@
         sourceDate: priorityDate ? main.priorities?.[0]?.dateStr || '' : main.filingDate || '',
         resolved: hasFeeSignalAfter(base31Date, /translation|entry into european phase|rule 159|filing fee|page fee|request for examination/i),
         method: 'Rule-based: priority/filing date +31 months',
+        rolledOver: calc31.rolledOver,
+        rolloverNote: calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '',
       });
 
       push({
@@ -2055,6 +2092,8 @@
         sourceDate: isrDate ? `${formatDate(base31Date)} / ${isr?.dateStr || ''}` : formatDate(base31Date),
         resolved: hasFeeSignalAfter(base31Date, /request for examination|examination fee|designation fee|extension fee|validation fee/i),
         method: isrDate ? 'Rule-based: max(31 months from priority/filing, ISR +6 months)' : 'Rule-based: 31 months from priority/filing (ISR date unavailable)',
+        rolledOver: dueLaterRolled,
+        rolloverNote: dueLaterRollNote,
       });
     }
 
@@ -2063,23 +2102,29 @@
     if (grantMention) {
       const anchor = parseDateString(grantMention.dateStr);
       if (anchor) {
+        const calcOpp = addCalendarMonthsDetailed(anchor, 9);
         push({
           label: 'Opposition period (third-party monitor)',
-          date: addMonths(anchor, 9),
+          date: calcOpp.date,
           level: 'warn',
           confidence: 'high',
           sourceDate: grantMention.dateStr,
           resolved: false,
           method: 'Rule-based: grant mention +9 months',
+          rolledOver: calcOpp.rolledOver,
+          rolloverNote: calcOpp.rolledOver ? `day ${calcOpp.fromDay}→${calcOpp.toDay}` : '',
         });
+        const calcUe = addCalendarMonthsDetailed(anchor, 1);
         push({
           label: 'Unitary effect request window',
-          date: addMonths(anchor, 1),
+          date: calcUe.date,
           level: 'warn',
           confidence: 'high',
           sourceDate: grantMention.dateStr,
           resolved: hasAfter(anchor, (r) => /unitary effect/i.test(`${r.title} ${r.detail}`)),
           method: 'Rule-based: grant mention +1 month',
+          rolledOver: calcUe.rolledOver,
+          rolloverNote: calcUe.rolledOver ? `day ${calcUe.fromDay}→${calcUe.toDay}` : '',
         });
       }
     }
@@ -2089,30 +2134,37 @@
     if (decision) {
       const anchor = parseDateString(decision.dateStr);
       if (anchor) {
+        const calcNotice = addCalendarMonthsDetailed(anchor, 2);
         push({
           label: 'Appeal notice + fee',
-          date: addMonths(anchor, 2),
+          date: calcNotice.date,
           level: 'bad',
           confidence: 'high',
           sourceDate: decision.dateStr,
           resolved: hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)),
           method: 'Rule-based: decision date +2 months',
+          rolledOver: calcNotice.rolledOver,
+          rolloverNote: calcNotice.rolledOver ? `day ${calcNotice.fromDay}→${calcNotice.toDay}` : '',
         });
+        const calcGrounds = addCalendarMonthsDetailed(anchor, 4);
         push({
           label: 'Appeal grounds',
-          date: addMonths(anchor, 4),
+          date: calcGrounds.date,
           level: 'bad',
           confidence: 'high',
           sourceDate: decision.dateStr,
           resolved: hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)),
           method: 'Rule-based: decision date +4 months',
+          rolledOver: calcGrounds.rolledOver,
+          rolloverNote: calcGrounds.rolledOver ? `day ${calcGrounds.fromDay}→${calcGrounds.toDay}` : '',
         });
       }
     }
 
     // Priority + patent-term references.
     if (priorityDate) {
-      const due = addMonths(priorityDate, 12);
+      const calcPriority = addCalendarMonthsDetailed(priorityDate, 12);
+      const due = calcPriority.date;
       if (due > new Date()) {
         push({
           label: 'Priority year ends',
@@ -2122,19 +2174,24 @@
           sourceDate: main.priorities?.[0]?.dateStr || '',
           resolved: false,
           method: 'Rule-based: earliest priority date +12 months',
+          rolledOver: calcPriority.rolledOver,
+          rolloverNote: calcPriority.rolledOver ? `day ${calcPriority.fromDay}→${calcPriority.toDay}` : '',
         });
       }
     }
 
     if (filingDate) {
+      const calcTerm = addCalendarMonthsDetailed(filingDate, 12 * 20);
       push({
         label: '20-year term from filing (reference)',
-        date: addMonths(filingDate, 12 * 20),
+        date: calcTerm.date,
         level: 'info',
         confidence: 'high',
         reference: true,
         resolved: false,
         method: 'Rule-based: filing date +20 years',
+        rolledOver: calcTerm.rolledOver,
+        rolloverNote: calcTerm.rolledOver ? `day ${calcTerm.fromDay}→${calcTerm.toDay}` : '',
       });
     }
 
@@ -2452,6 +2509,7 @@
           `From ${d.sourceDate || 'procedural event'}`,
           d.confidence ? `${d.confidence} confidence` : '',
           d.method || '',
+          d.rolledOver ? `rolled over${d.rolloverNote ? ` (${d.rolloverNote})` : ''}` : '',
           d.resolved ? 'responded' : '',
         ].filter(Boolean);
         html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span>${!d.reference ? `<div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div>` : ''}</div></div>`;
@@ -2464,6 +2522,7 @@
         `From ${m.nextDeadline.sourceDate || 'procedural event'}`,
         m.nextDeadline.confidence ? `${m.nextDeadline.confidence} confidence` : '',
         m.nextDeadline.method || '',
+        m.nextDeadline.rolledOver ? `rolled over${m.nextDeadline.rolloverNote ? ` (${m.nextDeadline.rolloverNote})` : ''}` : '',
         m.nextDeadline.resolved ? 'responded' : '',
       ].filter(Boolean).join(' · ')
       : '';

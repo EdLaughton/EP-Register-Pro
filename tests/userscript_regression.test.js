@@ -36,6 +36,7 @@ has(/function\s+wireTimeline\s*\(caseNo\)/, 'Timeline wire-up should persist gro
 has(/function\s+persistLiveTimelineGroups\s*\(/, 'Timeline open-group persistence helper missing');
 has(/function\s+persistLiveDoclistGroups\s*\(/, 'Doclist open-group persistence helper missing');
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
+has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');
 has(/function\s+timelineCacheKey\s*\(/, 'Timeline model should expose a cache key for memoization');
 has(/function\s+ensurePdfJs\s*\(/, 'PDF parser loader helper missing');
 has(/function\s+refreshPdfDeadlines\s*\(/, 'PDF deadline refresh pipeline missing');
@@ -89,6 +90,7 @@ has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
 has(/function\s+persistCurrentPanelScroll\s*\(/, 'Panel scroll persistence helper missing');
 has(/restorePanelScroll\(caseNo,\s*activeView\)/, 'Panel scroll should be restored after rerender');
 has(/nextDeadlineBadge/, 'Actionable status should show next-deadline day delta inline');
+hasText('rolled over', 'Deadline metadata should include rollover indicator when applicable');
 notHas(/<div class="epoRP-l">Most recent event<\/div>/, 'Actionable status should not render a separate Most recent event row');
 has(/el\.addEventListener\('input',\s*commit\)/, 'Options toggles should react on input events for reliable checkbox commits');
 
