@@ -69,5 +69,6 @@ has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibil
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
 has(/function\s+persistCurrentPanelScroll\s*\(/, 'Panel scroll persistence helper missing');
 has(/restorePanelScroll\(caseNo,\s*activeView\)/, 'Panel scroll should be restored after rerender');
+has(/el\.addEventListener\('input',\s*commit\)/, 'Options toggles should react on input events for reliable checkbox commits');
 
 console.log('userscript regression checks passed');
