@@ -62,7 +62,8 @@ has(/extractEpNumbersByHeader\(doc,\s*\/\\bParent application/, 'Parent applicat
 has(/extractEpNumbersByHeader\(doc,\s*\/\\bDivisional application/, 'Divisional child extraction should use header-scoped helper');
 hasText('[A-Z]{2}\\d[0-9A-Z\\/\\-]{4,}', 'Priority parser should require numeric body after country code (prevents LANGUAGE false matches)');
 hasText('Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event', 'Priority page-text fallback should stop at known next labels to avoid pulling publication rows');
-hasText('priority document|annex', 'Annex filings should be classed with the filing package');
+hasText('priority document|annex', 'Annex filings should be classed with the filing package when applicant-filed');
+has(/annex to \(\?:the \)\?communication\|communication annex\|annex\.\*examining division/, 'Annex-to-communication should be classed as EPO examination material');
 has(/const\s+internationalField\s*=\s*dedupeMultiline\(fieldByLabel\(doc,\s*\[\/\^International application\\b\/i,\s*\/\^International publication\\b\/i,\s*\/\^PCT application\\b\/i\]\)\);/, 'E/PCT detection should use international-application scoped fields');
 notHas(/const\s+isEuroPct\s*=\s*!!internationalAppNo\s*\|\|\s*\/\\bPCT\\b\/i/, 'E/PCT detection should not rely on broad page-wide PCT token matching');
 has(/function\s+enhanceDoclistGrouping\s*\(/, 'All-documents grouping enhancer missing');
@@ -86,6 +87,8 @@ has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibil
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
 has(/function\s+persistCurrentPanelScroll\s*\(/, 'Panel scroll persistence helper missing');
 has(/restorePanelScroll\(caseNo,\s*activeView\)/, 'Panel scroll should be restored after rerender');
+has(/nextDeadlineBadge/, 'Actionable status should show next-deadline day delta inline');
+notHas(/<div class="epoRP-l">Most recent event<\/div>/, 'Actionable status should not render a separate Most recent event row');
 has(/el\.addEventListener\('input',\s*commit\)/, 'Options toggles should react on input events for reliable checkbox commits');
 
 console.log('userscript regression checks passed');
