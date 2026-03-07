@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.36
+// @version      7.0.37
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.36';
+  const VERSION = '7.0.37';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -70,6 +70,8 @@
     abortController: null,
     fetchCaseNo: null,
     scrollSaveTimer: null,
+    timelineCache: { key: '', items: [] },
+    doclistGroupSigByCase: {},
   };
 
   let memory = null;
@@ -707,6 +709,18 @@
     return { simple: oneLine || 'Unknown', level: 'info' };
   }
 
+  function inferStatusStage(statusRaw) {
+    const t = normalize(statusRaw || '').toLowerCase();
+    if (!t) return '';
+    if (/revoked|refused|withdrawn|deemed to be withdrawn|lapsed|expired|closed/.test(t)) return 'Closed';
+    if (/rule\s*71\(3\)|intention to grant|mention of grant|granted/.test(t)) return 'Grant / post-grant';
+    if (/article\s*94\(3\)|art\.\s*94\(3\)|examining division|examination/.test(t)) return 'Examination';
+    if (/search report|search opinion|written opinion|\bsearch\b/.test(t)) return 'Search';
+    if (/filing/.test(t)) return 'Filing';
+    if (/published|publication/.test(t)) return 'Post-publication';
+    return '';
+  }
+
   function parseApplicationType(mainData) {
     const appNo = mainData.appNo || '';
     const priorities = Array.isArray(mainData.priorities) ? mainData.priorities : [];
@@ -845,6 +859,7 @@
       statusRaw: normalize(statusField),
       statusSimple: status.simple,
       statusLevel: status.level,
+      statusStage: inferStatusStage(statusField),
       designatedStates: dedupeMultiline(fieldByLabel(doc, [/^Designated/i])),
       recentEvents: parseRecentEvents(recentEventField),
       publications: parsePublications(publicationField, 'EP (this file)'),
@@ -977,6 +992,19 @@
     });
   }
 
+  function doclistGroupingSignature(table) {
+    const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
+    if (!rows.length) return 'empty';
+    const head = rows.slice(0, 5);
+    const tail = rows.slice(-5);
+    const sample = [...head, ...tail].map((row) => {
+      const cells = [...row.querySelectorAll('td')].map(text).filter(Boolean);
+      const joined = cells.slice(0, 3).join('|');
+      return normalize(joined).slice(0, 200);
+    }).join('||');
+    return `${rows.length}|${sample}`;
+  }
+
   function enhanceDoclistGrouping() {
     if (tabSlug() !== 'doclist') return;
 
@@ -996,6 +1024,14 @@
         if (!liveTable) return;
         applyDoclistFilter(liveTable, event.target.value || '');
       });
+    }
+
+    const currentQuery = (filterWrap.querySelector('#epoRP-doclist-filter')?.value || '');
+    const signature = doclistGroupingSignature(table);
+
+    if (runtime.doclistGroupSigByCase[caseNo] === signature && table.querySelector('tr.epoRP-docgrp')) {
+      applyDoclistFilter(table, currentQuery);
+      return;
     }
 
     persistLiveDoclistGroups(caseNo);
@@ -1101,7 +1137,7 @@
       syncHeaderCheckbox();
     }
 
-    const currentQuery = (filterWrap.querySelector('#epoRP-doclist-filter')?.value || '');
+    runtime.doclistGroupSigByCase[caseNo] = signature;
     applyDoclistFilter(table, currentQuery);
   }
 
@@ -1197,6 +1233,11 @@
           transport: 'dom',
           data,
         };
+        if (sourceKey === 'main') {
+          c.meta = c.meta || {};
+          c.meta.lastMainStatusRaw = String(data?.statusRaw || '');
+          c.meta.lastMainStage = String(data?.statusStage || inferStatusStage(data?.statusRaw || '') || '');
+        }
       });
     } catch (error) {
       addLog(caseNo, 'error', `Live parse failure: ${error?.message || error}`, { source: sourceKey, transport: 'dom' });
@@ -1435,6 +1476,11 @@
               transport: 'fetch',
               data: parsed,
             };
+            if (src.key === 'main') {
+              c.meta = c.meta || {};
+              c.meta.lastMainStatusRaw = String(parsed?.statusRaw || '');
+              c.meta.lastMainStage = String(parsed?.statusStage || inferStatusStage(parsed?.statusRaw || '') || '');
+            }
           });
           addLog(caseNo, 'info', `Cache write ${src.key}`, { source: src.key });
         } catch (error) {
@@ -1484,27 +1530,195 @@
     return d;
   }
 
+  function addDays(date, days) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
+
+  function endOfMonth(year, monthIndex) {
+    return new Date(year, monthIndex + 1, 0);
+  }
+
+  function epRenewalDueDate(filingDate, patentYear) {
+    if (!(filingDate instanceof Date) || Number.isNaN(filingDate.getTime())) return null;
+    if (!Number.isFinite(patentYear) || patentYear < 3) return null;
+    const anniversaryYear = filingDate.getFullYear() + patentYear - 1;
+    return endOfMonth(anniversaryYear, filingDate.getMonth());
+  }
+
+  function inferProceduralDeadlines(main, docs) {
+    const out = [];
+    const sortedDocs = [...(docs || [])].sort(compareDateDesc);
+
+    const push = (entry) => {
+      if (!entry?.date || Number.isNaN(entry.date.getTime())) return;
+      out.push(entry);
+    };
+
+    const latestMatching = (regex) => sortedDocs.find((d) => regex.test(`${d.title || ''} ${d.procedure || ''}`));
+    const hasLaterApplicant = (date) => {
+      const ts = date?.getTime?.() || 0;
+      if (!ts) return false;
+      return sortedDocs.some((d) => {
+        const dt = parseDateString(d.dateStr);
+        return d.actor === 'Applicant' && dt && dt.getTime() > ts;
+      });
+    };
+
+    const templates = [
+      {
+        re: /rule\s*71\(3\)|intention to grant|text intended for grant/i,
+        label: 'R71(3) response period',
+        months: 4,
+        level: 'warn',
+        confidence: 'high',
+      },
+      {
+        re: /article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining/i,
+        label: 'Art. 94(3) response period',
+        months: 4,
+        level: 'warn',
+        confidence: 'high',
+      },
+      {
+        re: /rule\s*161|rule\s*162|communication pursuant to rule 161|invitation.*rule 161/i,
+        label: 'Rule 161/162 response period',
+        months: 6,
+        level: 'warn',
+        confidence: 'high',
+      },
+      {
+        re: /reminder period for payment of examination fee\/designation fee|correction of deficiencies in written opinion/i,
+        label: 'Exam/designation fee remedy period',
+        months: 6,
+        level: 'bad',
+        confidence: 'medium',
+      },
+    ];
+
+    for (const tpl of templates) {
+      const doc = latestMatching(tpl.re);
+      if (!doc) continue;
+      const anchor = parseDateString(doc.dateStr);
+      if (!anchor) continue;
+
+      const due = addMonths(anchor, tpl.months);
+      const feeRemedy = /fee remedy|designation fee|examination fee/i.test(tpl.label);
+      const paidAfter = feeRemedy && sortedDocs.some((d) => {
+        const dt = parseDateString(d.dateStr);
+        const txt = `${d.title || ''} ${d.procedure || ''}`;
+        return dt && dt.getTime() >= anchor.getTime() && /payment.*examination fee|payment.*designation fee|designation fee paid|examination fee paid|fee payment received/i.test(txt);
+      });
+      const resolved = hasLaterApplicant(anchor) || paidAfter;
+
+      push({
+        label: tpl.label,
+        date: due,
+        level: tpl.level,
+        confidence: tpl.confidence,
+        sourceDate: doc.dateStr,
+        resolved,
+      });
+    }
+
+    const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
+    if (priorityDate) {
+      const due = addMonths(priorityDate, 12);
+      if (due > new Date()) {
+        push({
+          label: 'Priority year ends',
+          date: due,
+          level: 'warn',
+          confidence: 'high',
+          sourceDate: main.priorities?.[0]?.dateStr || '',
+          resolved: false,
+        });
+      }
+    }
+
+    const filingDate = parseDateString(main.filingDate);
+    if (filingDate) {
+      push({
+        label: '20-year term from filing (reference)',
+        date: addMonths(filingDate, 12 * 20),
+        level: 'info',
+        confidence: 'high',
+        reference: true,
+        resolved: false,
+      });
+    }
+
+    return out;
+  }
+
   function inferRenewalModel(main, legal, ue) {
+    const now = new Date();
     const renewals = legal.renewals || [];
     const mentionGrant = (legal.events || []).find((e) => /mention of grant|granted/i.test(`${e.title} ${e.detail}`));
     const ueRegistered = /unitary effect registered/i.test(ue.ueStatus || ue.statusRaw || '');
     const filingDate = parseDateString(main.filingDate);
-    const nextDue = filingDate ? addMonths(filingDate, 24) : null;
+    const highestYear = renewals.reduce((m, r) => (r.year && r.year > m ? r.year : m), 0) || null;
+
+    let feeForum = 'Unknown';
+    if (ueRegistered) feeForum = 'EPO central (Unitary Patent)';
+    else if (mentionGrant) feeForum = 'National offices (post-grant EP bundle)';
+    else if (filingDate) feeForum = 'EPO central (pre-grant EP application)';
+
+    let nextYear = null;
+    let nextDue = null;
+    let graceUntil = null;
+    let dueState = 'unknown';
+    let confidence = 'low';
+
+    const canUseCentralEpSchedule = !!filingDate && (ueRegistered || !mentionGrant);
+    if (canUseCentralEpSchedule) {
+      if (highestYear) {
+        nextYear = highestYear + 1;
+        confidence = 'high';
+      } else {
+        for (let y = 3; y <= 40; y++) {
+          const due = epRenewalDueDate(filingDate, y);
+          if (!due) continue;
+          const grace = addMonths(due, 6);
+          if (grace.getTime() >= now.getTime() - 86400000) {
+            nextYear = y;
+            break;
+          }
+        }
+        if (!nextYear) nextYear = 40;
+        confidence = 'medium';
+      }
+
+      nextDue = epRenewalDueDate(filingDate, nextYear);
+      graceUntil = nextDue ? addMonths(nextDue, 6) : null;
+
+      if (nextDue) {
+        if (now.getTime() <= nextDue.getTime()) dueState = 'upcoming';
+        else if (graceUntil && now.getTime() <= graceUntil.getTime()) dueState = 'grace';
+        else dueState = 'overdue';
+      }
+    }
 
     const mode = ueRegistered
-      ? 'Unitary patent renewal fees become centrally payable at EPO after UE registration.'
+      ? 'Unitary patent renewal fees are payable centrally at the EPO; due dates follow the EP filing-anniversary month schedule.'
       : mentionGrant
-        ? 'Post-grant national renewals generally due in designated states after grant.'
-        : 'Pre-grant EP renewal fees start from patent year 3 (about 2 years from filing date).';
+        ? 'After mention of grant, renewal timing generally shifts to designated national offices (unless unitary effect applies).'
+        : 'Pre-grant EP renewal fees are centrally payable at the EPO from patent year 3 onward.';
 
     return {
       count: renewals.length,
       latest: renewals[0] || null,
-      highestYear: renewals.reduce((m, r) => (r.year && r.year > m ? r.year : m), 0) || null,
+      highestYear,
       explanatoryBasis: mode,
       mentionGrantDate: mentionGrant?.dateStr || '',
       isUnitary: ueRegistered,
+      feeForum,
+      nextYear,
       nextDue,
+      graceUntil,
+      dueState,
+      confidence,
     };
   }
 
@@ -1525,56 +1739,22 @@
     const publicationFallback = publicationsPrimary.length ? [] : inferPublicationsFromDocs(docs);
     const publications = dedupe([...publicationsPrimary, ...publicationFallback], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`).sort(compareDateDesc);
 
-    const stageText = normalize(main.statusRaw || '').toLowerCase();
-    const stage = /revoked|refused|withdrawn|deemed to be withdrawn|lapsed|expired|closed/.test(stageText)
-      ? 'Closed'
-      : docs.some((d) => d.bundle === 'Grant package') || /rule\s*71\(3\)|intention to grant|mention of grant|granted/.test(stageText)
-        ? 'Grant / post-grant'
-        : docs.some((d) => d.bundle === 'Examination') || /article\s*94\(3\)|art\.\s*94\(3\)|examining division|examination/.test(stageText)
-          ? 'Examination'
-          : docs.some((d) => d.bundle === 'Search package') || /search report|search opinion|written opinion|\bsearch\b/.test(stageText)
-            ? 'Search'
-            : docs.some((d) => d.bundle === 'Filing package') || /filing/.test(stageText)
-              ? 'Filing'
-              : /published|publication/.test(stageText)
-                ? 'Post-publication'
-                : 'Unknown';
+    const storedStatusRaw = c.meta?.lastMainStatusRaw || '';
+    const stageText = normalize(main.statusRaw || storedStatusRaw).toLowerCase();
+    const statusStage = main.statusStage || c.meta?.lastMainStage || inferStatusStage(stageText);
 
-    const deadlines = [];
-    const filingDate = parseDateString(main.filingDate);
-    const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
-    if (priorityDate) {
-      const due = addMonths(priorityDate, 12);
-      if (due > new Date()) deadlines.push({ label: 'Priority year ends', date: due, level: 'warn' });
-    }
-    const rule713 = docs.find((d) => /rule\s*71\(3\)|intention to grant/i.test(d.title));
-    if (rule713) {
-      const d = parseDateString(rule713.dateStr);
-      if (d) deadlines.push({ label: 'R71(3) response (approx.)', date: addMonths(d, 4), level: 'warn' });
-    }
-    const art943 = docs.find((d) => /article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining/i.test(d.title));
-    if (art943) {
-      const d = parseDateString(art943.dateStr);
-      if (d) deadlines.push({ label: 'Art. 94(3) response (approx.)', date: addMonths(d, 4), level: 'warn' });
-    }
-    const reminderPeriod = docs.find((d) => /reminder period for payment of examination fee\/designation fee|correction of deficiencies in written opinion/i.test(d.title));
-    if (reminderPeriod) {
-      const d = parseDateString(reminderPeriod.dateStr);
-      const reminderTs = d?.getTime() || 0;
-      const hasLaterApplicantActivity = reminderTs > 0 && docs.some((x) => {
-        const ts = parseDateString(x.dateStr)?.getTime() || 0;
-        return x.actor === 'Applicant' && ts > reminderTs;
-      });
-      const hasLaterFeePaymentSignal = reminderTs > 0 && docs.some((x) => {
-        const ts = parseDateString(x.dateStr)?.getTime() || 0;
-        const txt = `${x.title || ''} ${x.procedure || ''}`;
-        return ts >= reminderTs && /payment.*examination fee|payment.*designation fee|designation fee paid|examination fee paid|fee payment received/i.test(txt);
-      });
-      if (d && !hasLaterApplicantActivity && !hasLaterFeePaymentSignal) {
-        deadlines.push({ label: 'Exam/designation fee reminder period (approx.)', date: addMonths(d, 6), level: 'bad' });
-      }
-    }
-    if (filingDate) deadlines.push({ label: '20-year term from filing (reference)', date: addMonths(filingDate, 12 * 20), level: 'info', reference: true });
+    const stage = statusStage
+      || (docs.some((d) => d.bundle === 'Grant package')
+        ? 'Grant / post-grant'
+        : docs.some((d) => d.bundle === 'Examination')
+          ? 'Examination'
+          : docs.some((d) => d.bundle === 'Search package')
+            ? 'Search'
+            : docs.some((d) => d.bundle === 'Filing package')
+              ? 'Filing'
+              : 'Unknown');
+
+    const deadlines = inferProceduralDeadlines(main, docs);
 
     const renewal = inferRenewalModel(main, legal, ue);
 
@@ -1583,7 +1763,7 @@
     const waitingOn = latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant';
     const waitingDays = waitingOn === 'EPO' && latestApplicantDate ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000) : null;
 
-    const actionableDeadlines = deadlines.filter((d) => !d.reference);
+    const actionableDeadlines = deadlines.filter((d) => !d.reference && !d.resolved);
     const nextDeadline = actionableDeadlines.find((d) => d.date > new Date())
       || actionableDeadlines[0]
       || null;
@@ -1598,7 +1778,7 @@
       filingDate: main.filingDate || '—',
       priority: main.priorityText || '—',
       stage,
-      status: (main.statusRaw || '—').split('\n')[0],
+      status: (main.statusRaw || storedStatusRaw || '—').split('\n')[0],
       statusSimple: main.statusSimple || 'Unknown',
       statusLevel: main.statusLevel || 'warn',
       applicationType: main.applicationType || parseApplicationType(main),
@@ -1635,9 +1815,33 @@
     return 'info';
   }
 
+  function sourceStamp(c, key) {
+    const src = c?.sources?.[key] || {};
+    return `${key}:${src.status || 'na'}:${src.fetchedAt || 0}:${src.parserVersion || ''}`;
+  }
+
+  function timelineCacheKey(caseNo, opts, c) {
+    const optPart = [
+      opts.showEventHistory,
+      opts.showLegalStatusRows,
+      opts.showPublications,
+      opts.timelineEventLevel,
+      opts.timelineLegalLevel,
+      opts.timelineMaxEntries,
+    ].join('|');
+
+    const srcPart = ['main', 'doclist', 'event', 'family', 'legal'].map((k) => sourceStamp(c, k)).join('|');
+    return `${caseNo}|${optPart}|${srcPart}`;
+  }
+
   function timelineModel(caseNo) {
     const opts = options();
     const c = getCase(caseNo);
+    const cacheKey = timelineCacheKey(caseNo, opts, c);
+    if (runtime.timelineCache.key === cacheKey && Array.isArray(runtime.timelineCache.items)) {
+      return runtime.timelineCache.items;
+    }
+
     const main = c.sources.main?.data || {};
     const doclist = c.sources.doclist?.data || {};
     const family = c.sources.family?.data || {};
@@ -1726,10 +1930,13 @@
       }
     }
 
-    return dedupe(items, (i) => {
+    const built = dedupe(items, (i) => {
       if (i.type === 'group') return `g|${i.dateStr}|${i.title}|${(i.items || []).map((x) => `${x.title}|${x.url}`).join('||')}`;
       return `i|${i.dateStr}|${i.title}|${i.detail}|${i.url}`;
     }).sort(compareDateDesc).slice(0, opts.timelineMaxEntries);
+
+    runtime.timelineCache = { key: cacheKey, items: built };
+    return built;
   }
 
   function renderOverview(caseNo) {
@@ -1754,9 +1961,11 @@
         const ds = formatDate(d.date);
         const dd = Math.ceil((d.date.getTime() - Date.now()) / 86400000);
         const proximity = dd < 0 ? 'bad' : dd <= 14 ? 'bad' : dd <= 45 ? 'warn' : 'ok';
-        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span></div></div>`;
+        const confidence = d.confidence ? ` · ${d.confidence} confidence` : '';
+        const resolved = d.resolved ? ' · responded' : '';
+        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span>${!d.reference ? `<div class="epoRP-m">${esc(`From ${d.sourceDate || 'procedural event'}${confidence}${resolved}`)}</div>` : ''}</div></div>`;
       }
-      html += `</div><div class="epoRP-m">Heuristic dates from available Register documents.</div></div>`;
+      html += `</div><div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.</div></div>`;
     }
 
     html += `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
@@ -1771,14 +1980,21 @@
       const filingDateObj = parseDateString(m.filingDate);
       const yearsFromFiling = filingDateObj ? Math.max(0, Math.floor((Date.now() - filingDateObj.getTime()) / (365.25 * 86400000))) : null;
       const patentYearFromFiling = yearsFromFiling != null ? yearsFromFiling + 1 : null;
-      const filingBasedNextYear = patentYearFromFiling != null ? Math.max(3, patentYearFromFiling + 1) : null;
-      const highestPaidNextYear = m.renewal.highestYear ? (m.renewal.highestYear + 1) : null;
-      const nextRenewalYear = Math.max(3, filingBasedNextYear || 0, highestPaidNextYear || 0);
       const nextDueDays = m.renewal.nextDue ? Math.ceil((m.renewal.nextDue.getTime() - Date.now()) / 86400000) : null;
       const dueLevel = nextDueDays == null ? 'info' : (nextDueDays < 0 ? 'bad' : nextDueDays <= 30 ? 'bad' : nextDueDays <= 75 ? 'warn' : 'ok');
+      const dueText = m.renewal.nextDue
+        ? `${esc(formatDate(m.renewal.nextDue))}${nextDueDays != null ? ` · ${nextDueDays >= 0 ? formatDaysHuman(nextDueDays) : `${formatDaysHuman(nextDueDays).slice(1)} overdue`}` : ''}`
+        : 'Not available';
+      const graceText = m.renewal.graceUntil
+        ? `${esc(formatDate(m.renewal.graceUntil))}${m.renewal.dueState === 'grace' ? ' (surcharge period active)' : ''}`
+        : '—';
+
       html += `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
         <div class="epoRP-l">Patent year status</div><div class="epoRP-v">${patentYearFromFiling ? `Current year ${patentYearFromFiling}${m.renewal.highestYear ? ` · paid through Year ${m.renewal.highestYear}` : ''}` : (m.renewal.highestYear ? `Paid through Year ${m.renewal.highestYear}` : 'No renewal payment captured yet')}</div>
-        <div class="epoRP-l">Next fee year / due</div><div class="epoRP-v">Year ${nextRenewalYear} · ${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${esc(formatDate(m.renewal.nextDue))}${nextDueDays != null ? ` · ${nextDueDays >= 0 ? formatDaysHuman(nextDueDays) : `${formatDaysHuman(nextDueDays).slice(1)} overdue`}` : ''}</span>` : 'Unknown'}</div>
+        <div class="epoRP-l">Fee forum</div><div class="epoRP-v">${esc(m.renewal.feeForum || 'Unknown')}</div>
+        <div class="epoRP-l">Next fee year / due</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}</div>
+        <div class="epoRP-l">Grace period until</div><div class="epoRP-v">${graceText}</div>
+        <div class="epoRP-l">Model confidence</div><div class="epoRP-v">${esc(m.renewal.confidence || 'low')}</div>
         <div class="epoRP-l">Latest renewal</div><div class="epoRP-v">${m.renewal.latest ? `${esc(m.renewal.latest.dateStr)} · ${esc(m.renewal.latest.title)}` : 'No renewal events cached.'}</div>
         ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Mention of grant</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
       </div><div class="epoRP-m">${esc(m.renewal.explanatoryBasis)}</div></div>`;
