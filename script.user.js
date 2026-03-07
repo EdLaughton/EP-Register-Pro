@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.26
+// @version      7.0.27
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.26';
+  const VERSION = '7.0.27';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -553,10 +553,16 @@
 
   function parseApplicationType(mainData) {
     const appNo = mainData.appNo || '';
-    const statusText = `${mainData.statusRaw || ''} ${mainData.title || ''} ${mainData.priorityText || ''} ${mainData.parentCase || ''}`;
-    const priorities = mainData.priorities || [];
+    const priorities = Array.isArray(mainData.priorities) ? mainData.priorities : [];
+    const internationalAppNo = normalize(mainData.internationalAppNo || '').toUpperCase();
+    const statusRaw = normalize(mainData.statusRaw || '');
 
-    if (mainData.isEuroPct || /PCT|WO\d+/i.test(statusText) || priorities.some((p) => /^WO/i.test(p.no))) {
+    const hasExplicitPctMarker =
+      /\bPCT\/[A-Z]{2}\d{4}\/\d{5,}\b/i.test(internationalAppNo)
+      || /\bWO\d{4}[A-Z]{2}\d{3,}\b/i.test(internationalAppNo)
+      || /\b(?:E\/PCT|EURO-?PCT|regional phase)\b/i.test(statusRaw);
+
+    if (hasExplicitPctMarker || priorities.some((p) => /^WO\d{4}[A-Z]{2}\d{3,}$/i.test(String(p?.no || '')))) {
       return 'E/PCT regional phase';
     }
     if (mainData.isDivisional || mainData.parentCase) return 'Divisional';
@@ -655,9 +661,13 @@
     const divisionalChildrenFromText = [...divisionalSection.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
     const divisionalChildren = dedupe([...divisionalChildrenFromHeader, ...divisionalChildrenFromText], (x) => x);
 
-    const woMatch = `${String(appField || '')}\n${pageText}`.match(/\b(WO\d{4}[A-Z]{2}\d{3,})\b/i);
-    const internationalAppNo = woMatch ? woMatch[1].toUpperCase() : '';
-    const isEuroPct = !!internationalAppNo || /\bPCT\b/i.test(`${String(appField || '')} ${pageText}`);
+    const internationalField = dedupeMultiline(fieldByLabel(doc, [/^International application\b/i, /^International publication\b/i, /^PCT application\b/i]));
+    const internationalSectionFromPage = String(pageText).match(/International\s+application(?:\s+number)?[\s\S]{0,220}/i)?.[0] || '';
+    const pctScopeText = `${String(appField || '')}\n${internationalField}\n${internationalSectionFromPage}`;
+    const woMatch = pctScopeText.match(/\b(WO\d{4}[A-Z]{2}\d{3,})\b/i);
+    const pctMatch = pctScopeText.match(/\b(PCT\/[A-Z]{2}\d{4}\/\d{5,})\b/i);
+    const internationalAppNo = (woMatch?.[1] || pctMatch?.[1] || '').toUpperCase();
+    const isEuroPct = !!internationalAppNo;
 
     const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
     const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
