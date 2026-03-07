@@ -63,6 +63,7 @@ has(/extractEpNumbersByHeader\(doc,\s*\/\\bDivisional application/, 'Divisional 
 hasText('[A-Z]{2}\\d[0-9A-Z\\/\\-]{4,}', 'Priority parser should require numeric body after country code (prevents LANGUAGE false matches)');
 hasText('Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event', 'Priority page-text fallback should stop at known next labels to avoid pulling publication rows');
 hasText('priority document|annex', 'Annex filings should be classed with the filing package when applicant-filed');
+hasText('Response to search', 'Search-response applicant bundle should exist for grouped amendments after search report');
 has(/annex to \(\?:the \)\?communication\|communication annex\|annex\.\*examining division/, 'Annex-to-communication should be classed as EPO examination material');
 has(/const\s+internationalField\s*=\s*dedupeMultiline\(fieldByLabel\(doc,\s*\[\/\^International application\\b\/i,\s*\/\^International publication\\b\/i,\s*\/\^PCT application\\b\/i\]\)\);/, 'E/PCT detection should use international-application scoped fields');
 notHas(/const\s+isEuroPct\s*=\s*!!internationalAppNo\s*\|\|\s*\/\\bPCT\\b\/i/, 'E/PCT detection should not rely on broad page-wide PCT token matching');

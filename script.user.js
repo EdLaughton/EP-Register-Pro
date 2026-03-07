@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.41
+// @version      7.0.42
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.41';
+  const VERSION = '7.0.42';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -907,7 +907,14 @@
     const t = String(title || '').toLowerCase();
     const p = String(procedure || '').toLowerCase();
 
+    const isSearchResponseContext =
+      /search\s*\/\s*examination|search\s*and\s*examination|search report|search opinion/.test(p)
+      || /after receipt of \(?(?:european\)? )?search report|before examination/.test(t);
+
     if (/by applicant|amendment by applicant|filed by applicant|from applicant/.test(p)) {
+      if (isSearchResponseContext && /amend|claims|description|letter|annotations|subsequently filed items/.test(t)) {
+        return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
+      }
       if (/request for grant|description|claims|drawings|designation of inventor|priority document|annex/.test(t)) {
         return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
       }
@@ -916,6 +923,10 @@
 
     if (/acknowledgement of receipt|receipt of electronic submission|auto-acknowledgement/.test(t) || /acknowledgement/.test(p)) {
       return { bundle: 'Other', level: 'info', actor: 'System' };
+    }
+
+    if (isSearchResponseContext && /amend|claims|description|letter accompanying subsequently filed items|annotations|amendments received before examination/.test(t)) {
+      return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
     }
 
     if (/amended claims filed|amendment by applicant|claims and\/or description|filed after receipt/i.test(t)) {
@@ -1047,7 +1058,7 @@
     });
 
     const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
-    const groupable = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings']);
+    const groupable = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
 
     const runs = [];
     let run = null;
@@ -2344,7 +2355,7 @@
     }
 
     const docsSorted = [...(doclist.docs || [])].sort(compareDateDesc);
-    const groupableBundles = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings']);
+    const groupableBundles = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
 
     const docItems = [];
     const groupedByKey = new Map();
