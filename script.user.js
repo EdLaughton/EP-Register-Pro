@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.35
+// @version      7.0.36
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.35';
+  const VERSION = '7.0.36';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -831,6 +831,8 @@
 
     const fallbackApplicant = normalize((pageText.match(/\bApplicant\s*(?:\n|:)\s*([^\n]+)/i)?.[1]) || '');
 
+    const divisionalMarker = /\bdivisional application\b/i.test(`${String(statusField || '')}\n${pageText}`);
+
     const result = {
       appNo: caseNo,
       title: extractTitle(doc) || cleanTitle(titleField),
@@ -848,7 +850,7 @@
       publications: parsePublications(publicationField, 'EP (this file)'),
       internationalAppNo,
       isEuroPct,
-      isDivisional: !!parentCase || priorities.some((p) => /^EP/i.test(p.no)),
+      isDivisional: !!parentCase || divisionalMarker,
       parentCase,
       divisionalChildren: divisionalChildren.filter((ep) => ep !== caseNo),
       hasDivisionals: divisionalChildren.some((ep) => ep !== caseNo),
@@ -1524,17 +1526,19 @@
     const publications = dedupe([...publicationsPrimary, ...publicationFallback], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`).sort(compareDateDesc);
 
     const stageText = normalize(main.statusRaw || '').toLowerCase();
-    const stage = docs.some((d) => d.bundle === 'Grant package') || /rule\s*71\(3\)|intention to grant|mention of grant|granted/.test(stageText)
-      ? 'Grant / post-grant'
-      : docs.some((d) => d.bundle === 'Examination') || /article\s*94\(3\)|art\.\s*94\(3\)|examining division|examination/.test(stageText)
-        ? 'Examination'
-        : docs.some((d) => d.bundle === 'Search package') || /search report|search opinion|written opinion|\bsearch\b/.test(stageText)
-          ? 'Search'
-          : docs.some((d) => d.bundle === 'Filing package') || /filing/.test(stageText)
-            ? 'Filing'
-            : /published|publication/.test(stageText)
-              ? 'Post-publication'
-              : 'Unknown';
+    const stage = /revoked|refused|withdrawn|deemed to be withdrawn|lapsed|expired|closed/.test(stageText)
+      ? 'Closed'
+      : docs.some((d) => d.bundle === 'Grant package') || /rule\s*71\(3\)|intention to grant|mention of grant|granted/.test(stageText)
+        ? 'Grant / post-grant'
+        : docs.some((d) => d.bundle === 'Examination') || /article\s*94\(3\)|art\.\s*94\(3\)|examining division|examination/.test(stageText)
+          ? 'Examination'
+          : docs.some((d) => d.bundle === 'Search package') || /search report|search opinion|written opinion|\bsearch\b/.test(stageText)
+            ? 'Search'
+            : docs.some((d) => d.bundle === 'Filing package') || /filing/.test(stageText)
+              ? 'Filing'
+              : /published|publication/.test(stageText)
+                ? 'Post-publication'
+                : 'Unknown';
 
     const deadlines = [];
     const filingDate = parseDateString(main.filingDate);

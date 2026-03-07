@@ -51,6 +51,7 @@ notHas(/IPC\/CPC/, 'IPC/CPC should be removed from UI');
 has(/dedupeMultiline/, 'dedupeMultiline helper missing');
 has(/parentCase/, 'Divisional parent case tracking missing');
 has(/cleanTitle/, 'Title cleanup helper missing');
+notHas(/isDivisional:\s*!!parentCase\s*\|\|\s*priorities\.some\(\(p\)\s*=>\s*\/\^EP\/i\.test\(p\.no\)\)/, 'Divisional detection should not rely on EP priority numbers alone');
 has(/function\s+extractEpNumbersByHeader\s*\(/, 'Header-based EP number extraction helper missing');
 has(/extractEpNumbersByHeader\(doc,\s*\/\\bParent application/, 'Parent application extraction should use header-scoped helper');
 has(/extractEpNumbersByHeader\(doc,\s*\/\\bDivisional application/, 'Divisional child extraction should use header-scoped helper');
@@ -71,6 +72,7 @@ has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-do
 has(/const\s+highestPaidNextYear\s*=\s*m\.renewal\.highestYear\s*\?\s*\(m\.renewal\.highestYear\s*\+\s*1\)\s*:\s*null;/, 'Renewal next-year should account for paid-ahead highest year');
 has(/Math\.max\(3,\s*filingBasedNextYear\s*\|\|\s*0,\s*highestPaidNextYear\s*\|\|\s*0\)/, 'Renewal next-year should be max of filing-based and paid-ahead baseline');
 has(/\? 'Post-publication'/, 'Stage mapping should avoid using "Published" as a stage label');
+has(/\? 'Closed'/, 'Stage mapping should classify withdrawn/refused/revoked outcomes as Closed');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
