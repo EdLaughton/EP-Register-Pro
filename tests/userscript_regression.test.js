@@ -33,6 +33,7 @@ has(/\.epoRP-grph::marker\{content:''\}/, 'Timeline group summary should hide de
 has(/function\s+timelineGroupKey\s*\(/, 'Timeline group key helper missing');
 has(/data-group-key="\$\{esc\(groupKey\)\}"/, 'Timeline groups should render stable key attributes for open-state persistence');
 has(/function\s+wireTimeline\s*\(caseNo\)/, 'Timeline wire-up should persist group expansion state');
+has(/function\s+persistLiveTimelineGroups\s*\(/, 'Timeline open-group persistence helper missing');
 
 // Timeline controls (include/exclude + importance)
 has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
@@ -61,6 +62,10 @@ has(/function\s+enhanceDoclistGrouping\s*\(/, 'All-documents grouping enhancer m
 has(/epoRP-docgrp/, 'All-documents grouping row class missing');
 has(/headerRow\.classList\.toggle\('open',\s*nextExpanded\)/, 'All-documents group header should mark expanded state for styling');
 has(/epoRP-docgrp-open/, 'All-documents grouped rows should get expanded-state class for background differentiation');
+has(/function\s+getDoclistOpenGroups\s*\(/, 'All-documents open-state persistence helper missing');
+has(/epoRP-docgrp-check/, 'All-documents group header should include a select-all checkbox');
+has(/dispatchEvent\(new Event\('change',\s*\{ bubbles: true \}\)\)/, 'Group select-all should emit row checkbox change events');
+has(/epoRP-docgrp-item\.epoRP-docgrp-last\.epoRP-docgrp-open td\{border-bottom:2px solid #bfdbfe\}/, 'All-documents grouped rows should draw a bottom boundary line when expanded');
 has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-documents group header control should suppress native button chrome');
 has(/const\s+highestPaidNextYear\s*=\s*m\.renewal\.highestYear\s*\?\s*\(m\.renewal\.highestYear\s*\+\s*1\)\s*:\s*null;/, 'Renewal next-year should account for paid-ahead highest year');
 has(/Math\.max\(3,\s*filingBasedNextYear\s*\|\|\s*0,\s*highestPaidNextYear\s*\|\|\s*0\)/, 'Renewal next-year should be max of filing-based and paid-ahead baseline');

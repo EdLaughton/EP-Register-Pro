@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.33
+// @version      7.0.34
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -19,7 +19,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.33';
+  const VERSION = '7.0.34';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -379,16 +379,15 @@
     runtime.collapsed = !!next.collapsed;
   }
 
-  function timelineGroupKey(caseNo, item, idx = 0) {
-    const first = (item.items || [])[0] || {};
+  function timelineGroupKey(caseNo, item) {
+    const topTitles = (item.items || []).slice(0, 3).map((x) => normalize(String(x?.title || ''))).join('||');
     const parts = [
       caseNo,
       item.dateStr || '',
       item.title || '',
       item.actor || '',
       String((item.items || []).length || 0),
-      first.title || '',
-      String(idx),
+      topTitles,
     ];
     return parts.map((v) => normalize(String(v))).join('|');
   }
@@ -411,6 +410,46 @@
     }
 
     setUiState({ timelineOpenByCase: byCase });
+  }
+
+  function persistLiveTimelineGroups(caseNo) {
+    const b = runtime.body;
+    if (!b || runtime.activeView !== 'timeline') return;
+    const openGroups = getTimelineOpenGroups(caseNo);
+    b.querySelectorAll('details.epoRP-grp[data-group-key]').forEach((el) => {
+      const key = String(el.getAttribute('data-group-key') || '');
+      if (!key) return;
+      if (el.open) openGroups.add(key);
+      else openGroups.delete(key);
+    });
+    setTimelineOpenGroups(caseNo, openGroups);
+  }
+
+  function getDoclistOpenGroups(caseNo) {
+    const byCase = uiState().doclistOpenByCase || {};
+    const arr = Array.isArray(byCase[caseNo]) ? byCase[caseNo] : [];
+    return new Set(arr.map((v) => String(v)));
+  }
+
+  function setDoclistOpenGroups(caseNo, groupSet) {
+    const state = uiState();
+    const byCase = { ...(state.doclistOpenByCase || {}) };
+    byCase[caseNo] = [...groupSet].slice(0, 250);
+
+    const keys = Object.keys(byCase);
+    if (keys.length > 20) {
+      const keep = new Set(keys.slice(-20));
+      for (const k of keys) if (!keep.has(k)) delete byCase[k];
+    }
+
+    setUiState({ doclistOpenByCase: byCase });
+  }
+
+  function doclistGroupKey(caseNo, bundle, rows) {
+    const firstText = normalize(text(rows?.[0] || '')).slice(0, 160);
+    const lastText = normalize(text(rows?.[rows.length - 1] || '')).slice(0, 160);
+    const parts = [caseNo, bundle || 'Group', String(rows?.length || 0), firstText, lastText];
+    return parts.map((v) => normalize(String(v))).join('|');
   }
 
   function panelScrollKey(caseNo, view) {
@@ -927,6 +966,7 @@
   function enhanceDoclistGrouping() {
     if (tabSlug() !== 'doclist') return;
 
+    const caseNo = detectAppNo() || runtime.appNo || '';
     const table = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
     if (!table) return;
 
@@ -944,9 +984,18 @@
       });
     }
 
+    const openGroups = getDoclistOpenGroups(caseNo);
+    table.querySelectorAll('tr.epoRP-docgrp .epoRP-docgrp-btn[data-group-key]').forEach((btn) => {
+      const key = String(btn.getAttribute('data-group-key') || '');
+      if (!key) return;
+      if (btn.getAttribute('aria-expanded') === 'true') openGroups.add(key);
+      else openGroups.delete(key);
+    });
+    if (caseNo) setDoclistOpenGroups(caseNo, openGroups);
+
     table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
     table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
-      row.classList.remove('epoRP-docgrp-item', 'collapsed', 'epoRP-filter-hidden', 'epoRP-docgrp-open');
+      row.classList.remove('epoRP-docgrp-item', 'collapsed', 'epoRP-filter-hidden', 'epoRP-docgrp-open', 'epoRP-docgrp-last');
       row.removeAttribute('data-eporp-group');
     });
 
@@ -975,34 +1024,73 @@
       if (!groupable.has(r.bundle) || r.rows.length < 2) continue;
       gid += 1;
       const groupId = `g${gid}`;
+      const groupKey = doclistGroupKey(caseNo, r.bundle, r.rows);
+      const isOpen = openGroups.has(groupKey);
       const firstRow = r.rows[0];
       const cells = [...firstRow.querySelectorAll('td')];
 
       const headerRow = document.createElement('tr');
       headerRow.className = 'epoRP-docgrp';
+      headerRow.classList.toggle('open', isOpen);
+
       const td = document.createElement('td');
       td.colSpan = Math.max(1, cells.length);
-      td.innerHTML = `<button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" aria-expanded="false"><span class="epoRP-docgrp-label" data-bundle="${esc(r.bundle)}">${esc(r.bundle)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button>`;
+      td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-label" data-bundle="${esc(r.bundle)}">${esc(r.bundle)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
       headerRow.appendChild(td);
       firstRow.parentElement?.insertBefore(headerRow, firstRow);
 
-      for (const row of r.rows) {
+      const rowCheckboxes = [];
+      r.rows.forEach((row, idx) => {
         row.setAttribute('data-eporp-group', groupId);
-        row.classList.add('epoRP-docgrp-item', 'collapsed');
-        row.classList.remove('epoRP-docgrp-open');
+        row.classList.add('epoRP-docgrp-item');
+        row.classList.toggle('collapsed', !isOpen);
+        row.classList.toggle('epoRP-docgrp-open', isOpen);
+        row.classList.toggle('epoRP-docgrp-last', idx === r.rows.length - 1);
+        const cb = row.querySelector("input[type='checkbox']");
+        if (cb) rowCheckboxes.push(cb);
+      });
+
+      const button = td.querySelector('button.epoRP-docgrp-btn');
+      const headerCheckbox = td.querySelector('input.epoRP-docgrp-check');
+
+      const syncHeaderCheckbox = () => {
+        if (!headerCheckbox || !rowCheckboxes.length) return;
+        const checked = rowCheckboxes.filter((cb) => !!cb.checked).length;
+        headerCheckbox.indeterminate = checked > 0 && checked < rowCheckboxes.length;
+        headerCheckbox.checked = checked > 0 && checked === rowCheckboxes.length;
+      };
+
+      if (button) {
+        button.addEventListener('click', (event) => {
+          const btn = event.currentTarget;
+          const expanded = btn.getAttribute('aria-expanded') === 'true';
+          const nextExpanded = !expanded;
+          btn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+          headerRow.classList.toggle('open', nextExpanded);
+          for (const row of r.rows) {
+            row.classList.toggle('collapsed', !nextExpanded);
+            row.classList.toggle('epoRP-docgrp-open', nextExpanded);
+          }
+          if (nextExpanded) openGroups.add(groupKey);
+          else openGroups.delete(groupKey);
+          if (caseNo) setDoclistOpenGroups(caseNo, openGroups);
+        });
       }
 
-      td.querySelector('button')?.addEventListener('click', (event) => {
-        const btn = event.currentTarget;
-        const expanded = btn.getAttribute('aria-expanded') === 'true';
-        const nextExpanded = !expanded;
-        btn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
-        headerRow.classList.toggle('open', nextExpanded);
-        for (const row of r.rows) {
-          row.classList.toggle('collapsed', !nextExpanded);
-          row.classList.toggle('epoRP-docgrp-open', nextExpanded);
-        }
-      });
+      if (headerCheckbox) {
+        headerCheckbox.addEventListener('change', () => {
+          const shouldCheck = !!headerCheckbox.checked;
+          for (const cb of rowCheckboxes) {
+            if (cb.checked === shouldCheck) continue;
+            cb.checked = shouldCheck;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          syncHeaderCheckbox();
+        });
+      }
+
+      rowCheckboxes.forEach((cb) => cb.addEventListener('change', syncHeaderCheckbox));
+      syncHeaderCheckbox();
     }
 
     const currentQuery = (filterWrap.querySelector('#epoRP-doclist-filter')?.value || '');
@@ -1732,7 +1820,7 @@
     const out = [];
     const openGroups = getTimelineOpenGroups(caseNo);
 
-    for (const [idx, item] of items.entries()) {
+    for (const item of items) {
       if (!insertedToday) {
         const itemDate = parseDateString(item.dateStr);
         const midnight = new Date();
@@ -1745,7 +1833,7 @@
 
       if (item.type === 'group') {
         const actorClass = item.actor === 'Applicant' ? 'actor-applicant' : item.actor === 'EPO' ? 'actor-epo' : item.actor === 'Third party' ? 'actor-third' : '';
-        const groupKey = timelineGroupKey(caseNo, item, idx);
+        const groupKey = timelineGroupKey(caseNo, item);
         const openAttr = openGroups.has(groupKey) ? ' open' : '';
         out.push(`<details class="epoRP-grp" data-group-key="${esc(groupKey)}"${openAttr}>
           <summary class="epoRP-grph">
@@ -1949,6 +2037,7 @@
     const previousView = runtime.activeView || 'overview';
     if (runtime.body && previousCaseNo && !runtime.collapsed) {
       setPanelScroll(previousCaseNo, previousView, runtime.body.scrollTop || 0);
+      if (previousView === 'timeline') persistLiveTimelineGroups(previousCaseNo);
     }
 
     const caseNo = detectAppNo();
@@ -2115,12 +2204,16 @@
     .epoRP-deadlineRow{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px dashed #cbd5e1;align-items:start;background:#f8fafc}
     tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:4px 8px}
     tr.epoRP-docgrp.open td{background:#dbeafe;border-top-color:#93c5fd;border-bottom-color:#bfdbfe}
+    .epoRP-docgrp-head{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+    .epoRP-docgrp-sel{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#1e3a8a;white-space:nowrap;cursor:pointer}
+    .epoRP-docgrp-sel input{margin:0}
     .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent !important;background-image:none !important;border:0 !important;border-radius:0;box-shadow:none !important;padding:0;appearance:none !important;-webkit-appearance:none !important}
     .epoRP-docgrp-btn::-moz-focus-inner{border:0;padding:0}
     .epoRP-docgrp-btn:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;border-radius:6px}
     .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}
     .epoRP-docgrp-btn[aria-expanded="true"] .epoRP-docgrp-arrow{transform:rotate(90deg)}
-    tr.epoRP-docgrp-item.epoRP-docgrp-open td{background:#f8fbff;box-shadow:inset 3px 0 0 #bfdbfe}
+    tr.epoRP-docgrp-item.epoRP-docgrp-open td{background:#f8fbff}
+    tr.epoRP-docgrp-item.epoRP-docgrp-last.epoRP-docgrp-open td{border-bottom:2px solid #bfdbfe}
     tr.epoRP-docgrp-item.collapsed{display:none}
     .epoRP-doclist-filter-wrap{margin:8px 0}
     .epoRP-doclist-filter{width:100%;max-width:420px;border:1px solid #cbd5e1;border-radius:8px;padding:7px 10px;font:13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
@@ -2166,6 +2259,7 @@
       runtime.scrollSaveTimer = null;
     }
     persistCurrentPanelScroll();
+    if (runtime.appNo && runtime.activeView === 'timeline') persistLiveTimelineGroups(runtime.appNo);
     flushNow();
   });
 
