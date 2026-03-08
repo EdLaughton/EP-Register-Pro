@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.58
+// @version      7.0.59
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -23,7 +23,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.58';
+  const VERSION = '7.0.59';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -2325,6 +2325,64 @@
     return Array.from(slice).map((b) => String.fromCharCode(b)).join('');
   }
 
+  function hasMeaningfulCommunicationText(raw) {
+    const txt = normalize(String(raw || ''));
+    if (!txt) return false;
+    const alphaCount = (txt.match(/[A-Za-z]/g) || []).length;
+    return txt.length >= 120 && alphaCount >= 40;
+  }
+
+  function focusCommunicationContextText(raw) {
+    const txt = normalize(String(raw || ''));
+    if (!txt) return '';
+
+    const low = txt.toLowerCase();
+    const anchors = [
+      'registered letter',
+      'date of communication',
+      'date of this communication',
+      'time limit',
+      'within',
+      'article 94(3)',
+      'art. 94(3)',
+      'rule 71(3)',
+      'rule 116',
+      'rule 161',
+      'rule 162',
+    ];
+
+    let idx = -1;
+    for (const anchor of anchors) {
+      const pos = low.indexOf(anchor);
+      if (pos >= 0 && (idx < 0 || pos < idx)) idx = pos;
+    }
+
+    if (idx < 0) return txt;
+    const start = Math.max(0, idx - 1200);
+    const end = Math.min(txt.length, idx + 3200);
+    return txt.slice(start, end);
+  }
+
+  function deriveDocumentPageUrlFromPdfUrl(rawUrl) {
+    try {
+      const u = new URL(String(rawUrl || ''), location.origin);
+      const docId = normalize(u.searchParams.get('documentId') || '');
+      if (!docId) return '';
+
+      const number = normalize(u.searchParams.get('number') || u.searchParams.get('appnumber') || '').toUpperCase();
+      const lng = normalize(u.searchParams.get('lng') || currentLang() || 'en');
+
+      const out = new URL(`${location.origin}/application`);
+      out.searchParams.set('documentId', docId);
+      if (number) out.searchParams.set('number', number);
+      if (lng) out.searchParams.set('lng', lng);
+      out.searchParams.set('npl', 'false');
+      return out.toString();
+    } catch {
+      return '';
+    }
+  }
+
   function extractPdfLikeUrlFromHtml(html, baseUrl) {
     const doc = parseHtml(String(html || ''));
     const attrCandidates = [
@@ -2372,9 +2430,35 @@
       }
     };
 
+    const htmlFallbackFromPayload = (html, transport, resolvedUrl) => {
+      const raw = bodyText(parseHtml(String(html || '')));
+      const focused = focusCommunicationContextText(raw);
+      if (!hasMeaningfulCommunicationText(focused)) return null;
+      return { text: focused, transport, resolvedUrl, isPdf: false };
+    };
+
+    const tryDocumentPageFallback = async (seedUrl, transport) => {
+      const docPageUrl = deriveDocumentPageUrlFromPdfUrl(seedUrl);
+      if (!docPageUrl) return null;
+      try {
+        const html = await fetchWithRetry(docPageUrl, signal);
+        return htmlFallbackFromPayload(html, transport, docPageUrl);
+      } catch {
+        return null;
+      }
+    };
+
     const binary = await fetchBinaryWithRetry(url, signal);
     if (isPdfBinaryData(binary)) {
-      return { text: await parsePdfBinaryToText(binary), transport: 'pdfjs', resolvedUrl: url, isPdf: true };
+      const text = normalize(await parsePdfBinaryToText(binary));
+      if (text) {
+        return { text, transport: 'pdfjs', resolvedUrl: url, isPdf: true };
+      }
+
+      const docPageFallback = await tryDocumentPageFallback(url, 'html-fallback-from-document-page-after-empty-pdf-text');
+      if (docPageFallback) return docPageFallback;
+
+      return { text: '', transport: 'pdfjs-empty-text', resolvedUrl: url, isPdf: true };
     }
 
     const htmlPayload = binaryToUtf8(binary);
@@ -2383,24 +2467,32 @@
       throw new Error('Invalid PDF structure (non-PDF payload)');
     }
 
+    const directHtmlFallback = htmlFallbackFromPayload(htmlPayload, 'html-fallback', url);
+
     const linkedUrl = extractPdfLikeUrlFromHtml(htmlPayload, url);
     if (linkedUrl && linkedUrl !== url) {
       const linkedBinary = await fetchBinaryWithRetry(linkedUrl, signal);
       if (isPdfBinaryData(linkedBinary)) {
-        return { text: await parsePdfBinaryToText(linkedBinary), transport: 'pdfjs-via-linked-url', resolvedUrl: linkedUrl, isPdf: true };
+        const linkedText = normalize(await parsePdfBinaryToText(linkedBinary));
+        if (linkedText) {
+          return { text: linkedText, transport: 'pdfjs-via-linked-url', resolvedUrl: linkedUrl, isPdf: true };
+        }
+
+        const parentHtmlFallback = htmlFallbackFromPayload(htmlPayload, 'html-fallback-from-document-page-after-empty-linked-pdf-text', url);
+        if (parentHtmlFallback) return parentHtmlFallback;
+
+        const linkedDocPageFallback = await tryDocumentPageFallback(linkedUrl, 'html-fallback-from-linked-document-page-after-empty-pdf-text');
+        if (linkedDocPageFallback) return linkedDocPageFallback;
+
+        return { text: '', transport: 'pdfjs-via-linked-url-empty-text', resolvedUrl: linkedUrl, isPdf: true };
       }
 
       const linkedHtml = binaryToUtf8(linkedBinary);
-      const linkedText = bodyText(parseHtml(linkedHtml));
-      if (linkedText) {
-        return { text: linkedText, transport: 'html-fallback-via-linked-url', resolvedUrl: linkedUrl, isPdf: false };
-      }
+      const linkedHtmlFallback = htmlFallbackFromPayload(linkedHtml, 'html-fallback-via-linked-url', linkedUrl);
+      if (linkedHtmlFallback) return linkedHtmlFallback;
     }
 
-    const fallbackText = bodyText(parseHtml(htmlPayload));
-    if (fallbackText) {
-      return { text: fallbackText, transport: 'html-fallback', resolvedUrl: url, isPdf: false };
-    }
+    if (directHtmlFallback) return directHtmlFallback;
 
     throw new Error('Invalid PDF structure (HTML payload without readable text)');
   }

@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.59
+- Improved empty-PDF handling when linked document endpoints return PDF bytes with no extractable text layer:
+  - Adds secondary fallback to parse communication context from document-page HTML when pdf.js text extraction returns empty.
+  - Adds linked-document-page fallback path for `showPdfPage`/documentId URL chains.
+  - Keeps transport diagnostics explicit (`pdfjs-empty-text`, linked/html fallback paths) for easier debugging.
+
 ### 7.0.58
 - Improved non-PDF payload handling for document links that do not return raw PDF bytes:
   - Detects non-PDF responses before pdf.js parse and avoids opaque `Invalid PDF structure` failures where possible.

@@ -51,6 +51,9 @@ has(/function\s+refreshPdfDeadlines\s*\(/, 'PDF deadline refresh pipeline missin
 has(/async function extractPdfText\(url, signal, pdfjsInstance = null\)/, 'PDF extraction should accept preloaded pdf.js engine instance');
 has(/function\s+isPdfBinaryData\s*\(/, 'PDF extraction should detect non-PDF payloads before parser invocation');
 has(/function\s+binaryToUtf8\s*\(/, 'PDF extraction should decode binary payloads for HTML fallback parsing');
+has(/function\s+hasMeaningfulCommunicationText\s*\(/, 'PDF extraction should score fallback HTML text quality before using it');
+has(/function\s+focusCommunicationContextText\s*\(/, 'PDF extraction should focus fallback text around communication/deadline anchors');
+has(/function\s+deriveDocumentPageUrlFromPdfUrl\s*\(/, 'PDF extraction should derive document-page URLs for empty-PDF fallback');
 has(/function\s+extractPdfLikeUrlFromHtml\s*\(/, 'PDF extraction should probe HTML payloads for linked PDF/document URLs');
 has(/function\s+pdfContentToStructuredText\s*\(/, 'PDF text extraction should include layout-aware line reconstruction helper');
 has(/const\s+txt\s*=\s*pdfContentToStructuredText\(content\);/, 'PDF extraction should use structured line reconstruction per page');
@@ -68,6 +71,8 @@ has(/addCalendarMonthsDetailed\(communicationDate,\s*monthPeriod\.months\)/, 'PD
 hasText('PDF proof line (below "Registered Letter")', 'PDF parser logging should report line below Registered Letter to prove document was opened');
 hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-date/response-period diagnostics');
 hasText('PDF binary unavailable; using HTML fallback text extraction', 'PDF parser should log explicit HTML fallback path when binary response is not a valid PDF');
+hasText('pdfjs-via-linked-url-empty-text', 'PDF parser should expose explicit transport tag when linked PDF has no extractable text layer');
+hasText('html-fallback-from-document-page-after-empty-linked-pdf-text', 'PDF parser should support fallback from document-page HTML after empty linked-PDF text extraction');
 hasText('normalizedDocUrl', 'PDF URL failure logging should include normalized URL attempt for debugging');
 hasText('PDF parser engine ready', 'PDF parser should log successful engine initialization before scanning documents');
 hasText('PDF parser unavailable:', 'PDF parser should log explicit engine-loader failures');
