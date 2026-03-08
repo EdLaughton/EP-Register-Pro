@@ -31,8 +31,9 @@ hasText('scheduleInit(false);', 'Route/pageshow handling should use debounced in
 // Derived-source dedupe
 has(/function\s+storeCaseSource\s*\(/, 'Centralized source-write helper missing');
 hasText("const dependencyStamp = derivedDependencyStamp(caseNo, 'upcRegistry');", 'UPC refresh should compute dependency stamp from upstream state');
-hasText('const doclistPublications = inferPublicationsFromDocs(doclist.docs || []);', 'UPC candidate selection should supplement main-page publication numbers from case-local doclist evidence');
+has(/function\s+casePublications\s*\(/, 'Publication evidence should be centralized behind a casePublications helper');
 hasText('Prefer explicit main-page publications, then supplement from case-local doclist evidence.', 'UPC candidate selection should document the main+doclist publication priority');
+hasText("for (const p of casePublications(c, { docs, includeFamily: false }))", 'UPC candidate selection should reuse centralized case-local publication evidence without widening to family publications');
 hasText("isFresh(cached, options().refreshHours, { allowEmpty: true, dependencyStamp })", 'UPC/PDF derived refresh should reuse fresh empty/ok cache only when dependency stamp matches');
 hasText("status: 'empty'", 'Derived-source refreshers should cache explicit empty states when appropriate');
 hasText('dependencyStamp,', 'Derived-source cache entries should persist dependency stamps');
@@ -43,11 +44,14 @@ hasText('let failedCandidates = 0;', 'PDF refresh should track per-candidate fai
 hasText("const pdfStatus = dedupedHints.length", 'PDF refresh should derive status from successful-vs-failed candidate scans');
 
 // Overview-model memoization
+has(/function\s+caseSnapshot\s*\(/, 'Case-source reads should be centralized behind a caseSnapshot helper');
 has(/function\s+overviewCacheKey\s*\(/, 'Overview cache key helper missing');
 hasText("runtime.overviewCache = { key: cacheKey, model };", 'Overview model should be memoized');
 hasText("if (runtime.overviewCache.key === cacheKey && runtime.overviewCache.model)", 'Overview model should reuse cached derived state when inputs are unchanged');
+has(/function\s+renderOverviewHeaderCard\s*\(/, 'Overview renderer should be split into maintainable sub-renderers');
+has(/function\s+renderOverviewActionableCard\s*\(/, 'Actionable-status overview card should be isolated from the top-level renderer');
 
 // Publication hydration should merge fallback evidence instead of only replacing on total miss
-hasText('const publicationFallback = inferPublicationsFromDocs(docs);', 'Publication fallback should always be available as supplemental evidence');
+hasText('const publicationFallback = includeDocFallback ? inferPublicationsFromDocs(docs) : [];', 'Publication fallback should always be available as centralized supplemental evidence');
 
 console.log('userscript lifecycle checks passed');

@@ -94,6 +94,13 @@ node tests/userscript_lifecycle.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.82
+- Fourth-pass maintainability refactor:
+  - centralized case-source reads behind `caseSnapshot()` / `caseSourceData()` / `caseDocs()` helpers
+  - centralized publication evidence assembly behind `casePublications()` / `mergePublications()` so overview, timeline, and UPC logic stop rebuilding publication sets differently
+  - split the large overview renderer into focused card helpers (`header`, `actionable`, `renewals`, `UPC/UE`, `publications`) without changing the feature set
+  - added regression coverage for the new shared helpers in `tests/userscript_lifecycle.test.js`
+
 ### 7.0.81
 - Third-pass cross-page hydration cleanup:
   - UPC candidate-number selection now supplements main-page publication numbers with **case-local doclist-derived publication evidence**
