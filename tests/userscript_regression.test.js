@@ -63,6 +63,7 @@ has(/function\s+extractExplicitDeadlineDateFromPdf\s*\(/, 'PDF parser should sup
 has(/function\s+inferDeadlineCategoryFromContext\s*\(/, 'PDF parser should infer category from document title/procedure metadata when text lacks legal markers');
 has(/function\s+defaultResponseMonthsForCategory\s*\(/, 'PDF parser should provide conservative default response periods for key categories');
 has(/function\s+extractRegisteredLetterProofLine\s*\(/, 'PDF parser should extract proof line below Registered Letter for logging');
+hasText('registered\\s+letter\\b[:\\s\\-]*', 'Registered Letter parser should handle same-line payload patterns');
 has(/function\s+normalizePdfDocumentUrl\s*\(/, 'PDF resolver should normalize javascript-based document links');
 hasText('/^javascript:/i.test(raw)', 'PDF URL normalizer should detect javascript pseudo-links from doclist');
 hasText('source.match(/\\/?application\\?documentId=', 'PDF URL normalizer should extract application?documentId links from javascript handlers');
@@ -73,7 +74,10 @@ has(/addCalendarMonthsDetailed\(communicationDate,\s*responseMonths\)/, 'PDF mon
 hasText('PDF proof line (below "Registered Letter")', 'PDF parser logging should report line below Registered Letter to prove document was opened');
 hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-date/response-period diagnostics');
 hasText('categoryEvidence', 'PDF parse diagnostics should expose whether category came from text or document metadata');
+hasText('registeredLetterLine', 'PDF diagnostics should include captured Registered Letter line snippet');
+hasText('registeredLetterProofLine', 'PDF diagnostics should include captured Registered Letter proof-line snippet');
 hasText('Default ${fallbackMonths}-month period inferred for ${category}', 'PDF parser should support conservative default response-period fallback when explicit month phrases are missing');
+hasText('Derived from fragmented phrase', 'PDF parser should detect fragmented month phrase patterns such as "of 4 months"');
 hasText('PDF binary unavailable; using HTML fallback text extraction', 'PDF parser should log explicit HTML fallback path when binary response is not a valid PDF');
 hasText('pdfjs-via-linked-url-empty-text', 'PDF parser should expose explicit transport tag when linked PDF has no extractable text layer');
 hasText('html-fallback-from-document-page-after-empty-linked-pdf-text', 'PDF parser should support fallback from document-page HTML after empty linked-PDF text extraction');

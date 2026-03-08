@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.60
+// @version      7.0.61
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -23,7 +23,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.60';
+  const VERSION = '7.0.61';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -2008,6 +2008,9 @@
     for (const m of textRaw.matchAll(/\bwithin\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
       push(m[1], `Derived from "${String(m[0] || '').trim()}" in PDF text`, 110);
     }
+    for (const m of textRaw.matchAll(/\bof\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
+      push(m[1], `Derived from fragmented phrase "${String(m[0] || '').trim()}" in PDF text`, 70);
+    }
 
     if (!candidates.length) return { months: 0, evidence: '' };
 
@@ -2026,26 +2029,59 @@
 
     const idx = lines.findIndex((line) => /\bregistered\s+letter\b/i.test(line));
     if (idx >= 0) {
-      for (let i = idx + 1; i < Math.min(lines.length, idx + 8); i++) {
+      const current = lines[idx] || '';
+      const tail = normalize(current.replace(/.*?\bregistered\s+letter\b[:\s\-]*/i, ''));
+      if (tail && !/\bregistered\s+letter\b/i.test(tail)) {
+        return {
+          registeredLetterLine: current,
+          proofLine: tail.slice(0, 180),
+        };
+      }
+
+      for (let i = idx + 1; i < Math.min(lines.length, idx + 10); i++) {
         const line = normalize(lines[i]);
         if (!line) continue;
         if (/\bregistered\s+letter\b/i.test(line)) continue;
         return {
-          registeredLetterLine: lines[idx],
+          registeredLetterLine: current,
           proofLine: line,
         };
       }
+
+      for (let i = Math.max(0, idx - 4); i < idx; i++) {
+        const line = normalize(lines[i]);
+        if (!line) continue;
+        if (/\bregistered\s+letter\b/i.test(line)) continue;
+        if (/\bepo\s*form\b|\(\d{2}\.\d{2}\.\d{4}\)/i.test(line)) {
+          return {
+            registeredLetterLine: current,
+            proofLine: line,
+          };
+        }
+      }
+
       return {
-        registeredLetterLine: lines[idx],
+        registeredLetterLine: current,
         proofLine: '',
       };
     }
 
-    const inline = raw.match(/registered\s+letter[^\n\r]{0,24}(?:\r?\n|\s+)([^\n\r]{3,140})/i);
+    const inline = normalize(raw).match(/registered\s+letter\s*[:\-]?\s*([^\n\r]{3,180})/i);
     if (inline?.[1]) {
+      const proof = normalize(String(inline[1] || '').split(/\s{2,}/)[0]);
+      if (proof) {
+        return {
+          registeredLetterLine: 'Registered Letter',
+          proofLine: proof,
+        };
+      }
+    }
+
+    const nearby = normalize(raw).match(/(epo\s*form[^\n\r]{0,140}\(\d{2}\.\d{2}\.\d{4}\))/i);
+    if (nearby?.[1]) {
       return {
         registeredLetterLine: 'Registered Letter',
-        proofLine: normalize(inline[1]),
+        proofLine: normalize(nearby[1]),
       };
     }
 
@@ -2409,7 +2445,16 @@
     if (idx < 0) return txt;
     const start = Math.max(0, idx - 1200);
     const end = Math.min(txt.length, idx + 3200);
-    return txt.slice(start, end);
+    let focused = txt.slice(start, end);
+
+    const regIdx = low.lastIndexOf('registered letter');
+    if (regIdx >= 0 && (regIdx < start || regIdx > end)) {
+      const regStart = Math.max(0, regIdx - 220);
+      const regEnd = Math.min(txt.length, regIdx + 380);
+      focused = `${focused}\n${txt.slice(regStart, regEnd)}`;
+    }
+
+    return dedupeMultiline(focused);
   }
 
   function deriveDocumentPageUrlFromPdfUrl(rawUrl) {
@@ -2649,6 +2694,8 @@
           responseEvidence: diagnostics.responseEvidence || '',
           explicitDeadlineDate: diagnostics.explicitDeadlineDate || '',
           explicitDeadlineEvidence: diagnostics.explicitDeadlineEvidence || '',
+          registeredLetterLine: String(diagnostics.registeredLetterLine || '').slice(0, 180),
+          registeredLetterProofLine: String(diagnostics.registeredLetterProofLine || '').slice(0, 180),
           textChars: text.length,
         });
 

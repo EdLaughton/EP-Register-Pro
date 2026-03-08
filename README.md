@@ -91,6 +91,14 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.61
+- Improved robustness of **Registered Letter proof-line extraction**:
+  - handles same-line payloads after `Registered Letter`
+  - checks nearby `EPO Form ... (dd.mm.yyyy)` fallback patterns when line ordering is irregular
+  - preserves/reattaches Registered Letter tail context when focused fallback text window would otherwise exclude it
+- Improved fragmented month phrase detection (`of 4 months`) in fallback text extraction.
+- Added registered-letter line/proof snippets into PDF diagnostics metadata for easier verification.
+
 ### 7.0.60
 - Improved deadline inference when PDF/HTML fallback text lacks explicit legal markers:
   - Adds category fallback from document metadata (`doc title`/`procedure`) when communication text does not contain `Art. 94(3)`/rule tags.
