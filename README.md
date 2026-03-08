@@ -81,18 +81,28 @@ A production-focused **Tampermonkey userscript** for the [European Patent Regist
 
 ## 🧪 Testing
 
+Install test dependencies once:
+
+```bash
+npm install
+```
+
 Run the checks:
 
 ```bash
 node --check script.user.js
-node tests/userscript_smoke.test.js
-node tests/userscript_regression.test.js
-node tests/userscript_lifecycle.test.js
+npm test
 ```
 
 ---
 
 ## 📝 Changelog (recent)
+
+### 7.0.84
+- Added real fixture-based parser tests using a lightweight `jsdom` harness:
+  - exercises `parseMain`, `parseDoclist`, `parseLegal`, `parseEventHistory`, `parseFamily`, `parseUe`, `parsePdfDeadlineHints`, and `inferProceduralDeadlines`
+  - uses saved representative Register HTML fixtures plus PDF-text fixtures under `tests/fixtures/`
+  - adds `npm test` as the canonical multi-test entry point
 
 ### 7.0.83
 - Fifth-pass maintainability refactor:

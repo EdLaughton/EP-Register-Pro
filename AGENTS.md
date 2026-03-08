@@ -115,9 +115,11 @@ Rules:
 ## Validation before completion
 At minimum run:
 - `node --check script.user.js`
-- `node tests/userscript_smoke.test.js`
-- `node tests/userscript_regression.test.js`
+- `npm test`
 - any additional test added for the change
+
+Fixture expectation:
+- when touching parsers, page extraction, or PDF deadline logic, prefer representative saved fixtures under `tests/fixtures/` over adding only string-assertion tests
 
 Also explicitly reason-check:
 - initial load on each supported page type

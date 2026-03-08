@@ -1,0 +1,27 @@
+{
+  "name": "ep-register-pro",
+  "version": "1.0.0",
+  "description": "A production-focused **Tampermonkey userscript** for the [European Patent Register](https://register.epo.org/) that adds a fast, data-rich right-hand sidebar for prosecution tracking.",
+  "main": "script.user.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "node tests/userscript_smoke.test.js && node tests/userscript_regression.test.js && node tests/userscript_lifecycle.test.js && node tests/userscript_parser_fixtures.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EdLaughton/EP-Register-Pro.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/EdLaughton/EP-Register-Pro/issues"
+  },
+  "homepage": "https://github.com/EdLaughton/EP-Register-Pro#readme",
+  "devDependencies": {
+    "jsdom": "^28.1.0"
+  }
+}
