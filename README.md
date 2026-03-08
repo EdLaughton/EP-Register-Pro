@@ -91,6 +91,13 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.58
+- Improved non-PDF payload handling for document links that do not return raw PDF bytes:
+  - Detects non-PDF responses before pdf.js parse and avoids opaque `Invalid PDF structure` failures where possible.
+  - Tries to extract linked PDF/document URLs from HTML payloads and re-fetches those when available.
+  - Falls back to HTML text extraction for deadline parsing when binary PDF is unavailable.
+  - Adds transport/url diagnostics so logs clearly show whether parsing used `pdfjs`, linked PDF fetch, or HTML fallback.
+
 ### 7.0.57
 - Improved pdf.js compatibility in Tampermonkey sandbox contexts:
   - Added `unsafeWindow` bridge support for detecting/registering `pdfjsLib` globals across sandbox/page scopes.

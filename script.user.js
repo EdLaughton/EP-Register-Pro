@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.57
+// @version      7.0.58
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -23,7 +23,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.57';
+  const VERSION = '7.0.58';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -2306,26 +2306,103 @@
     return lines.join('\n');
   }
 
+  function isPdfBinaryData(binary) {
+    if (!binary) return false;
+    const bytes = binary instanceof Uint8Array ? binary : new Uint8Array(binary);
+    if (bytes.length < 5) return false;
+    return bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2d; // %PDF-
+  }
+
+  function binaryToUtf8(binary, maxBytes = 300000) {
+    if (!binary) return '';
+    const bytes = binary instanceof Uint8Array ? binary : new Uint8Array(binary);
+    const slice = bytes.slice(0, Math.max(0, maxBytes));
+    try {
+      if (typeof TextDecoder === 'function') return new TextDecoder('utf-8', { fatal: false }).decode(slice);
+    } catch {
+      // fallback below
+    }
+    return Array.from(slice).map((b) => String.fromCharCode(b)).join('');
+  }
+
+  function extractPdfLikeUrlFromHtml(html, baseUrl) {
+    const doc = parseHtml(String(html || ''));
+    const attrCandidates = [
+      ...[...doc.querySelectorAll('a[href]')].map((el) => el.getAttribute('href') || ''),
+      ...[...doc.querySelectorAll('iframe[src], embed[src]')].map((el) => el.getAttribute('src') || ''),
+      ...[...doc.querySelectorAll('object[data]')].map((el) => el.getAttribute('data') || ''),
+    ];
+
+    const scriptText = [...doc.querySelectorAll('script')].map((s) => text(s)).join('\n');
+    const regexCandidates = [
+      ...(scriptText.match(/https?:\/\/[^\s"')>]+\.pdf(?:\?[^\s"')>]*)?/gi) || []),
+      ...(scriptText.match(/\/?application\?documentId=[^\s"')>]+/gi) || []),
+    ];
+
+    const all = [...attrCandidates, ...regexCandidates].map((v) => normalize(String(v || ''))).filter(Boolean);
+    for (const raw of all) {
+      const normalized = normalizePdfDocumentUrl(raw) || (() => {
+        try { return new URL(raw, baseUrl).toString(); } catch { return ''; }
+      })();
+      if (!normalized) continue;
+      if (/\.pdf(?:\?|$)/i.test(normalized) || /[?&]documentId=/i.test(normalized)) return normalized;
+    }
+    return '';
+  }
+
   async function extractPdfText(url, signal, pdfjsInstance = null) {
     const pdfjs = pdfjsInstance || await ensurePdfJs(signal);
-    const binary = await fetchBinaryWithRetry(url, signal);
-    const data = new Uint8Array(binary);
-    const loadingTask = pdfjs.getDocument({ data, disableWorker: true, useWorkerFetch: false, isEvalSupported: false });
-    const pdf = await loadingTask.promise;
 
-    try {
-      const maxPages = Math.min(pdf.numPages || 0, 8);
-      const chunks = [];
-      for (let i = 1; i <= maxPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        const txt = pdfContentToStructuredText(content);
-        if (txt) chunks.push(txt);
+    const parsePdfBinaryToText = async (binary) => {
+      const data = binary instanceof Uint8Array ? binary : new Uint8Array(binary);
+      const loadingTask = pdfjs.getDocument({ data, disableWorker: true, useWorkerFetch: false, isEvalSupported: false });
+      const pdf = await loadingTask.promise;
+      try {
+        const maxPages = Math.min(pdf.numPages || 0, 8);
+        const chunks = [];
+        for (let i = 1; i <= maxPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const txt = pdfContentToStructuredText(content);
+          if (txt) chunks.push(txt);
+        }
+        return chunks.join('\n');
+      } finally {
+        try { await pdf.destroy(); } catch {}
       }
-      return chunks.join('\n');
-    } finally {
-      try { await pdf.destroy(); } catch {}
+    };
+
+    const binary = await fetchBinaryWithRetry(url, signal);
+    if (isPdfBinaryData(binary)) {
+      return { text: await parsePdfBinaryToText(binary), transport: 'pdfjs', resolvedUrl: url, isPdf: true };
     }
+
+    const htmlPayload = binaryToUtf8(binary);
+    const looksHtml = /<\s*html\b|<!doctype\s+html|<\s*body\b|<\s*title\b/i.test(String(htmlPayload || '').slice(0, 2000));
+    if (!looksHtml) {
+      throw new Error('Invalid PDF structure (non-PDF payload)');
+    }
+
+    const linkedUrl = extractPdfLikeUrlFromHtml(htmlPayload, url);
+    if (linkedUrl && linkedUrl !== url) {
+      const linkedBinary = await fetchBinaryWithRetry(linkedUrl, signal);
+      if (isPdfBinaryData(linkedBinary)) {
+        return { text: await parsePdfBinaryToText(linkedBinary), transport: 'pdfjs-via-linked-url', resolvedUrl: linkedUrl, isPdf: true };
+      }
+
+      const linkedHtml = binaryToUtf8(linkedBinary);
+      const linkedText = bodyText(parseHtml(linkedHtml));
+      if (linkedText) {
+        return { text: linkedText, transport: 'html-fallback-via-linked-url', resolvedUrl: linkedUrl, isPdf: false };
+      }
+    }
+
+    const fallbackText = bodyText(parseHtml(htmlPayload));
+    if (fallbackText) {
+      return { text: fallbackText, transport: 'html-fallback', resolvedUrl: url, isPdf: false };
+    }
+
+    throw new Error('Invalid PDF structure (HTML payload without readable text)');
   }
 
   async function refreshPdfDeadlines(caseNo, signal, force = false) {
@@ -2382,10 +2459,23 @@
           continue;
         }
 
-        const text = await extractPdfText(resolvedUrl, signal, pdfjs);
+        const extracted = await extractPdfText(resolvedUrl, signal, pdfjs);
+        const text = normalize(String(extracted?.text || ''));
+        const parseTransport = String(extracted?.transport || 'unknown');
+        const parseUrl = String(extracted?.resolvedUrl || resolvedUrl);
+
         if (!text) {
-          addLog(caseNo, 'warn', 'PDF opened but extracted text was empty', { source: 'pdfDeadlines', doc: doc.title || '', url: resolvedUrl });
+          addLog(caseNo, 'warn', 'PDF opened but extracted text was empty', { source: 'pdfDeadlines', doc: doc.title || '', url: parseUrl, transport: parseTransport });
           continue;
+        }
+
+        if (!extracted?.isPdf) {
+          addLog(caseNo, 'warn', 'PDF binary unavailable; using HTML fallback text extraction', {
+            source: 'pdfDeadlines',
+            doc: doc.title || '',
+            url: parseUrl,
+            transport: parseTransport,
+          });
         }
 
         const parsed = parsePdfDeadlineHints(text, { docDateStr: doc.dateStr });
@@ -2397,11 +2487,15 @@
           source: 'pdfDeadlines',
           doc: doc.title || '',
           docDate: doc.dateStr || '',
+          transport: parseTransport,
+          url: parseUrl,
         });
 
         addLog(caseNo, 'info', 'PDF parse diagnostics', {
           source: 'pdfDeadlines',
           doc: doc.title || '',
+          transport: parseTransport,
+          url: parseUrl,
           category: diagnostics.category || '',
           communicationDate: diagnostics.communicationDate || '',
           communicationEvidence: diagnostics.communicationEvidence || '',
@@ -2417,12 +2511,16 @@
           addLog(caseNo, 'ok', `PDF deadline hints parsed: ${parsedHints.length}`, {
             source: 'pdfDeadlines',
             doc: doc.title || '',
+            transport: parseTransport,
+            url: parseUrl,
             hints: parsedHints.map((h) => `${h.label}=${h.dateStr}`),
           });
         } else {
           addLog(caseNo, 'info', 'PDF opened but no deadline hint produced for this document', {
             source: 'pdfDeadlines',
             doc: doc.title || '',
+            transport: parseTransport,
+            url: parseUrl,
             category: diagnostics.category || '',
           });
         }
@@ -2430,7 +2528,8 @@
         scanned.push({
           title: doc.title,
           dateStr: doc.dateStr,
-          url: resolvedUrl,
+          url: parseUrl,
+          transport: parseTransport,
           hintCount: parsedHints.length,
           category: String(diagnostics.category || ''),
           communicationDate: String(diagnostics.communicationDate || ''),
