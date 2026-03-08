@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.75
+- Added a clear blue guide line on the left side of doclist grouping rows:
+  - group header rows: stronger blue left marker
+  - grouped child rows: lighter blue continuation line
+- Improves visual scanning of which documents belong to each collapsible group.
+
 ### 7.0.74
 - Full-script audit cleanup pass:
   - removed an unused `caseNo` parameter from `parseDoclist` call flow

@@ -219,6 +219,8 @@ notHas(/<div class="epoRP-l">Applicant last filing<\/div>/, 'Actionable status s
 notHas(/<div class="epoRP-l">Days since applicant response<\/div>/, 'Actionable status should not render a separate day-counter row after consolidation');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
 hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use explicit R71(3) wording for grant package groups');
+hasText('tr.epoRP-docgrp td:first-child{box-shadow:inset 3px 0 0 #3b82f6}', 'Doclist group header should show a strong blue left guide line');
+hasText('tr.epoRP-docgrp-item.epoRP-docgrp-open td:first-child{box-shadow:inset 3px 0 0 #93c5fd}', 'Doclist grouped child rows should show a lighter blue continuation guide line');
 has(/if \(sameDateGrantSignals\) model\.bundle = 'Grant package';/, 'Doclist grouping should fold same-date bibliographic rows into intention-to-grant group when grant signals are present');
 has(/const\s+isLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed to be withdrawn\|loss of rights/, 'Document classification should mark loss-of-rights communications as EPO actions');
 has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute a structural signature for change detection');
