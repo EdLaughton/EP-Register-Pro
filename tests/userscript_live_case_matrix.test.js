@@ -72,6 +72,8 @@ function caseDoc(caseNo, tab) {
   const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
   const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
   const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const federated = hooks.parseFederated(caseDoc(caseNo, 'federated'), caseNo);
+  const citations = hooks.parseCitations(caseDoc(caseNo, 'citations'));
   const ue = hooks.parseUe(caseDoc(caseNo, 'ueMain'));
 
   assert(/No opposition filed within time limit/i.test(main.statusRaw || ''), 'Granted baseline should preserve the post-grant no-opposition status');
@@ -80,6 +82,11 @@ function caseDoc(caseNo, tab) {
   assert(eventHistory.events.some((e) => /No opposition filed within time limit/i.test(e.title)), 'Granted baseline should retain no-opposition event history');
   assert(eventHistory.events.some((e) => /Lapse of the patent in a contracting state/i.test(e.title)), 'Granted baseline should retain post-grant lapse signals from live event history');
   assert(family.publications.some((p) => p.no === 'EP4438108' && p.kind === 'A3'), 'Granted baseline should retain the divisional-child family publication');
+  assert.strictEqual(federated.status, 'No opposition filed within time limit', 'Granted baseline should parse federated-register status');
+  assert.strictEqual(federated.renewalFeesPaidUntil, 'Year 17', 'Granted baseline should parse federated-register renewal horizon');
+  assert(federated.states.some((s) => s.state === 'UP'), 'Granted baseline should retain UP row from federated register');
+  assert(citations.phases.some((p) => p.name === 'Search') && citations.phases.some((p) => p.name === 'International search'), 'Granted baseline should parse citations grouped by real phases');
+  assert(citations.entries.some((e) => e.publicationNo === 'WO2017035502'), 'Granted baseline should parse real citation publication numbers');
   assert.strictEqual(ue.ueStatus, 'Unitary effect registered', 'Granted baseline should parse real unitary-effect registration status');
   assert(/AT, BE, BG, DE/.test(ue.memberStates || ''), 'Granted baseline should retain covered UP member states');
 }

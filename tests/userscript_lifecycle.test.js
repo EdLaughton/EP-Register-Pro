@@ -44,6 +44,10 @@ hasText('let failedCandidates = 0;', 'PDF refresh should track per-candidate fai
 has(/function\s+derivePdfDeadlineStatus\s*\(/, 'PDF refresh should derive status from successful-vs-failed candidate scans through a dedicated helper');
 
 // Overview-model memoization
+hasText("{ key: 'federated', slug: 'federated', title: 'EP Federated register' }", 'Federated register should be a first-class cached source');
+hasText("{ key: 'citations', slug: 'citations', title: 'EP Citations' }", 'Citations should be a first-class cached source');
+has(/function\s+parseFederated\s*\(/, 'Federated-register parser missing');
+has(/function\s+parseCitations\s*\(/, 'Citations parser missing');
 has(/function\s+sectionRowsByHeader\s*\(/, 'Header-rowspan section extraction should be centralized for real Register table parsing');
 has(/function\s+parseMainPublications\s*\(/, 'Main-page publication parsing should handle multi-row Register publication tables');
 has(/function\s+caseSnapshot\s*\(/, 'Case-source reads should be centralized behind a caseSnapshot helper');
@@ -53,7 +57,10 @@ hasText("if (runtime.overviewCache.key === cacheKey && runtime.overviewCache.mod
 has(/function\s+compactOverviewTitle\s*\(/, 'Overview renderer should centralize noisy document-title cleanup behind a compaction helper');
 has(/function\s+renderOverviewHeaderCard\s*\(/, 'Overview renderer should be split into maintainable sub-renderers');
 has(/function\s+renderOverviewActionableCard\s*\(/, 'Actionable-status overview card should be isolated from the top-level renderer');
+has(/function\s+renderOverviewFederatedCard\s*\(/, 'Federated-register summary should have a dedicated overview renderer');
+has(/function\s+renderOverviewCitationsCard\s*\(/, 'Compact citations section should have a dedicated overview renderer');
 hasText("termReferenceDate ? `20-year term ${termReferenceDate}` : ''", 'Overview header should show 20-year term date without extra years-remaining noise');
+hasText("showCitations: true,", 'Citations panel should be controllable via options');
 
 // Publication hydration should merge fallback evidence instead of only replacing on total miss
 hasText('const publicationFallback = includeDocFallback ? inferPublicationsFromDocs(docs) : [];', 'Publication fallback should always be available as centralized supplemental evidence');

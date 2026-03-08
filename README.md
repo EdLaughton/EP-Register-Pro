@@ -98,6 +98,17 @@ npm test
 
 ## 📝 Changelog (recent)
 
+### 7.0.89
+- Added **Federated register** and **Citations** as first-class cached Register sources.
+- New sidebar/data integration:
+  - federated-register parser and compact overview card for national / UP summary
+  - citations parser and optional compact citations card grouped by phase
+  - federated renewal horizon is now used where appropriate to enrich post-grant renewal display
+- Added real captured fixtures for `EP19871250` federated + citations tabs and extended live case-matrix coverage accordingly.
+- Live-source expansion surfaced and fixed another real parser gap:
+  - `parseFederated()` now preserves per-state rows from live federated HTML
+  - `parseMain()` now handles live multi-row publication tables and concatenated application-number / filing-date rows more robustly
+
 ### 7.0.88
 - Removed the synthetic/fake Register HTML fixtures and consolidated real Register captures under `tests/fixtures/cases/<application>/`.
 - Added a persistent scrape tracker at `tests/live-fixture-tracker.md` so future runs can retry missing tabs/cases until the requested coverage set is complete.

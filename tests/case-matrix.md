@@ -14,7 +14,7 @@ Per-tab live capture status is tracked separately in `tests/live-fixture-tracker
 | `EP25203732` | Active divisional child | English title selection, divisional type + parent link, search-publication path, family/publication crossover to parent case, reminder/search-opinion doc coverage | `EP4644110` |
 | `EP19205846` | Withdrawn/deemed-withdrawn + renewal-history + UPC opt-out negative control | Status simplification, repeated R71 cycles, deemed-withdrawn outcome, renewal-fee extraction, publication fallback behavior, UPC lookup resolves as no opt-out found | `EP3816364` |
 | `EP24189818` | Divisional child / branching procedural path / renewal-heavy / UPC opt-out positive control | Parent link to `EP19871250`, repeated grant-intention cycles, renewal-fee extraction through later years, family/publication linkage, UPC registry lookup resolves as opted out | `EP4438108` |
-| `EP19871250` | Parent granted baseline + Euro-PCT + unitary effect | Parent half of the `EP19871250` ↔ `EP24189818` divisional pair; granted/no-opposition happy path, unitary effect extraction, B1/C0 family/publication coverage, post-grant lapse signals | `EP3863511` |
+| `EP19871250` | Parent granted baseline + Euro-PCT + unitary effect | Parent half of the `EP19871250` ↔ `EP24189818` divisional pair; granted/no-opposition happy path, unitary effect extraction, federated-register national/UP summary, citations grouping, B1/C0 family/publication coverage, post-grant lapse signals | `EP3863511` |
 
 ## Queued high-value additions
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.88
+// @version      7.0.89
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.88';
+  const VERSION = '7.0.89';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -73,6 +73,8 @@
     { key: 'event', slug: 'event', title: 'EP Event history' },
     { key: 'family', slug: 'family', title: 'EP Patent family' },
     { key: 'legal', slug: 'legal', title: 'EP Legal status' },
+    { key: 'federated', slug: 'federated', title: 'EP Federated register' },
+    { key: 'citations', slug: 'citations', title: 'EP Citations' },
     { key: 'ueMain', slug: 'ueMain', title: 'UP About this file' },
   ];
 
@@ -88,6 +90,7 @@
     showLegalStatusRows: true,
     showRenewals: true,
     showUpcUe: true,
+    showCitations: true,
     timelineDensity: 'standard',
     timelineEventLevel: 'info',
     timelineLegalLevel: 'warn',
@@ -787,6 +790,26 @@
     return dedupe(sectionRowsByHeader(doc, headerRegex).map((rows) => rows.map((r) => text(r)).join('\n').trim()).filter(Boolean), (x) => x);
   }
 
+  function rowLabelValuePairs(row) {
+    const pairs = {};
+    let currentKey = '';
+    for (const cell of row.querySelectorAll('th,td')) {
+      const raw = normalize(text(cell));
+      const tag = String(cell.tagName || '').toUpperCase();
+      const cls = String(cell.className || '').toLowerCase();
+      const isLabel = tag === 'TH' || /\bth\b/.test(cls) || cls.includes('header');
+      if (isLabel) {
+        currentKey = raw.replace(/:\s*$/, '').trim();
+        if (currentKey && !(currentKey in pairs)) pairs[currentKey] = '';
+        continue;
+      }
+      if (!currentKey) continue;
+      if (raw) pairs[currentKey] = pairs[currentKey] ? `${pairs[currentKey]} ${raw}`.trim() : raw;
+      currentKey = '';
+    }
+    return pairs;
+  }
+
   function fieldByLabel(doc, regexes) {
     for (const row of doc.querySelectorAll('tr')) {
       const cells = [...row.querySelectorAll('th,td')].map(text);
@@ -1042,13 +1065,15 @@
     const doclist = caseSourceData(c, 'doclist', {});
     const family = caseSourceData(c, 'family', {});
     const legal = caseSourceData(c, 'legal', {});
+    const federated = caseSourceData(c, 'federated', {});
+    const citations = caseSourceData(c, 'citations', {});
     const eventHistory = caseSourceData(c, 'event', {});
     const ue = caseSourceData(c, 'ueMain', {});
     const upcRegistry = caseSourceData(c, 'upcRegistry', null);
     const pdfDeadlines = caseSourceData(c, 'pdfDeadlines', {});
     const docs = [...(doclist.docs || [])].sort(compareDateDesc);
     const publications = casePublications(c, { docs });
-    return { c, main, doclist, family, legal, eventHistory, ue, upcRegistry, pdfDeadlines, docs, publications };
+    return { c, main, doclist, family, legal, federated, citations, eventHistory, ue, upcRegistry, pdfDeadlines, docs, publications };
   }
 
   function parseRecentEvents(raw) {
@@ -1690,6 +1715,103 @@
     };
   }
 
+  function parseFederated(doc, caseNo) {
+    const states = [];
+    const summary = {
+      appNo: caseNo,
+      fullPublicationNo: '',
+      applicantProprietor: '',
+      status: '',
+      upMemberStates: '',
+      invalidationDate: '',
+      renewalFeesPaidUntil: '',
+      recordUpdated: '',
+    };
+
+    const captureSummary = (pairs) => {
+      if (!summary.appNo && pairs['EP application number']) summary.appNo = pairs['EP application number'];
+      if (!summary.fullPublicationNo && pairs['Full publication number']) summary.fullPublicationNo = pairs['Full publication number'];
+      if (!summary.applicantProprietor && pairs['Applicant / proprietor']) summary.applicantProprietor = pairs['Applicant / proprietor'];
+      if (!summary.status && pairs.Status) summary.status = pairs.Status;
+      if (!summary.upMemberStates && pairs['Member States covered by Unitary Patent Protection']) summary.upMemberStates = pairs['Member States covered by Unitary Patent Protection'];
+      if (!summary.invalidationDate && pairs['Invalidation date']) summary.invalidationDate = pairs['Invalidation date'];
+      if (!summary.renewalFeesPaidUntil && pairs['Renewal fees paid until']) summary.renewalFeesPaidUntil = pairs['Renewal fees paid until'];
+      if (!summary.recordUpdated && pairs['Record last updated']) summary.recordUpdated = pairs['Record last updated'];
+    };
+
+    for (const row of doc.querySelectorAll('tr')) {
+      const pairs = rowLabelValuePairs(row);
+      if (Object.keys(pairs).length < 1) continue;
+      captureSummary(pairs);
+      if (!pairs.State) continue;
+      states.push({
+        state: pairs.State,
+        nationalPublicationNo: pairs['National publication number'] || '',
+        publicationDate: pairs['Publication date'] || '',
+        upMemberStates: pairs['Member States covered by Unitary Patent Protection'] || '',
+        invalidationDate: pairs['Invalidation date'] || '',
+        renewalFeesPaidUntil: pairs['Renewal fees paid until'] || '',
+        recordUpdated: pairs['Record last updated'] || '',
+        notInForceSince: pairs['Not in force since'] || '',
+        status: pairs.Status || summary.status || '',
+      });
+    }
+
+    return {
+      ...summary,
+      states,
+      notableStates: states.filter((s) => normalize(s.notInForceSince || '') || /lapse|revok|terminated|not in force/i.test(`${s.status || ''} ${s.nationalPublicationNo || ''}`)),
+    };
+  }
+
+  function parseCitations(doc) {
+    const entries = [];
+    let phase = '';
+    let currentType = '';
+
+    for (const row of doc.querySelectorAll('tr')) {
+      const cells = [...row.querySelectorAll('th,td')].map((cell) => normalize(text(cell))).filter(Boolean);
+      if (!cells.length) continue;
+
+      if (/^Cited in$/i.test(cells[0] || '') && cells[1]) {
+        phase = cells[1];
+        continue;
+      }
+      if (/^Type:?$/i.test(cells[0] || '')) {
+        currentType = cells[1] || '';
+        continue;
+      }
+      if (!/^Publication No\.:?$/i.test(cells[0] || '')) continue;
+
+      const raw = cells.slice(1).join(' ');
+      const pubMatch = raw.match(/\b((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)\d{4,})\b/i);
+      if (!pubMatch?.[1]) continue;
+      const categoryMatches = [...raw.matchAll(/\[([A-Z]{1,4})\]/g)].map((m) => String(m[1] || ''));
+      const applicant = raw.match(/\(([^)]+)\)/)?.[1] || '';
+      entries.push({
+        phase: phase || 'Other',
+        type: currentType || 'Patent literature',
+        publicationNo: String(pubMatch[1] || '').toUpperCase(),
+        categories: dedupe(categoryMatches, (x) => x),
+        applicant,
+        detail: raw,
+      });
+    }
+
+    const phaseOrder = ['Search', 'International search', 'Examination', 'Opposition', 'Appeal', 'by applicant'];
+    const byPhase = {};
+    for (const entry of entries) {
+      (byPhase[entry.phase] ||= []).push(entry);
+    }
+    const phases = Object.keys(byPhase).sort((a, b) => {
+      const ai = phaseOrder.indexOf(a);
+      const bi = phaseOrder.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.localeCompare(b);
+    }).map((name) => ({ name, entries: byPhase[name] }));
+
+    return { entries, phases };
+  }
+
   function parseSource(key, doc, caseNo) {
     switch (key) {
       case 'main': return parseMain(doc, caseNo);
@@ -1697,6 +1819,8 @@
       case 'event': return parseEventHistory(doc, caseNo);
       case 'family': return parseFamily(doc);
       case 'legal': return parseLegal(doc, caseNo);
+      case 'federated': return parseFederated(doc, caseNo);
+      case 'citations': return parseCitations(doc);
       case 'ueMain': return parseUe(doc);
       default: return {};
     }
@@ -1737,6 +1861,21 @@
         source: sourceKey,
         events: Array.isArray(d.events) ? d.events.length : 0,
         renewals: Array.isArray(d.renewals) ? d.renewals.length : 0,
+      };
+    }
+    if (sourceKey === 'federated') {
+      return {
+        source: sourceKey,
+        status: d.status || '',
+        states: Array.isArray(d.states) ? d.states.length : 0,
+        upMemberStates: normalize(d.upMemberStates || '').split(/,\s*/).filter(Boolean).length,
+      };
+    }
+    if (sourceKey === 'citations') {
+      return {
+        source: sourceKey,
+        entries: Array.isArray(d.entries) ? d.entries.length : 0,
+        phases: Array.isArray(d.phases) ? d.phases.length : 0,
       };
     }
     if (sourceKey === 'ueMain') {
@@ -4011,19 +4150,20 @@
     const optPart = [
       opts.showRenewals,
       opts.showUpcUe,
+      opts.showCitations,
       opts.showPublications,
       opts.showEventHistory,
       opts.showLegalStatusRows,
     ].join('|');
 
-    const srcPart = ['main', 'doclist', 'event', 'family', 'legal', 'ueMain', 'upcRegistry', 'pdfDeadlines']
+    const srcPart = ['main', 'doclist', 'event', 'family', 'legal', 'federated', 'citations', 'ueMain', 'upcRegistry', 'pdfDeadlines']
       .map((k) => sourceStamp(c, k))
       .join('|');
     return `${caseNo}|${optPart}|${srcPart}`;
   }
 
   function overviewModel(caseNo) {
-    const { c, main, legal, eventHistory, ue, upcRegistry, pdfDeadlines, docs, publications } = caseSnapshot(caseNo);
+    const { c, main, legal, federated, citations, eventHistory, ue, upcRegistry, pdfDeadlines, docs, publications } = caseSnapshot(caseNo);
     const opts = options();
     const cacheKey = overviewCacheKey(caseNo, opts, c);
     if (runtime.overviewCache.key === cacheKey && runtime.overviewCache.model) {
@@ -4081,6 +4221,11 @@
 
     const daysToDeadline = nextDeadline ? Math.ceil((nextDeadline.date.getTime() - Date.now()) / 86400000) : null;
 
+    const federatedStates = Array.isArray(federated.states) ? federated.states : [];
+    const federatedNotableStates = Array.isArray(federated.notableStates) ? federated.notableStates : [];
+    const citationEntries = Array.isArray(citations.entries) ? citations.entries : [];
+    const citationPhases = Array.isArray(citations.phases) ? citations.phases : [];
+
     const model = {
       title: main.title || '—',
       applicant: main.applicant || '—',
@@ -4107,6 +4252,20 @@
       publications,
       deadlines: deadlines.sort((a, b) => a.date - b.date),
       renewal,
+      federated: {
+        status: federated.status || '',
+        upMemberStates: federated.upMemberStates || '',
+        invalidationDate: federated.invalidationDate || '',
+        renewalFeesPaidUntil: federated.renewalFeesPaidUntil || '',
+        recordUpdated: federated.recordUpdated || '',
+        applicantProprietor: federated.applicantProprietor || '',
+        trackedStates: federatedStates.length,
+        notableStates: federatedNotableStates.slice(0, 6),
+      },
+      citations: {
+        entries: citationEntries,
+        phases: citationPhases,
+      },
       upcUe: {
         ueStatus: ue.ueStatus || 'Unknown',
         upcOptOut: upcRegistry ? (upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')) : (ue.upcOptOut || 'Unknown'),
@@ -4436,12 +4595,14 @@
     const graceText = m.renewal.graceUntil
       ? `Grace until ${esc(formatDate(m.renewal.graceUntil))}${m.renewal.dueState === 'grace' ? ' (surcharge period active)' : ''}`
       : '';
-    const patentYearStatus = m.renewal.highestYear
-      ? `Paid through Year ${m.renewal.highestYear}${patentYearFromFiling ? ` · current year ${patentYearFromFiling}` : ''}`
+    const federatedPaidYear = Number(String(m.federated?.renewalFeesPaidUntil || '').match(/Year\s+(\d+)/i)?.[1] || 0) || null;
+    const effectivePaidYear = Math.max(Number(m.renewal.highestYear || 0) || 0, Number(federatedPaidYear || 0) || 0) || null;
+    const patentYearStatus = effectivePaidYear
+      ? `Paid through Year ${effectivePaidYear}${patentYearFromFiling ? ` · current year ${patentYearFromFiling}` : ''}`
       : (patentYearFromFiling ? `Current year ${patentYearFromFiling}` : 'No renewal payment captured yet');
     const latestRenewalNote = m.renewal.latest
       ? `Last payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}`
-      : 'No renewal payment event cached.';
+      : (federatedPaidYear ? `Federated register reports payments through Year ${federatedPaidYear}` : 'No renewal payment event cached.');
     const basisSummary = `${m.renewal.explanatoryBasis} · ${m.renewal.confidence || 'low'} confidence`;
 
     return `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
@@ -4450,6 +4611,47 @@
       <div class="epoRP-l">Next fee</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}${graceText ? `<div class="epoRP-m">${graceText}</div>` : ''}</div>
       ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Grant mention</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
     </div><div class="epoRP-m">${esc(basisSummary)}</div></div>`;
+  }
+
+  function renderOverviewFederatedCard(m) {
+    if (!(m.federated.status || m.federated.trackedStates || m.federated.upMemberStates)) return '';
+    const notableStates = m.federated.notableStates || [];
+    const upCount = normalize(m.federated.upMemberStates || '').split(/,\s*/).filter(Boolean).length;
+
+    return `<div class="epoRP-c"><h4>Federated / national</h4><div class="epoRP-g">
+      <div class="epoRP-l">Status</div><div class="epoRP-v">${esc(m.federated.status || '—')}</div>
+      <div class="epoRP-l">UP coverage</div><div class="epoRP-v">${m.federated.upMemberStates ? `${esc(m.federated.upMemberStates)} <span class="epoRP-bdg ok">${upCount} states</span>` : '—'}</div>
+      <div class="epoRP-l">Renewals paid to</div><div class="epoRP-v">${esc(m.federated.renewalFeesPaidUntil || '—')}</div>
+      <div class="epoRP-l">Invalidation date</div><div class="epoRP-v">${esc(m.federated.invalidationDate || '—')}</div>
+      <div class="epoRP-l">Tracked states</div><div class="epoRP-v">${esc(String(m.federated.trackedStates || 0))}${m.federated.recordUpdated ? `<div class="epoRP-m">Updated ${esc(m.federated.recordUpdated)}</div>` : ''}</div>
+    </div>${notableStates.length ? `<div class="epoRP-m">Notable states: ${esc(notableStates.map((s) => `${s.state}${s.notInForceSince ? ` (not in force since ${s.notInForceSince})` : ''}`).join(', '))}</div>` : ''}</div>`;
+  }
+
+  function citationCategoryLevel(categories = []) {
+    const joined = categories.join(' ');
+    if (/\bX/.test(joined)) return 'bad';
+    if (/\bY/.test(joined)) return 'warn';
+    return 'info';
+  }
+
+  function renderOverviewCitationsCard(m) {
+    const phases = m.citations.phases || [];
+    if (!phases.length) return '';
+
+    let html = `<div class="epoRP-c"><h4>Citations</h4>`;
+    html += `<div class="epoRP-m">${esc(`${m.citations.entries.length} citation${m.citations.entries.length === 1 ? '' : 's'} across ${phases.length} phase${phases.length === 1 ? '' : 's'}`)}</div>`;
+    for (const phase of phases.slice(0, 3)) {
+      html += `<div class="epoRP-m"><b>${esc(phase.name)}</b></div>`;
+      html += `<div class="epoRP-pubs">`;
+      for (const entry of phase.entries.slice(0, 3)) {
+        const catText = entry.categories?.length ? entry.categories.join('/') : 'ref';
+        html += `<div class="epoRP-pub"><div><div class="epoRP-pn">${esc(entry.publicationNo)}</div><div class="epoRP-pm">${esc(entry.applicant || entry.type || phase.name)}</div></div><div class="epoRP-d"><span class="epoRP-bdg ${citationCategoryLevel(entry.categories || [])}">${esc(catText)}</span></div></div>`;
+      }
+      html += `</div>`;
+    }
+    if (phases.length > 3) html += `<div class="epoRP-m">${esc(`+ ${phases.length - 3} more citation phase${phases.length - 3 === 1 ? '' : 's'}`)}</div>`;
+    html += `</div>`;
+    return html;
   }
 
   function renderOverviewUpcUeCard(m) {
@@ -4482,8 +4684,10 @@
     let html = renderOverviewHeaderCard(m);
     html += renderOverviewActionableCard(m);
     if (opts.showRenewals) html += renderOverviewRenewalsCard(m);
+    html += renderOverviewFederatedCard(m);
     if (opts.showUpcUe) html += renderOverviewUpcUeCard(m);
     html += renderOverviewPublicationsCard(caseNo, m);
+    if (opts.showCitations) html += renderOverviewCitationsCard(m);
     return html;
   }
 
@@ -4565,12 +4769,13 @@
 
     return `<div class="epoRP-c"><h4>Options</h4>
       ${checkbox('epoRP-opt-shift', 'shiftBody', 'Shift page body', 'Adds right padding so Register content is not hidden under panel.')}
-      ${checkbox('epoRP-opt-preload', 'preloadAllTabs', 'Preload all case tabs in background', 'Loads main/doclist/event/family/legal/ueMain in background and fills cache.')}
+      ${checkbox('epoRP-opt-preload', 'preloadAllTabs', 'Preload all case tabs in background', 'Loads main/doclist/event/family/legal/federated/citations/ueMain in background and fills cache.')}
       ${checkbox('epoRP-opt-pubs', 'showPublications', 'Show publications on timeline', 'Includes publication entries from main + family sources.')}
       ${checkbox('epoRP-opt-events', 'showEventHistory', 'Show event-history rows', 'Includes EP Event history source rows in timeline.')}
       ${checkbox('epoRP-opt-legal', 'showLegalStatusRows', 'Show legal-status rows', 'Includes EP Legal status rows in timeline.')}
       ${checkbox('epoRP-opt-ren', 'showRenewals', 'Show renewals panel', 'Displays pre-/post-grant and UE-sensitive renewal explanation in Overview.')}
       ${checkbox('epoRP-opt-upc', 'showUpcUe', 'Show UPC/UE panel', 'Displays inferred UE + UPC opt-out state with notes.')}
+      ${checkbox('epoRP-opt-cit', 'showCitations', 'Show citations panel', 'Displays a compact cited-art summary grouped by phase.')}
       <label class="epoRP-or"><div><div class="epoRP-ol">Timeline density</div><div class="epoRP-oh">Compact / standard / verbose visual density.</div></div>
         <select id="epoRP-opt-density" class="epoRP-in"><option value="compact" ${o.timelineDensity === 'compact' ? 'selected' : ''}>Compact</option><option value="standard" ${o.timelineDensity === 'standard' ? 'selected' : ''}>Standard</option><option value="verbose" ${o.timelineDensity === 'verbose' ? 'selected' : ''}>Verbose</option></select>
       </label>
@@ -4678,6 +4883,7 @@
     wireToggle('epoRP-opt-legal', 'showLegalStatusRows');
     wireToggle('epoRP-opt-ren', 'showRenewals');
     wireToggle('epoRP-opt-upc', 'showUpcUe');
+    wireToggle('epoRP-opt-cit', 'showCitations');
 
     b.querySelector('#epoRP-opt-density')?.addEventListener('change', (event) => {
       setOptions({ timelineDensity: event.target.value || 'standard' });

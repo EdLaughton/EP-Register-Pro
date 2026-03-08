@@ -13,13 +13,13 @@ Keep this file current. When a user asks for more real Register/UPC coverage:
 
 ## Current EP Register case coverage
 
-| Application | Publication / label | Purpose | main | legal | event | family | doclist | ueMain | Notes |
-|---|---|---|---|---|---|---|---|---|---|
-| `EP24837586` | `EP4623169 A1` | active parent / family / Euro-PCT baseline | captured | captured | captured | captured | captured | captured | already in real case fixtures |
-| `EP25203732` | `EP4644110 A2/A3` | active divisional child / parent link / search-publication path | captured | missing | captured | captured | captured | missing | child half of the recommended parent/divisional branching pair; legal/ueMain still missing |
-| `EP24189818` | `EP4438108 A2/A3` | divisional child + renewal-heavy grant-intention flow / UPC positive publication | captured | captured | captured | captured | captured | missing | explicitly paired with parent `EP19871250 / EP3863511`; ueMain still missing; UPC positive control captured separately |
-| `EP19205846` | `EP3816364 A1` | deemed-withdrawn / renewal-history / UPC negative publication | captured | captured | captured | captured | captured | missing | ueMain not yet saved; UPC negative control captured separately |
-| `EP19871250` | `EP3863511 B1 / C0` | granted baseline + Euro-PCT + unitary effect happy-path | captured | missing | captured | captured | missing | captured | parent half of the recommended branching parent/divisional pair; legal/doclist hit challenge on this run |
+| Application | Publication / label | Purpose | main | legal | event | family | doclist | federated | citations | ueMain | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `EP24837586` | `EP4623169 A1` | active parent / family / Euro-PCT baseline | captured | captured | captured | captured | captured | missing | missing | captured | already in real case fixtures; federated/citations still not captured |
+| `EP25203732` | `EP4644110 A2/A3` | active divisional child / parent link / search-publication path | captured | missing | captured | captured | captured | missing | missing | missing | child half of the recommended parent/divisional branching pair; legal/federated/citations/ueMain still missing |
+| `EP24189818` | `EP4438108 A2/A3` | divisional child + renewal-heavy grant-intention flow / UPC positive publication | captured | captured | captured | captured | captured | missing | missing | missing | explicitly paired with parent `EP19871250 / EP3863511`; federated/citations/ueMain still missing; UPC positive control captured separately |
+| `EP19205846` | `EP3816364 A1` | deemed-withdrawn / renewal-history / UPC negative publication | captured | captured | captured | captured | captured | missing | missing | missing | federated/citations/ueMain not yet saved; UPC negative control captured separately |
+| `EP19871250` | `EP3863511 B1 / C0` | granted baseline + Euro-PCT + unitary effect happy-path | captured | missing | captured | captured | missing | captured | captured | captured | parent half of the recommended branching parent/divisional pair; legal/doclist still missing after this run |
 
 ## UPC coverage
 
@@ -37,7 +37,7 @@ Keep this file current. When a user asks for more real Register/UPC coverage:
 | `P1/P5 Mauer family spine — EP24837586 / EP4623169 + EP25203726 / EP4644109 + EP25203732 / EP4644110 + PCT/EP2024/087573 / WO2025132902` | `EP24837586` + siblings | partial | `EP24837586` and `EP25203732` are already captured; still missing sibling `EP25203726`; use this family for cross-family role labelling and EP+PCT parsing |
 | `P1 backup Euro-PCT family — EP20831233.0 / EP3989815` | `EP20831233` | missing | backup non-Element-Science Euro-PCT fixture from different family |
 | `P1 backup Euro-PCT family — EP20735516.5 / EP3987119` | `EP20735516` | missing | backup non-Element-Science Euro-PCT fixture from different family |
-| `3511B1 — good granted EP baseline, richer because Euro-PCT + later unitary effect` | `EP19871250` | partial | captured `main/event/family/ueMain`; still missing `legal` and `doclist` |
+| `3511B1 — good granted EP baseline, richer because Euro-PCT + later unitary effect` | `EP19871250` | partial | captured `main/event/family/federated/citations/ueMain`; still missing `legal` and `doclist` |
 | `P2 — branching procedural paths: parent/divisional pair (EP19871250 / EP3863511 parent + EP24189818 / EP4438108 divisional)` | `EP19871250` + `EP24189818` | partial | strong real branching pair; `EP24189818` is already broadly captured, but parent `EP19871250` still needs `legal` and `doclist`; child `EP24189818` still needs `ueMain` |
 | `P3/P4 deadline-heavy + grant + UP — EP19871250.7 / EP3863511B1` | `EP19871250` | partial | already in live fixtures; strongest single public case for EP-phase entry → examination → grant-intention → grant fee → grant → UP transitions |
 | `P3/P4 deadline-heavy + grant without UP — EP17751711.7 / EP3496607B1` | `EP17751711` | missing | wanted as non-UP control for grant / post-grant lapse handling |

@@ -32,6 +32,8 @@ function loadUserscriptHooks() {
     'parseFamily',
     'parseLegal',
     'parseEventHistory',
+    'parseFederated',
+    'parseCitations',
     'parseUe',
     'parsePdfDeadlineHints',
     'parseUpcOptOutResult',
