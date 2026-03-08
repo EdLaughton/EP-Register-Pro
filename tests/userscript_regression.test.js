@@ -48,6 +48,15 @@ has(/checkbox\('epoRP-opt-legal'/, 'Timeline legal include toggle missing from o
 has(/id="epoRP-opt-event-level"/, 'Timeline event level selector missing from options');
 has(/id="epoRP-opt-legal-level"/, 'Timeline legal level selector missing from options');
 
+// Options diagnostics console + effective key/value snapshot
+has(/function\s+renderLogConsole\s*\(caseNo\)/, 'Operation console renderer missing');
+has(/id="epoRP-log-console"/, 'Operation console container missing from options view');
+has(/id="epoRP-clear-logs"/, 'Clear operation console button missing from options view');
+has(/function\s+renderOptionSnapshot\s*\(/, 'Option snapshot renderer missing');
+has(/Object\.keys\(o\)\.sort\(/, 'Option snapshot should enumerate and sort all option keys');
+has(/id="epoRP-optvals"/, 'Option key/value list container missing from options view');
+hasText('Current option values', 'Options view should show a section listing effective option values');
+
 // UI removals requested
 notHas(/Document index/, 'Document index UI should be removed');
 notHas(/data-view="logs"/, 'Logs tab should be removed');
