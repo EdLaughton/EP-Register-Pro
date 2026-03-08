@@ -13,8 +13,8 @@ Per-tab live capture status is tracked separately in `tests/live-fixture-tracker
 | `EP24837586` | Parent / family / active Euro-PCT baseline | Main-page title/applicant/rep extraction, divisional children, event/legal/doclist/family hydration, parent-side family publication coverage | `EP4623169` |
 | `EP25203732` | Active divisional child | English title selection, divisional type + parent link, search-publication path, family/publication crossover to parent case, reminder/search-opinion doc coverage | `EP4644110` |
 | `EP19205846` | Withdrawn/deemed-withdrawn + renewal-history + UPC opt-out negative control | Status simplification, repeated R71 cycles, deemed-withdrawn outcome, renewal-fee extraction, publication fallback behavior, UPC lookup resolves as no opt-out found | `EP3816364` |
-| `EP24189818` | Grant-intention / renewal-heavy / UPC opt-out positive control | Divisional parent link, repeated grant-intention cycles, renewal-fee extraction through later years, family/publication linkage, UPC registry lookup resolves as opted out | `EP4438108` |
-| `EP19871250` | Granted EP baseline + Euro-PCT + unitary effect | Granted/no-opposition happy path, unitary effect extraction, parent/divisional relationship, B1/C0 family/publication coverage, post-grant lapse signals | `EP3863511` |
+| `EP24189818` | Divisional child / branching procedural path / renewal-heavy / UPC opt-out positive control | Parent link to `EP19871250`, repeated grant-intention cycles, renewal-fee extraction through later years, family/publication linkage, UPC registry lookup resolves as opted out | `EP4438108` |
+| `EP19871250` | Parent granted baseline + Euro-PCT + unitary effect | Parent half of the `EP19871250` ↔ `EP24189818` divisional pair; granted/no-opposition happy path, unitary effect extraction, B1/C0 family/publication coverage, post-grant lapse signals | `EP3863511` |
 
 ---
 
@@ -24,6 +24,7 @@ Use these derivation paths to add additional EP cases for regression:
 
 1. **Divisional/parent link traversal**
    - If sidebar shows parent case in Type row, validate both child and parent.
+   - Current high-value real pair: `EP19871250 / EP3863511` (parent) ↔ `EP24189818 / EP4438108` (divisional child).
 
 2. **Priority chain traversal**
    - Extract EP/WO numbers from Priority section and test related EP numbers where available.
