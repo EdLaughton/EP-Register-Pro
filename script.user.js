@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.75
+// @version      7.0.76
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.75';
+  const VERSION = '7.0.76';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -4406,7 +4406,24 @@
       return;
     }
 
+    const staleSources = SOURCES.filter((s) => !isFresh(getCase(caseNo).sources[s.key], options().refreshHours)).map((s) => s.key);
+    const needsRefresh = staleSources.length > 0;
+
     if (runtime.autoPrefetchDoneByCase[caseNo]) {
+      if (needsRefresh) {
+        addLog(caseNo, 'warn', 'Prefetch gate bypassed: stale/missing sources detected', {
+          source: 'prefetch',
+          registerTab,
+          staleSources,
+        });
+
+        const gateTs = Date.now();
+        runtime.autoPrefetchDoneByCase[caseNo] = gateTs;
+        patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });
+        prefetchCase(caseNo, false);
+        return;
+      }
+
       if (tabChangedWithinCase) {
         addLog(caseNo, 'info', 'Same-case tab switch detected: prefetch gate active', {
           source: 'prefetch',
@@ -4431,11 +4448,11 @@
     runtime.autoPrefetchDoneByCase[caseNo] = gateTs;
     patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });
 
-    const needsRefresh = SOURCES.some((s) => !isFresh(getCase(caseNo).sources[s.key], options().refreshHours));
     if (needsRefresh) {
       addLog(caseNo, 'info', 'Initial case load: stale/missing sources detected; running auto prefetch', {
         source: 'prefetch',
         registerTab,
+        staleSources,
       });
       prefetchCase(caseNo, false);
       return;

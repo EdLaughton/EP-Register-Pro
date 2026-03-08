@@ -91,6 +91,11 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.76
+- Fixed auto-load regression where prefetch session-gate could suppress background loading even when sources were stale/missing (e.g. sidebar stuck at `1/6`).
+- Gate now auto-bypasses when stale/missing sources are detected and runs a recovery prefetch.
+- Added stale-source diagnostics in prefetch logs for easier troubleshooting.
+
 ### 7.0.75
 - Added a clear blue guide line on the left side of doclist grouping rows:
   - group header rows: stronger blue left marker

@@ -122,6 +122,8 @@ hasText('SESSION_KEY', 'Init gate should persist page-session state in sessionSt
 hasText('getCaseSession(caseNo)', 'Init should load case session state before applying prefetch gate');
 hasText('patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });', 'Init should persist prefetch gate state to session storage for reload-safe same-tab switching');
 hasText('Initial case load: stale/missing sources detected; running auto prefetch', 'Init should log initial auto-prefetch decisions');
+hasText('Prefetch gate bypassed: stale/missing sources detected', 'Init should bypass session gate when stale/missing sources are detected');
+hasText('staleSources', 'Prefetch logs should include stale source-key diagnostics');
 hasText('Case tab/page changed; auto prefetch skipped for this page session', 'Init should skip repeated auto-prefetch on case/page switches in this session');
 hasText('Same-case tab switch detected: prefetch gate active', 'Init should log explicit same-case tab switch gate decisions');
 hasText('Same-case page reload detected: prefetch gate active', 'Init should log explicit same-case reload gate decisions');
