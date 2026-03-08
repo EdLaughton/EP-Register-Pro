@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.78
+// @version      7.0.79
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.78';
+  const VERSION = '7.0.79';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -106,12 +106,15 @@
     fetchCaseNo: null,
     scrollSaveTimer: null,
     timelineCache: { key: '', items: [] },
+    overviewCache: { key: '', model: null },
     doclistGroupSigByCase: {},
     pdfjsPromise: null,
     tesseractPromise: null,
     autoPrefetchDoneByCase: {},
     lastRegisterTabByCase: {},
     lastViewLogKey: '',
+    routeTimer: null,
+    pendingInitForce: false,
   };
 
   let memory = null;
@@ -403,9 +406,58 @@
     return keys.map((key) => `<div class="epoRP-optval-row"><div class="epoRP-optval-k">${esc(key)}</div><div class="epoRP-optval-v">${esc(optionValueText(o[key]))}</div></div>`).join('');
   }
 
-  function isFresh(src, refreshHours) {
+  function isFresh(src, refreshHours, config = {}) {
     const sameParser = src?.parserVersion === VERSION;
-    return !!(sameParser && src?.fetchedAt && Date.now() - src.fetchedAt < refreshHours * 3600000);
+    const ageMs = Number(refreshHours || 0) * 3600000;
+    const allowEmpty = !!config.allowEmpty;
+    const status = String(src?.status || '').toLowerCase();
+    const reusableStatuses = allowEmpty ? new Set(['ok', 'empty']) : new Set(['ok']);
+    if (!reusableStatuses.has(status)) return false;
+    if (config.dependencyStamp != null && String(src?.dependencyStamp || '') !== String(config.dependencyStamp || '')) return false;
+    return !!(sameParser && src?.fetchedAt && ageMs > 0 && Date.now() - src.fetchedAt < ageMs);
+  }
+
+  function clearDerivedCaches() {
+    runtime.timelineCache = { key: '', items: [] };
+    runtime.overviewCache = { key: '', model: null };
+  }
+
+  function resetRouteRuntime() {
+    if (initTimer) {
+      clearTimeout(initTimer);
+      initTimer = null;
+    }
+    if (runtime.routeTimer) {
+      clearTimeout(runtime.routeTimer);
+      runtime.routeTimer = null;
+    }
+    runtime.pendingInitForce = false;
+    runtime.appNo = '';
+    runtime.fetchCaseNo = null;
+    runtime.lastViewLogKey = '';
+    clearDerivedCaches();
+  }
+
+  function scheduleInit(force = false) {
+    runtime.pendingInitForce = runtime.pendingInitForce || !!force;
+    if (runtime.routeTimer) clearTimeout(runtime.routeTimer);
+    runtime.routeTimer = setTimeout(() => {
+      runtime.routeTimer = null;
+      const nextForce = runtime.pendingInitForce;
+      runtime.pendingInitForce = false;
+      init(nextForce);
+    }, 80);
+  }
+
+  function derivedDependencyStamp(caseNo, key) {
+    const c = getCase(caseNo);
+    if (key === 'upcRegistry') {
+      return `main:${sourceStamp(c, 'main')}|pubs:${upcCandidateNumbers(caseNo).join(',')}`;
+    }
+    if (key === 'pdfDeadlines') {
+      return `doclist:${sourceStamp(c, 'doclist')}`;
+    }
+    return '';
   }
 
   function currentUrl() {
@@ -1990,9 +2042,25 @@
     return [...new Set(picks)].slice(0, 4);
   }
 
-  async function refreshUpcRegistry(caseNo, signal) {
+  async function refreshUpcRegistry(caseNo, signal, force = false) {
+    const dependencyStamp = derivedDependencyStamp(caseNo, 'upcRegistry');
+    const cached = getCase(caseNo).sources.upcRegistry;
+    if (!force && isFresh(cached, options().refreshHours, { allowEmpty: true, dependencyStamp })) return;
+
     const candidates = upcCandidateNumbers(caseNo);
     if (!candidates.length) {
+      patchCase(caseNo, (c) => {
+        c.sources.upcRegistry = {
+          key: 'upcRegistry',
+          title: 'UPC Opt-out registry',
+          status: 'empty',
+          fetchedAt: Date.now(),
+          parserVersion: VERSION,
+          transport: 'cross-origin',
+          dependencyStamp,
+          data: { patentNumbers: [], status: 'No EP publication numbers available' },
+        };
+      });
       addLog(caseNo, 'info', 'UPC registry check skipped: no EP publication numbers available', { source: 'upcRegistry' });
       return;
     }
@@ -2009,8 +2077,10 @@
             title: 'UPC Opt-out registry',
             status: 'ok',
             fetchedAt: Date.now(),
+            parserVersion: VERSION,
             url,
             transport: 'cross-origin',
+            dependencyStamp,
             data: parsed,
           };
         });
@@ -2020,6 +2090,23 @@
         addLog(caseNo, 'warn', `UPC registry check failed for ${patentNumber}: ${error?.message || error}`, { source: 'upcRegistry' });
       }
     }
+
+    patchCase(caseNo, (c) => {
+      c.sources.upcRegistry = {
+        key: 'upcRegistry',
+        title: 'UPC Opt-out registry',
+        status: 'empty',
+        fetchedAt: Date.now(),
+        parserVersion: VERSION,
+        transport: 'cross-origin',
+        dependencyStamp,
+        data: { patentNumbers: candidates, status: 'No registry match found' },
+      };
+    });
+    addLog(caseNo, 'info', 'UPC registry check completed without a matching opt-out result', {
+      source: 'upcRegistry',
+      candidates,
+    });
   }
 
   function normalizeDateString(raw) {
@@ -2856,11 +2943,27 @@
   async function refreshPdfDeadlines(caseNo, signal, force = false) {
     if (!caseNo) return;
     const c = getCase(caseNo);
+    const dependencyStamp = derivedDependencyStamp(caseNo, 'pdfDeadlines');
     const cached = c.sources.pdfDeadlines;
-    if (!force && isFresh(cached, options().refreshHours)) return;
+    if (!force && isFresh(cached, options().refreshHours, { allowEmpty: true, dependencyStamp })) return;
 
     const docs = [...(c.sources.doclist?.data?.docs || [])].sort(compareDateDesc);
-    if (!docs.length) return;
+    if (!docs.length) {
+      patchCase(caseNo, (entry) => {
+        entry.sources.pdfDeadlines = {
+          key: 'pdfDeadlines',
+          title: 'PDF-derived deadlines',
+          status: 'empty',
+          fetchedAt: Date.now(),
+          parserVersion: VERSION,
+          transport: 'fetch+pdfjs',
+          dependencyStamp,
+          data: { hints: [], scanned: [] },
+        };
+      });
+      addLog(caseNo, 'info', 'PDF deadline scan skipped: doclist cache is empty', { source: 'pdfDeadlines' });
+      return;
+    }
 
     const candidates = docs.filter((d) => {
       const actor = String(d.actor || '').toLowerCase();
@@ -2875,6 +2978,18 @@
       return false;
     }).slice(0, 8);
     if (!candidates.length) {
+      patchCase(caseNo, (entry) => {
+        entry.sources.pdfDeadlines = {
+          key: 'pdfDeadlines',
+          title: 'PDF-derived deadlines',
+          status: 'empty',
+          fetchedAt: Date.now(),
+          parserVersion: VERSION,
+          transport: 'fetch+pdfjs',
+          dependencyStamp,
+          data: { hints: [], scanned: [] },
+        };
+      });
       addLog(caseNo, 'info', 'PDF deadline scan skipped: no communication-type documents found', { source: 'pdfDeadlines' });
       return;
     }
@@ -2894,6 +3009,7 @@
           fetchedAt: Date.now(),
           parserVersion: VERSION,
           transport: 'fetch+pdfjs',
+          dependencyStamp,
           error: errText,
           data: { hints: [], scanned: [] },
         };
@@ -3046,6 +3162,7 @@
         fetchedAt: Date.now(),
         parserVersion: VERSION,
         transport: 'fetch+pdfjs',
+        dependencyStamp,
         data: { hints: dedupedHints, scanned },
       };
     });
@@ -3225,7 +3342,7 @@
     } finally {
       if (runtime.abortController === controller) {
         try {
-          await refreshUpcRegistry(caseNo, controller.signal);
+          await refreshUpcRegistry(caseNo, controller.signal, force);
         } catch {
           // non-blocking
         }
@@ -3686,8 +3803,29 @@
     };
   }
 
+  function overviewCacheKey(caseNo, opts, c) {
+    const optPart = [
+      opts.showRenewals,
+      opts.showUpcUe,
+      opts.showPublications,
+      opts.showEventHistory,
+      opts.showLegalStatusRows,
+    ].join('|');
+
+    const srcPart = ['main', 'doclist', 'event', 'family', 'legal', 'ueMain', 'upcRegistry', 'pdfDeadlines']
+      .map((k) => sourceStamp(c, k))
+      .join('|');
+    return `${caseNo}|${optPart}|${srcPart}`;
+  }
+
   function overviewModel(caseNo) {
     const c = getCase(caseNo);
+    const opts = options();
+    const cacheKey = overviewCacheKey(caseNo, opts, c);
+    if (runtime.overviewCache.key === cacheKey && runtime.overviewCache.model) {
+      return runtime.overviewCache.model;
+    }
+
     const main = c.sources.main?.data || {};
     const doclist = c.sources.doclist?.data || {};
     const family = c.sources.family?.data || {};
@@ -3702,7 +3840,7 @@
     const applicantDocs = docs.filter((d) => d.actor === 'Applicant');
     const latestApplicant = applicantDocs.find((d) => d.bundle !== 'Other') || applicantDocs[0] || null;
     const publicationsPrimary = dedupe([...(main.publications || []), ...(family.publications || [])], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
-    const publicationFallback = publicationsPrimary.length ? [] : inferPublicationsFromDocs(docs);
+    const publicationFallback = inferPublicationsFromDocs(docs);
     const publications = dedupe([...publicationsPrimary, ...publicationFallback], (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`).sort(compareDateDesc);
 
     const storedStatusRaw = c.meta?.lastMainStatusRaw || '';
@@ -3752,7 +3890,7 @@
 
     const daysToDeadline = nextDeadline ? Math.ceil((nextDeadline.date.getTime() - Date.now()) / 86400000) : null;
 
-    return {
+    const model = {
       title: main.title || '—',
       applicant: main.applicant || '—',
       representative: main.representative || '—',
@@ -3789,6 +3927,9 @@
       },
       docs,
     };
+
+    runtime.overviewCache = { key: cacheKey, model };
+    return model;
   }
 
   function topLevel(levels) {
@@ -4353,6 +4494,9 @@
       runtime.panel?.remove();
       runtime.panel = null;
       runtime.body = null;
+      runtime.appNo = '';
+      runtime.lastViewLogKey = '';
+      clearDerivedCaches();
       document.body.classList.remove('epoRP-shifted');
       return;
     }
@@ -4413,12 +4557,18 @@
   function init(force = false) {
     if (!isCasePage()) {
       cancelPrefetch();
+      resetRouteRuntime();
       renderPanel();
       return;
     }
 
+    const previousCaseNo = runtime.appNo;
     const caseNo = detectAppNo();
-    const changed = runtime.appNo !== caseNo;
+    const changed = previousCaseNo !== caseNo;
+    if (changed) {
+      clearDerivedCaches();
+      runtime.lastViewLogKey = '';
+    }
     runtime.appNo = caseNo;
 
     if (changed && runtime.fetchCaseNo && runtime.fetchCaseNo !== caseNo) cancelPrefetch();
@@ -4513,6 +4663,36 @@
       source: 'prefetch',
       registerTab,
     });
+  }
+
+  function installRouteObservers() {
+    const handleLocationChange = () => {
+      if (location.href === runtime.href) return;
+      runtime.href = location.href;
+      scheduleInit(false);
+    };
+
+    for (const method of ['pushState', 'replaceState']) {
+      const original = history[method];
+      if (typeof original !== 'function') continue;
+      history[method] = function patchedHistoryState(...args) {
+        const result = original.apply(this, args);
+        handleLocationChange();
+        return result;
+      };
+    }
+
+    addEventListener('popstate', () => {
+      runtime.href = location.href;
+      scheduleInit(false);
+    });
+
+    addEventListener('hashchange', () => {
+      runtime.href = location.href;
+      scheduleInit(false);
+    });
+
+    setInterval(handleLocationChange, 1500);
   }
 
   GM_addStyle(`
@@ -4633,22 +4813,29 @@
     .epoRP-filter-hidden{display:none !important}
   `);
 
-  setInterval(() => {
-    if (location.href !== runtime.href) {
-      runtime.href = location.href;
-      init(false);
-    }
-  }, 1000);
+  installRouteObservers();
 
   addEventListener('storage', (event) => {
     if (![CACHE_KEY, OPTIONS_KEY, UI_KEY].includes(event.key)) return;
-    if (event.key === CACHE_KEY) memory = null;
-    if (event.key === OPTIONS_KEY) optionsShadow = null;
+    if (event.key === CACHE_KEY) {
+      memory = null;
+      clearDerivedCaches();
+    }
+    if (event.key === OPTIONS_KEY) {
+      optionsShadow = null;
+      clearDerivedCaches();
+    }
+    if (event.key === UI_KEY) {
+      const ui = uiState();
+      runtime.activeView = ui.activeView || runtime.activeView;
+      runtime.collapsed = !!ui.collapsed;
+    }
     if (isCasePage()) renderPanel();
   });
 
   addEventListener('focus', () => {
     if (!isCasePage()) return;
+    runtime.href = location.href;
     enhanceDoclistGrouping();
     if (runtime.activeView !== 'timeline') renderPanel();
   });
@@ -4663,15 +4850,24 @@
     }
 
     if (document.visibilityState !== 'visible') return;
+    runtime.href = location.href;
     enhanceDoclistGrouping();
     if (runtime.activeView !== 'timeline') renderPanel();
   });
 
-  addEventListener('pageshow', () => init(false));
+  addEventListener('pageshow', () => {
+    runtime.href = location.href;
+    scheduleInit(false);
+  });
+
   addEventListener('beforeunload', () => {
     if (runtime.scrollSaveTimer) {
       clearTimeout(runtime.scrollSaveTimer);
       runtime.scrollSaveTimer = null;
+    }
+    if (runtime.routeTimer) {
+      clearTimeout(runtime.routeTimer);
+      runtime.routeTimer = null;
     }
     persistCurrentPanelScroll();
     if (runtime.appNo) persistLiveDoclistGroups(runtime.appNo);

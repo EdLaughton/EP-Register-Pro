@@ -81,15 +81,30 @@ A production-focused **Tampermonkey userscript** for the [European Patent Regist
 
 ## 🧪 Testing
 
-Run the smoke test:
+Run the checks:
 
 ```bash
+node --check script.user.js
 node tests/userscript_smoke.test.js
+node tests/userscript_regression.test.js
+node tests/userscript_lifecycle.test.js
 ```
 
 ---
 
 ## 📝 Changelog (recent)
+
+### 7.0.79
+- Refactored page lifecycle + navigation handling:
+  - added debounced route observers around `pushState` / `replaceState` / `popstate` / `hashchange`
+  - retained a slower interval fallback instead of relying on a 1s poll loop alone
+  - clears case-scoped runtime state when leaving Register case pages, preventing stale delayed re-parses after navigation
+- Fixed cache freshness semantics so recent **error** fetches are no longer treated as reusable/fresh sources.
+  - broken source fetches now retry on later init/prefetch instead of remaining stuck until the refresh window expires.
+- Deduplicated derived-source background work:
+  - UPC registry checks now respect cache freshness + dependency stamps tied to current publication candidates
+  - PDF-derived deadline scans now respect doclist dependency stamps and cache explicit empty states when no eligible communication docs exist
+- Added overview-model memoization and publication fallback merging from doclist evidence even when main/family sources already contain partial publication data.
 
 ### 7.0.78
 - Fixed doclist response grouping edge-cases around intention-to-grant:
