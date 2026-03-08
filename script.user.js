@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.71
+// @version      7.0.72
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.71';
+  const VERSION = '7.0.72';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -557,23 +557,12 @@
   }
 
   function getTimelineOpenGroups(caseNo) {
-    const byCase = uiState().timelineOpenByCase || {};
-    const arr = Array.isArray(byCase[caseNo]) ? byCase[caseNo] : [];
-    return new Set(arr.map((v) => String(v)));
+    // Timeline groups should start collapsed on each render.
+    return new Set();
   }
 
   function setTimelineOpenGroups(caseNo, groupSet) {
-    const state = uiState();
-    const byCase = { ...(state.timelineOpenByCase || {}) };
-    byCase[caseNo] = [...groupSet].slice(0, 250);
-
-    const keys = Object.keys(byCase);
-    if (keys.length > 20) {
-      const keep = new Set(keys.slice(-20));
-      for (const k of keys) if (!keep.has(k)) delete byCase[k];
-    }
-
-    setUiState({ timelineOpenByCase: byCase });
+    // Intentionally no-op: do not persist timeline open state.
   }
 
   function persistLiveTimelineGroups(caseNo) {
@@ -1287,6 +1276,8 @@
 
     persistLiveDoclistGroups(caseNo);
     const openGroups = getDoclistOpenGroups(caseNo);
+    const doclistOpenByCase = uiState().doclistOpenByCase || {};
+    const hasSavedOpenState = Array.isArray(doclistOpenByCase[caseNo]);
 
     table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
     table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
@@ -1336,7 +1327,8 @@
       gid += 1;
       const groupId = `g${gid}`;
       const groupKey = doclistGroupKey(caseNo, r.bundle, gid);
-      const isOpen = openGroups.has(groupKey);
+      const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;
+      if (!hasSavedOpenState) openGroups.add(groupKey);
       const firstRow = r.rows[0];
       const cells = [...firstRow.querySelectorAll('td')];
 
@@ -3781,6 +3773,25 @@
     return 'info';
   }
 
+  function timelineAttorneyImportance(title, detail = '', source = '', actor = 'Other', baseLevel = 'info') {
+    const base = ['bad', 'warn', 'ok', 'info'].includes(baseLevel) ? baseLevel : 'info';
+    const t = normalize(`${title || ''}\n${detail || ''}\n${source || ''}\n${actor || ''}`).toLowerCase();
+
+    const badSignals = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|revocation|lapsed|not maintained|request for re-establishment.*rejected|rights restored refused|withdrawn by applicant|deemed withdrawn/;
+    if (badSignals.test(t)) return 'bad';
+    if (base === 'bad') return 'bad';
+
+    const warnSignals = /deadline|time limit|final date|summons to oral proceedings|rule\s*116|article\s*94\(3\)|art\.?\s*94\(3\)|rule\s*71\(3\)|intention to grant|communication from the examining|communication under|opposition|third party observations|request for re-establishment|further processing/;
+    if (warnSignals.test(t)) return 'warn';
+    if (base === 'warn') return 'warn';
+
+    const okSignals = /mention of grant|patent granted|grant decision|fee paid|renewal paid|annual fee paid|validation|registered|recorded/;
+    if (okSignals.test(t)) return 'ok';
+    if (base === 'ok') return 'ok';
+
+    return 'info';
+  }
+
   function sourceStamp(c, key) {
     const src = c?.sources?.[key] || {};
     return `${key}:${src.status || 'na'}:${src.fetchedAt || 0}:${src.parserVersion || ''}`;
@@ -3817,13 +3828,14 @@
     const items = [];
 
     for (const e of main.recentEvents || []) {
+      const detail = [e.detail, 'Main page'].filter(Boolean).join('\n');
       items.push({
         type: 'item',
         dateStr: e.dateStr,
         title: e.title,
-        detail: [e.detail, 'Main page'].filter(Boolean).join('\n'),
+        detail,
         source: 'Main',
-        level: 'info',
+        level: timelineAttorneyImportance(e.title, detail, 'Main', 'EPO', 'info'),
         actor: 'EPO',
         url: sourceUrl(caseNo, 'main'),
       });
@@ -3838,14 +3850,17 @@
     for (const d of docsSorted) {
       const actor = d.actor || 'Other';
       const shouldGroup = groupableBundles.has(d.bundle);
+      const detail = [d.procedure, 'All documents'].filter(Boolean).join(' · ');
+      const itemLevel = timelineAttorneyImportance(d.title, detail, 'Documents', actor, d.level || 'info');
+
       if (!shouldGroup) {
         docItems.push({
           type: 'item',
           dateStr: d.dateStr,
           title: d.title,
-          detail: [d.procedure, 'All documents'].filter(Boolean).join(' · '),
+          detail,
           source: 'Documents',
-          level: d.level || 'info',
+          level: itemLevel,
           actor,
           url: d.url,
         });
@@ -3855,14 +3870,14 @@
       // Group by exact document date + bundle + actor to avoid fragmented filing-package rows.
       const groupKey = `${d.dateStr || 'nodate'}|${d.bundle}|${actor}`;
       if (!groupedByKey.has(groupKey)) {
-        const group = { type: 'group', _key: groupKey, dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: d.level || 'info', actor, items: [] };
+        const group = { type: 'group', _key: groupKey, dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: itemLevel, actor, items: [] };
         groupedByKey.set(groupKey, group);
         docItems.push(group);
       }
 
       const group = groupedByKey.get(groupKey);
-      group.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: d.level || 'info', actor, url: d.url });
-      group.level = topLevel([group.level, d.level || 'info']);
+      group.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: itemLevel, actor, url: d.url });
+      group.level = topLevel([group.level, itemLevel]);
     }
 
     const normalizedDocItems = docItems.map((item) => {
@@ -3876,19 +3891,50 @@
 
     if (opts.showEventHistory) {
       for (const e of eventHistory.events || []) {
-        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Event history'].filter(Boolean).join('\n'), source: 'Event history', level: opts.timelineEventLevel || 'info', actor: 'EPO', url: e.url || sourceUrl(caseNo, 'event') });
+        const detail = [e.detail, 'Event history'].filter(Boolean).join('\n');
+        items.push({
+          type: 'item',
+          dateStr: e.dateStr,
+          title: e.title,
+          detail,
+          source: 'Event history',
+          level: timelineAttorneyImportance(e.title, detail, 'Event history', 'EPO', opts.timelineEventLevel || 'info'),
+          actor: 'EPO',
+          url: e.url || sourceUrl(caseNo, 'event'),
+        });
       }
     }
 
     if (opts.showLegalStatusRows) {
       for (const e of legal.events || []) {
-        items.push({ type: 'item', dateStr: e.dateStr, title: e.title, detail: [e.detail, 'Legal status'].filter(Boolean).join('\n'), source: 'Legal status', level: opts.timelineLegalLevel || 'warn', actor: 'EPO', url: e.url || sourceUrl(caseNo, 'legal') });
+        const detail = [e.detail, 'Legal status'].filter(Boolean).join('\n');
+        items.push({
+          type: 'item',
+          dateStr: e.dateStr,
+          title: e.title,
+          detail,
+          source: 'Legal status',
+          level: timelineAttorneyImportance(e.title, detail, 'Legal status', 'EPO', opts.timelineLegalLevel || 'warn'),
+          actor: 'EPO',
+          url: e.url || sourceUrl(caseNo, 'legal'),
+        });
       }
     }
 
     if (opts.showPublications) {
       for (const p of dedupe([...(main.publications || []), ...(family.publications || [])], (x) => `${x.no}${x.kind}|${x.dateStr}|${x.role}`)) {
-        items.push({ type: 'item', dateStr: p.dateStr, title: `${p.no}${p.kind || ''} publication`, detail: p.role || 'Publication', source: 'Publications', level: 'info', actor: 'EPO', url: sourceUrl(caseNo, 'main') });
+        const title = `${p.no}${p.kind || ''} publication`;
+        const detail = p.role || 'Publication';
+        items.push({
+          type: 'item',
+          dateStr: p.dateStr,
+          title,
+          detail,
+          source: 'Publications',
+          level: timelineAttorneyImportance(title, detail, 'Publications', 'EPO', 'info'),
+          actor: 'EPO',
+          url: sourceUrl(caseNo, 'main'),
+        });
       }
     }
 

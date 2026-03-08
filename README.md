@@ -91,6 +91,14 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.72
+- Timeline grouping now defaults to **collapsed** on each render (no persisted expanded groups).
+- Doclist grouping now defaults to **expanded** when no saved group-state exists for the case.
+- Added timeline importance classification tuned for EP prosecution triage:
+  - escalates loss-of-rights/refusal/revocation style events to high severity
+  - highlights deadline/summons/R71(3)/Art.94(3)/opposition style events as warn-level items
+  - keeps lower-signal procedural entries at lower emphasis
+
 ### 7.0.71
 - Rebalanced communication-date extraction priority for OCR-derived letters:
   - prioritizes central communication/header table date patterns (`Application No. / Ref. / Date` and `Date of communication` fields)
