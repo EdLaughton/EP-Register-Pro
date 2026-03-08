@@ -38,8 +38,12 @@ has(/function\s+persistLiveDoclistGroups\s*\(/, 'Doclist open-group persistence 
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
 has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');
 has(/function\s+timelineCacheKey\s*\(/, 'Timeline model should expose a cache key for memoization');
+has(/const\s+PDF_JS_CANDIDATES\s*=\s*\[/, 'PDF parser should define multi-CDN loader candidates');
 has(/function\s+ensurePdfJs\s*\(/, 'PDF parser loader helper missing');
+has(/function\s+loadExternalScriptTag\s*\(/, 'PDF parser should support script-tag fallback loading');
+has(/function\s+evaluateExternalScriptCode\s*\(/, 'PDF parser should support multi-strategy script evaluation fallback');
 has(/function\s+refreshPdfDeadlines\s*\(/, 'PDF deadline refresh pipeline missing');
+has(/async function extractPdfText\(url, signal, pdfjsInstance = null\)/, 'PDF extraction should accept preloaded pdf.js engine instance');
 has(/function\s+pdfContentToStructuredText\s*\(/, 'PDF text extraction should include layout-aware line reconstruction helper');
 has(/const\s+txt\s*=\s*pdfContentToStructuredText\(content\);/, 'PDF extraction should use structured line reconstruction per page');
 has(/function\s+extractCommunicationDateFromPdf\s*\(/, 'PDF parser should extract communication date explicitly');
@@ -56,6 +60,10 @@ has(/addCalendarMonthsDetailed\(communicationDate,\s*monthPeriod\.months\)/, 'PD
 hasText('PDF proof line (below "Registered Letter")', 'PDF parser logging should report line below Registered Letter to prove document was opened');
 hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-date/response-period diagnostics');
 hasText('normalizedDocUrl', 'PDF URL failure logging should include normalized URL attempt for debugging');
+hasText('PDF parser engine ready', 'PDF parser should log successful engine initialization before scanning documents');
+hasText('PDF parser unavailable:', 'PDF parser should log explicit engine-loader failures');
+hasText('PDF deadline parse aborted (parser engine unavailable)', 'PDF parser should stop clearly when engine is unavailable');
+has(/extractPdfText\(resolvedUrl,\s*signal,\s*pdfjs\)/, 'PDF parse loop should reuse a preloaded pdf.js engine instance');
 has(/withProofLine:\s*scanned\.filter\(/, 'PDF summary logging should include proof-line hit count');
 has(/withResponsePeriod:\s*scanned\.filter\(/, 'PDF summary logging should include response-period hit count');
 has(/function\s+sourceDiagnostics\s*\(/, 'Source diagnostics helper should summarize parsed feature payloads');

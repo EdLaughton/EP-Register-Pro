@@ -91,6 +91,17 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.55
+- Hardened PDF engine loading (pdf.js) with multi-path fallback:
+  - multiple CDN candidates (`cdnjs`, `jsdelivr`, `unpkg`)
+  - script-text fetch + multi-strategy evaluation fallback
+  - script-tag fallback loading path
+- Added explicit parser-engine diagnostics:
+  - `PDF parser engine ready`
+  - `PDF parser unavailable: ...`
+  - `PDF deadline parse aborted (parser engine unavailable)`
+- Reused a single loaded pdf.js instance per PDF parse cycle (instead of resolving engine per-document).
+
 ### 7.0.54
 - Fixed same-case auto-prefetch gate persistence across full page reloads by storing gate state in `sessionStorage`.
   - Prevents repeated background full-source reloads when switching Register tabs (`tab=main`, `tab=doclist`, etc.) for the same case in the same browser tab session.

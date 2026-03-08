@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.54
+// @version      7.0.55
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -11,6 +11,8 @@
 // @grant        GM_xmlhttpRequest
 // @connect      unifiedpatentcourt.org
 // @connect      cdnjs.cloudflare.com
+// @connect      cdn.jsdelivr.net
+// @connect      unpkg.com
 // ==/UserScript==
 
 (() => {
@@ -20,7 +22,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.54';
+  const VERSION = '7.0.55';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -33,6 +35,23 @@
   const FETCH_CONCURRENCY = 2;
   const FETCH_TIMEOUT_MS = 15000;
   const FETCH_RETRIES = 1;
+  const PDF_JS_CANDIDATES = [
+    {
+      id: 'cdnjs',
+      lib: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js',
+      worker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js',
+    },
+    {
+      id: 'jsdelivr',
+      lib: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js',
+      worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js',
+    },
+    {
+      id: 'unpkg',
+      lib: 'https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js',
+      worker: 'https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js',
+    },
+  ];
 
   const SOURCES = [
     { key: 'main', slug: 'main', title: 'EP About this file' },
@@ -1566,19 +1585,131 @@
     });
   }
 
+  function loadExternalScriptTag(url, signal) {
+    return new Promise((resolve, reject) => {
+      const root = document.head || document.documentElement || document.body;
+      if (!root) {
+        reject(new Error('Document root unavailable for script injection'));
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.async = true;
+      script.src = url;
+      script.crossOrigin = 'anonymous';
+
+      let settled = false;
+      const cleanup = () => {
+        script.onload = null;
+        script.onerror = null;
+        signal?.removeEventListener('abort', onAbort);
+      };
+      const settle = (error = null) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) {
+          try { script.remove(); } catch {}
+          reject(error);
+          return;
+        }
+        resolve();
+      };
+
+      const timeout = setTimeout(() => settle(new Error(`Timed out loading script tag: ${url}`)), FETCH_TIMEOUT_MS * 2);
+      const onAbort = () => settle(new DOMException('Aborted', 'AbortError'));
+
+      script.onload = () => {
+        clearTimeout(timeout);
+        settle();
+      };
+      script.onerror = () => {
+        clearTimeout(timeout);
+        settle(new Error(`Failed to load script tag: ${url}`));
+      };
+
+      signal?.addEventListener('abort', onAbort, { once: true });
+      root.appendChild(script);
+    });
+  }
+
+  function evaluateExternalScriptCode(code, label = 'external-script') {
+    const source = `${String(code || '')}\n//# sourceURL=${label}.js`;
+    let lastError = null;
+
+    try {
+      // eslint-disable-next-line no-new-func
+      Function(source)();
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (window.pdfjsLib?.getDocument) return true;
+
+    try {
+      // eslint-disable-next-line no-eval
+      (0, eval)(source);
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (window.pdfjsLib?.getDocument) return true;
+
+    try {
+      const root = document.head || document.documentElement || document.body;
+      if (!root) throw new Error('Document root unavailable for inline script evaluation');
+      const script = document.createElement('script');
+      script.textContent = source;
+      root.appendChild(script);
+      script.remove();
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (window.pdfjsLib?.getDocument) return true;
+    if (lastError) throw lastError;
+    throw new Error('Script evaluated but pdf.js global was not exposed');
+  }
+
   async function ensurePdfJs(signal) {
     if (window.pdfjsLib?.getDocument) return window.pdfjsLib;
     if (runtime.pdfjsPromise) return runtime.pdfjsPromise;
 
     runtime.pdfjsPromise = (async () => {
-      const pdfJsUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
-      const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-      const code = await loadExternalScriptText(pdfJsUrl, signal);
-      // eslint-disable-next-line no-new-func
-      Function(code)();
-      if (!window.pdfjsLib?.getDocument) throw new Error('pdf.js global not available after load');
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-      return window.pdfjsLib;
+      const errors = [];
+
+      for (const candidate of PDF_JS_CANDIDATES) {
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+        if (window.pdfjsLib && !window.pdfjsLib.getDocument) {
+          try { delete window.pdfjsLib; } catch { window.pdfjsLib = undefined; }
+        }
+
+        try {
+          const code = await loadExternalScriptText(candidate.lib, signal);
+          const head = String(code || '').slice(0, 400);
+          if (!code || code.length < 1000 || /<html|<!doctype/i.test(head)) {
+            throw new Error('non-script payload received');
+          }
+          evaluateExternalScriptCode(code, `eporp-pdfjs-${candidate.id}-text`);
+          if (!window.pdfjsLib?.getDocument) throw new Error('pdf.js global not available after text load/eval');
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = candidate.worker;
+          return window.pdfjsLib;
+        } catch (error) {
+          errors.push(`${candidate.id}/text: ${error?.message || error}`);
+        }
+
+        try {
+          await loadExternalScriptTag(candidate.lib, signal);
+          if (!window.pdfjsLib?.getDocument) throw new Error('pdf.js global not available after script-tag load');
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = candidate.worker;
+          return window.pdfjsLib;
+        } catch (error) {
+          errors.push(`${candidate.id}/tag: ${error?.message || error}`);
+        }
+      }
+
+      throw new Error(`pdf.js load failed (${errors.join(' | ') || 'unknown error'})`);
     })().catch((error) => {
       runtime.pdfjsPromise = null;
       throw error;
@@ -2158,8 +2289,8 @@
     return lines.join('\n');
   }
 
-  async function extractPdfText(url, signal) {
-    const pdfjs = await ensurePdfJs(signal);
+  async function extractPdfText(url, signal, pdfjsInstance = null) {
+    const pdfjs = pdfjsInstance || await ensurePdfJs(signal);
     const binary = await fetchBinaryWithRetry(url, signal);
     const data = new Uint8Array(binary);
     const loadingTask = pdfjs.getDocument({ data, disableWorker: true, useWorkerFetch: false, isEvalSupported: false });
@@ -2192,6 +2323,29 @@
     const candidates = docs.filter((d) => /rule\s*71\(3\)|rule\s*116|summons to oral proceedings|article\s*94\(3\)|art\.\s*94\(3\)|rule\s*161|rule\s*162|communication from the examining/i.test(`${d.title || ''} ${d.procedure || ''}`)).slice(0, 5);
     if (!candidates.length) return;
 
+    let pdfjs = null;
+    try {
+      pdfjs = await ensurePdfJs(signal);
+      addLog(caseNo, 'ok', 'PDF parser engine ready', { source: 'pdfDeadlines' });
+    } catch (error) {
+      const errText = String(error?.message || error || 'unknown error');
+      addLog(caseNo, 'error', `PDF parser unavailable: ${errText}`, { source: 'pdfDeadlines' });
+      patchCase(caseNo, (entry) => {
+        entry.sources.pdfDeadlines = {
+          key: 'pdfDeadlines',
+          title: 'PDF-derived deadlines',
+          status: 'error',
+          fetchedAt: Date.now(),
+          parserVersion: VERSION,
+          transport: 'fetch+pdfjs',
+          error: errText,
+          data: { hints: [], scanned: [] },
+        };
+      });
+      addLog(caseNo, 'warn', 'PDF deadline parse aborted (parser engine unavailable)', { source: 'pdfDeadlines' });
+      return;
+    }
+
     const hints = [];
     const scanned = [];
 
@@ -2211,7 +2365,7 @@
           continue;
         }
 
-        const text = await extractPdfText(resolvedUrl, signal);
+        const text = await extractPdfText(resolvedUrl, signal, pdfjs);
         if (!text) {
           addLog(caseNo, 'warn', 'PDF opened but extracted text was empty', { source: 'pdfDeadlines', doc: doc.title || '', url: resolvedUrl });
           continue;
