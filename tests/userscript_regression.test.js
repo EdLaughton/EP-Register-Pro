@@ -201,7 +201,7 @@ has(/function\s+epRenewalDueDate\s*\(/, 'Renewal model should compute EP due dat
 has(/feeForum\s*=\s*'EPO central \(Unitary Patent\)'/, 'Renewal model should distinguish UP central-fee forum');
 has(/graceUntil\s*=\s*nextDue\s*\?\s*addMonths\(nextDue,\s*6\)\s*:\s*null;/, 'Renewal model should include 6-month grace-period calculation');
 has(/const\s+graceText\s*=\s*m\.renewal\.graceUntil[\s\S]*?`Grace until \$\{esc\(formatDate\(m\.renewal\.graceUntil\)\)\}/, 'Renewals overview should fold grace-period text into the next-due row');
-hasText('Latest paid event:', 'Renewals overview should surface latest renewal inside patent year status');
+hasText('Last payment', 'Renewals overview should surface latest renewal inside the compact status row');
 notHas(/<div class="epoRP-l">Latest renewal<\/div>/, 'Renewals overview should not render a separate Latest renewal row');
 notHas(/<div class="epoRP-l">Grace period until<\/div>/, 'Renewals overview should not render a separate Grace period row');
 has(/return 'Post-publication';/, 'Stage mapping should avoid using "Published" as a stage label');
@@ -218,7 +218,7 @@ has(/if \(d\.reference && \/20-year term from filing\/i\.test\(String\(d\.label 
 has(/if \(d\.resolved\) return false;/, 'Detailed clocks should hide deadlines already resolved by subsequent activity');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
-hasText('Recovery options', 'Actionable status should expose recovery guidance for loss-of-rights postures');
+hasText('Loss-of-rights posture detected.', 'Actionable status should expose concise recovery guidance for loss-of-rights postures');
 has(/const\s+latestEpoIsLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed to be withdrawn\|loss of rights/, 'Overview model should detect loss-of-rights posture from latest EPO action');
 has(/const\s+waitingOn\s*=\s*latestEpoIsLossOfRights/, 'Waiting-on allocation should use dedicated loss-of-rights logic');
 has(/const\s+nextDeadlineMetaLines\s*=\s*\[\];/, 'Actionable status should build tidy next-deadline metadata lines');

@@ -4012,8 +4012,8 @@
     let recoveryOptions = '';
     if (latestEpoIsLossOfRights) {
       recoveryOptions = applicantAfterLatestEpo
-        ? 'Loss-of-rights posture detected. Applicant appears to have filed after the adverse communication; monitor EPO decision on recovery.'
-        : 'Loss-of-rights posture detected (deemed withdrawn / Rule 112 context). Further processing may still be available in some situations; otherwise re-establishment under Rule 136(1) EPC applies (earliest of 2 months from removal of cause of non-compliance and 1 year from expiry of the unobserved time limit).';
+        ? 'Loss-of-rights posture detected. Applicant appears to have responded; monitor the EPO recovery outcome.'
+        : 'Loss-of-rights posture detected. Check further processing first; if unavailable, consider Rule 136 re-establishment.';
     }
 
     const actionableDeadlines = deadlines.filter((d) => !d.reference && !d.resolved);
@@ -4053,10 +4053,10 @@
         ueStatus: ue.ueStatus || 'Unknown',
         upcOptOut: upcRegistry ? (upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')) : (ue.upcOptOut || 'Unknown'),
         note: upcRegistry
-          ? `UPC opt-out checked against registry for ${upcRegistry.patentNumber}.`
+          ? `Registry checked for ${upcRegistry.patentNumber}.`
           : (ue.ueStatus
-            ? 'UE/UPC inferred from UP tab and legal data where available.'
-            : 'UE/UPC data unavailable in current cache; will populate when source loads.'),
+            ? 'Taken from UP/legal data where available.'
+            : 'No cached UP/UPC data yet.'),
       },
       docs,
     };
@@ -4361,7 +4361,7 @@
     return `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : '—'}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
-      ${m.recoveryOptions ? `<div class="epoRP-l">Recovery options</div><div class="epoRP-v"><div class="epoRP-m">${esc(m.recoveryOptions)}</div></div>` : ''}
+      ${m.recoveryOptions ? `<div class="epoRP-l">Recovery</div><div class="epoRP-v"><div class="epoRP-m">${esc(m.recoveryOptions)}</div></div>` : ''}
       <div class="epoRP-l">Waiting on</div><div class="epoRP-v">${waitingSummary}</div>
     </div>${detailedDeadlinesHtml}</div>`;
   }
@@ -4378,27 +4378,27 @@
     const graceText = m.renewal.graceUntil
       ? `Grace until ${esc(formatDate(m.renewal.graceUntil))}${m.renewal.dueState === 'grace' ? ' (surcharge period active)' : ''}`
       : '';
-    const patentYearStatus = patentYearFromFiling
-      ? `Current year ${patentYearFromFiling}${m.renewal.highestYear ? ` · paid through Year ${m.renewal.highestYear}` : ''}`
-      : (m.renewal.highestYear ? `Paid through Year ${m.renewal.highestYear}` : 'No renewal payment captured yet');
+    const patentYearStatus = m.renewal.highestYear
+      ? `Paid through Year ${m.renewal.highestYear}${patentYearFromFiling ? ` · current year ${patentYearFromFiling}` : ''}`
+      : (patentYearFromFiling ? `Current year ${patentYearFromFiling}` : 'No renewal payment captured yet');
     const latestRenewalNote = m.renewal.latest
-      ? `Latest paid event: ${m.renewal.latest.dateStr} · ${compactOverviewTitle(m.renewal.latest.title)}`
+      ? `Last payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}`
       : 'No renewal payment event cached.';
+    const basisSummary = `${m.renewal.explanatoryBasis} · ${m.renewal.confidence || 'low'} confidence`;
 
     return `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
-      <div class="epoRP-l">Patent year status</div><div class="epoRP-v">${esc(patentYearStatus)}<div class="epoRP-m">${esc(latestRenewalNote)}</div></div>
-      <div class="epoRP-l">Fee forum</div><div class="epoRP-v">${esc(m.renewal.feeForum || 'Unknown')}</div>
-      <div class="epoRP-l">Next fee year / due</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}${graceText ? `<div class="epoRP-m">${graceText}</div>` : ''}</div>
-      <div class="epoRP-l">Model confidence</div><div class="epoRP-v">${esc(m.renewal.confidence || 'low')}</div>
-      ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Mention of grant</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
-    </div><div class="epoRP-m">${esc(m.renewal.explanatoryBasis)}</div></div>`;
+      <div class="epoRP-l">Status</div><div class="epoRP-v">${esc(patentYearStatus)}<div class="epoRP-m">${esc(latestRenewalNote)}</div></div>
+      <div class="epoRP-l">Forum</div><div class="epoRP-v">${esc(m.renewal.feeForum || 'Unknown')}</div>
+      <div class="epoRP-l">Next fee</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}${graceText ? `<div class="epoRP-m">${graceText}</div>` : ''}</div>
+      ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Grant mention</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
+    </div><div class="epoRP-m">${esc(basisSummary)}</div></div>`;
   }
 
   function renderOverviewUpcUeCard(m) {
     return `<div class="epoRP-c"><h4>UPC / UE</h4><div class="epoRP-g">
-      <div class="epoRP-l">UE status</div><div class="epoRP-v">${esc(m.upcUe.ueStatus)}</div>
-      <div class="epoRP-l">UPC opt-out</div><div class="epoRP-v">${esc(m.upcUe.upcOptOut)}${/Unitary effect registered/i.test(m.upcUe.ueStatus) ? ' (opt-out typically not applicable to UP)' : ''}</div>
-    </div><div class="epoRP-m">${esc(m.upcUe.note)} Unitary effect is only possible after grant/publication milestones.</div></div>`;
+      <div class="epoRP-l">Unitary effect</div><div class="epoRP-v">${esc(m.upcUe.ueStatus)}</div>
+      <div class="epoRP-l">Opt-out</div><div class="epoRP-v">${esc(m.upcUe.upcOptOut)}${/Unitary effect registered/i.test(m.upcUe.ueStatus) ? ' (typically not applicable to UP)' : ''}</div>
+    </div><div class="epoRP-m">${esc(m.upcUe.note)}</div></div>`;
   }
 
   function renderOverviewPublicationsCard(caseNo, m) {
