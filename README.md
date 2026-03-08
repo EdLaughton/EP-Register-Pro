@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.62
+- Expanded fragmented month-phrase detection to explicitly catch additional response periods often seen in OCR/HTML fallbacks:
+  - `2 months`, `3 months`, `5 months`, `6 months`
+  - and reversed/fragmented variants (e.g. `months ... 2` style ordering).
+- Keeps these targeted phrase detections lower-priority than explicit legal-wording matches.
+
 ### 7.0.61
 - Improved robustness of **Registered Letter proof-line extraction**:
   - handles same-line payloads after `Registered Letter`

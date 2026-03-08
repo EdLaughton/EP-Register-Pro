@@ -78,6 +78,9 @@ hasText('registeredLetterLine', 'PDF diagnostics should include captured Registe
 hasText('registeredLetterProofLine', 'PDF diagnostics should include captured Registered Letter proof-line snippet');
 hasText('Default ${fallbackMonths}-month period inferred for ${category}', 'PDF parser should support conservative default response-period fallback when explicit month phrases are missing');
 hasText('Derived from fragmented phrase', 'PDF parser should detect fragmented month phrase patterns such as "of 4 months"');
+hasText('(?:2|3|5|6|two|three|five|six)', 'PDF parser should include explicit fragmented target month detection for 2/3/5/6 month phrases');
+hasText('Derived from fragmented target phrase', 'PDF parser should log targeted fragmented month phrase evidence when matched');
+hasText('Derived from reversed fragmented target phrase', 'PDF parser should detect reversed fragmented month phrase ordering');
 hasText('PDF binary unavailable; using HTML fallback text extraction', 'PDF parser should log explicit HTML fallback path when binary response is not a valid PDF');
 hasText('pdfjs-via-linked-url-empty-text', 'PDF parser should expose explicit transport tag when linked PDF has no extractable text layer');
 hasText('html-fallback-from-document-page-after-empty-linked-pdf-text', 'PDF parser should support fallback from document-page HTML after empty linked-PDF text extraction');

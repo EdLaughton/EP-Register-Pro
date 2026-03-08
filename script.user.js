@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.61
+// @version      7.0.62
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -23,7 +23,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.61';
+  const VERSION = '7.0.62';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -2010,6 +2010,14 @@
     }
     for (const m of textRaw.matchAll(/\bof\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
       push(m[1], `Derived from fragmented phrase "${String(m[0] || '').trim()}" in PDF text`, 70);
+    }
+
+    // OCR/fragmented fallback phrases that often surface as short "X months" snippets.
+    for (const m of textRaw.matchAll(/\b((?:2|3|5|6|two|three|five|six))\s+months?\b/gi)) {
+      push(m[1], `Derived from fragmented target phrase "${String(m[0] || '').trim()}" in PDF text`, 62);
+    }
+    for (const m of textRaw.matchAll(/\bmonths?\s*(?:of|:|-)?\s*((?:2|3|5|6|two|three|five|six))\b/gi)) {
+      push(m[1], `Derived from reversed fragmented target phrase "${String(m[0] || '').trim()}" in PDF text`, 58);
     }
 
     if (!candidates.length) return { months: 0, evidence: '' };

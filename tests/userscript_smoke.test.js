@@ -21,7 +21,7 @@ for (const diagnosticsHook of ['epoRP-log-console', 'epoRP-clear-logs', 'epoRP-o
   assert(src.includes(diagnosticsHook), `Missing diagnostics hook ${diagnosticsHook}`);
 }
 
-for (const pdfHook of ['@grant        unsafeWindow', 'PDF_JS_CANDIDATES', 'getPdfJsGlobal', 'registerPdfJsGlobal', 'loadExternalScriptTag', 'evaluateExternalScriptCode', 'isPdfBinaryData', 'binaryToUtf8', 'hasMeaningfulCommunicationText', 'focusCommunicationContextText', 'deriveDocumentPageUrlFromPdfUrl', 'extractPdfLikeUrlFromHtml', 'inferDeadlineCategoryFromContext', 'defaultResponseMonthsForCategory', 'extractRegisteredLetterProofLine', 'normalizePdfDocumentUrl', 'PDF parse diagnostics', 'PDF proof line (below "Registered Letter")']) {
+for (const pdfHook of ['@grant        unsafeWindow', 'PDF_JS_CANDIDATES', 'getPdfJsGlobal', 'registerPdfJsGlobal', 'loadExternalScriptTag', 'evaluateExternalScriptCode', 'isPdfBinaryData', 'binaryToUtf8', 'hasMeaningfulCommunicationText', 'focusCommunicationContextText', 'deriveDocumentPageUrlFromPdfUrl', 'extractPdfLikeUrlFromHtml', 'inferDeadlineCategoryFromContext', 'defaultResponseMonthsForCategory', 'extractRegisteredLetterProofLine', 'normalizePdfDocumentUrl', 'Derived from fragmented target phrase', 'Derived from reversed fragmented target phrase', 'PDF parse diagnostics', 'PDF proof line (below "Registered Letter")']) {
   assert(src.includes(pdfHook), `Missing PDF diagnostics hook ${pdfHook}`);
 }
 
