@@ -32,5 +32,13 @@ Keep this file current. When a user asks for more real Register/UPC coverage:
 
 | Requested label | Register application | Status | Notes |
 |---|---|---|---|
+| `P1 baseline happy path — EP17751711.7 / EP3496607B1` | `EP17751711` | missing | target clean Euro-PCT granted baseline without UP; useful control against `EP19871250` |
+| `P1 direct EP seed — EP23160622.9 / EP4243380` | `EP23160622` | missing | treat as direct-EP parsing seed; not yet verified as first filing vs convention filing |
+| `P1/P5 Mauer family spine — EP24837586 / EP4623169 + EP25203726 / EP4644109 + EP25203732 / EP4644110 + PCT/EP2024/087573 / WO2025132902` | `EP24837586` + siblings | partial | `EP24837586` and `EP25203732` are already captured; still missing sibling `EP25203726`; use this family for cross-family role labelling and EP+PCT parsing |
+| `P1 backup Euro-PCT family — EP20831233.0 / EP3989815` | `EP20831233` | missing | backup non-Element-Science Euro-PCT fixture from different family |
+| `P1 backup Euro-PCT family — EP20735516.5 / EP3987119` | `EP20735516` | missing | backup non-Element-Science Euro-PCT fixture from different family |
 | `3511B1 — good granted EP baseline, richer because Euro-PCT + later unitary effect` | `EP19871250` | partial | captured `main/event/family/ueMain`; still missing `legal` and `doclist` |
 | `P2 — branching procedural paths: parent/divisional pair (EP19871250 / EP3863511 parent + EP24189818 / EP4438108 divisional)` | `EP19871250` + `EP24189818` | partial | strong real branching pair; `EP24189818` is already broadly captured, but parent `EP19871250` still needs `legal` and `doclist`; child `EP24189818` still needs `ueMain` |
+| `P3/P4 deadline-heavy + grant + UP — EP19871250.7 / EP3863511B1` | `EP19871250` | partial | already in live fixtures; strongest single public case for EP-phase entry → examination → grant-intention → grant fee → grant → UP transitions |
+| `P3/P4 deadline-heavy + grant without UP — EP17751711.7 / EP3496607B1` | `EP17751711` | missing | wanted as non-UP control for grant / post-grant lapse handling |
+| `P3/P4 repeated grant-intention churn — EP24189818.8 / EP4438108A3` | `EP24189818` | partial | broadly captured already; still missing `ueMain`; use as latest-controlling-deadline / repeated-R71 control |

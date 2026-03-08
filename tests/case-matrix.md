@@ -16,6 +16,16 @@ Per-tab live capture status is tracked separately in `tests/live-fixture-tracker
 | `EP24189818` | Divisional child / branching procedural path / renewal-heavy / UPC opt-out positive control | Parent link to `EP19871250`, repeated grant-intention cycles, renewal-fee extraction through later years, family/publication linkage, UPC registry lookup resolves as opted out | `EP4438108` |
 | `EP19871250` | Parent granted baseline + Euro-PCT + unitary effect | Parent half of the `EP19871250` ↔ `EP24189818` divisional pair; granted/no-opposition happy path, unitary effect extraction, B1/C0 family/publication coverage, post-grant lapse signals | `EP3863511` |
 
+## Queued high-value additions
+
+| Application # | Purpose | Why it matters | Publication Ref (optional) |
+|---|---|---|---|
+| `EP17751711` | Granted Euro-PCT baseline without UP | clean grant path + post-grant lapse signals; best control against `EP19871250` | `EP3496607` |
+| `EP23160622` | Direct EP parsing seed | cleaner non-PCT HTML/input shape for parser coverage | `EP4243380` |
+| `EP20831233` | Backup non-Element-Science Euro-PCT fixture | different family / bulletin source for Euro-PCT parsing backup | `EP3989815` |
+| `EP20735516` | Backup non-Element-Science Euro-PCT fixture | different family / bulletin source for Euro-PCT parsing backup | `EP3987119` |
+| `EP25203726` | Mauer sibling divisional | completes the captured Mauer family spine for sibling-role / family parsing checks | `EP4644109` |
+
 ---
 
 ## Extended Candidate Discovery (from live case context)
