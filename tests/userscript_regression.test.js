@@ -78,8 +78,9 @@ hasText('patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: reg
 hasText('Initial case load: stale/missing sources detected; running auto prefetch', 'Init should log initial auto-prefetch decisions');
 hasText('Case tab/page changed; auto prefetch skipped for this page session', 'Init should skip repeated auto-prefetch on case/page switches in this session');
 hasText('Same-case tab switch detected: prefetch gate active', 'Init should log explicit same-case tab switch gate decisions');
+hasText('Same-case page reload detected: prefetch gate active', 'Init should log explicit same-case reload gate decisions');
 hasText('Initial case load: cache is fresh; no auto prefetch needed', 'Init should log fresh-cache reuse on first case load');
-has(/const\s+tabChangedWithinCase\s*=\s*!changed\s*&&\s*!!previousRegisterTab\s*&&\s*previousRegisterTab\s*!==\s*registerTab;/, 'Init should detect same-case tab changes for gate logging');
+has(/const\s+tabChangedWithinCase\s*=\s*hasPreviousTab\s*&&\s*previousRegisterTab\s*!==\s*registerTab;/, 'Init should detect same-case tab changes for gate logging across reloads');
 notHas(/addEventListener\('focus',[\s\S]*prefetchCase\(/, 'Focus handler should not auto-reload all sources after same-case tab/page changes');
 has(/inferProceduralDeadlines\(main,\s*docs,\s*eventHistory,\s*legal,\s*pdfDeadlines\)/, 'Overview deadline model should include PDF-derived hints');
 

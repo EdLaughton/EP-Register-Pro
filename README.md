@@ -91,6 +91,14 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.56
+- Fixed same-case tab-switch gate detection across full Register page reloads.
+  - Gate logs now correctly classify:
+    - `Same-case tab switch detected: prefetch gate active`
+    - `Same-case page reload detected: prefetch gate active`
+- Reduced log churn by deduplicating near-identical back-to-back operation entries.
+- Removed unused legacy helper code paths (`fetchBinaryCrossOrigin`, `extractDateCandidates`, `addDays`) to simplify maintenance while preserving feature behavior.
+
 ### 7.0.55
 - Hardened PDF engine loading (pdf.js) with multi-path fallback:
   - multiple CDN candidates (`cdnjs`, `jsdelivr`, `unpkg`)

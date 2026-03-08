@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.55
+// @version      7.0.56
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -22,7 +22,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.55';
+  const VERSION = '7.0.56';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -317,8 +317,22 @@
 
   function addLog(caseNo, level, message, meta = {}) {
     try {
+      const normalizedLevel = String(level || 'info').toLowerCase();
+      const normalizedMessage = normalize(String(message || '')) || '(no message)';
+      const normalizedMeta = (meta && typeof meta === 'object' && !Array.isArray(meta)) ? meta : {};
+
       patchCase(caseNo, (c) => {
-        c.logs.push({ ts: nowIso(), level, message, meta });
+        const last = c.logs?.[c.logs.length - 1];
+        if (last && String(last.level || '').toLowerCase() === normalizedLevel && String(last.message || '') === normalizedMessage) {
+          const lastTs = new Date(last.ts || '').getTime();
+          const delta = Number.isFinite(lastTs) ? Date.now() - lastTs : Infinity;
+          if (delta >= 0 && delta < 900) {
+            const sameMeta = safeInlineJson(last.meta || {}) === safeInlineJson(normalizedMeta);
+            if (sameMeta) return;
+          }
+        }
+
+        c.logs.push({ ts: nowIso(), level: normalizedLevel, message: normalizedMessage, meta: normalizedMeta });
         if (c.logs.length > MAX_LOGS_PER_APP) c.logs = c.logs.slice(-MAX_LOGS_PER_APP);
       });
     } catch {
@@ -1539,30 +1553,6 @@
     }
   }
 
-  function fetchBinaryCrossOrigin(url, signal) {
-    if (typeof GM_xmlhttpRequest !== 'function') return fetchBinaryWithRetry(url, signal);
-    return new Promise((resolve, reject) => {
-      const req = GM_xmlhttpRequest({
-        method: 'GET',
-        url,
-        responseType: 'arraybuffer',
-        timeout: FETCH_TIMEOUT_MS,
-        onload: (res) => {
-          if (res.status >= 200 && res.status < 400 && res.response) resolve(res.response);
-          else reject(new Error(`HTTP ${res.status}`));
-        },
-        onerror: () => reject(new Error('Cross-origin binary request failed')),
-        ontimeout: () => reject(new Error('Cross-origin binary request timed out')),
-      });
-
-      const onAbort = () => {
-        try { req?.abort?.(); } catch {}
-        reject(new DOMException('Aborted', 'AbortError'));
-      };
-      signal?.addEventListener('abort', onAbort, { once: true });
-    });
-  }
-
   function loadExternalScriptText(url, signal) {
     if (typeof GM_xmlhttpRequest !== 'function') return Promise.reject(new Error('GM_xmlhttpRequest unavailable'));
     return new Promise((resolve, reject) => {
@@ -1834,26 +1824,6 @@
     return `${d}.${mo}.${y}`;
   }
 
-  function monthNumber(name) {
-    const n = String(name || '').toLowerCase();
-    if (!n) return 0;
-    const m = {
-      january: 1, jan: 1,
-      february: 2, feb: 2,
-      march: 3, mar: 3,
-      april: 4, apr: 4,
-      may: 5,
-      june: 6, jun: 6,
-      july: 7, jul: 7,
-      august: 8, aug: 8,
-      september: 9, sep: 9, sept: 9,
-      october: 10, oct: 10,
-      november: 11, nov: 11,
-      december: 12, dec: 12,
-    };
-    return m[n] || 0;
-  }
-
   function parseSmallNumberToken(token) {
     const t = String(token || '').trim().toLowerCase();
     if (!t) return 0;
@@ -1873,25 +1843,6 @@
       twelve: 12,
     };
     return map[t] || 0;
-  }
-
-  function extractDateCandidates(textBlock) {
-    const out = [];
-    const t = String(textBlock || '');
-
-    for (const m of t.matchAll(/\b(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})\b/g)) {
-      const d = normalizeDateString(m[1]);
-      if (d) out.push(d);
-    }
-
-    for (const m of t.matchAll(/\b(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})\b/gi)) {
-      const day = String(m[1] || '').padStart(2, '0');
-      const mon = String(monthNumber(m[2] || '')).padStart(2, '0');
-      const year = String(m[3] || '');
-      if (mon !== '00') out.push(`${day}.${mon}.${year}`);
-    }
-
-    return dedupe(out, (d) => d);
   }
 
   function extractExplicitDeadlineDateFromPdf(textBlock) {
@@ -2663,12 +2614,6 @@
 
   function addMonths(date, months) {
     return addCalendarMonthsDetailed(date, months).date;
-  }
-
-  function addDays(date, days) {
-    const d = new Date(date);
-    d.setDate(d.getDate() + days);
-    return d;
   }
 
   function endOfMonth(year, monthIndex) {
@@ -3728,7 +3673,9 @@
     if (caseSession.lastRegisterTab) runtime.lastRegisterTabByCase[caseNo] = String(caseSession.lastRegisterTab);
 
     const previousRegisterTab = String(runtime.lastRegisterTabByCase[caseNo] || caseSession.lastRegisterTab || '');
-    const tabChangedWithinCase = !changed && !!previousRegisterTab && previousRegisterTab !== registerTab;
+    const hasPreviousTab = !!previousRegisterTab;
+    const tabChangedWithinCase = hasPreviousTab && previousRegisterTab !== registerTab;
+    const sameTabReloadWithinCase = changed && hasPreviousTab && previousRegisterTab === registerTab;
     runtime.lastRegisterTabByCase[caseNo] = registerTab;
     patchCaseSession(caseNo, { lastRegisterTab: registerTab });
 
@@ -3742,17 +3689,21 @@
     }
 
     if (runtime.autoPrefetchDoneByCase[caseNo]) {
-      if (changed) {
-        addLog(caseNo, 'info', 'Case tab/page changed; auto prefetch skipped for this page session', {
-          source: 'prefetch',
-          registerTab,
-        });
-      }
       if (tabChangedWithinCase) {
         addLog(caseNo, 'info', 'Same-case tab switch detected: prefetch gate active', {
           source: 'prefetch',
           fromTab: previousRegisterTab,
           toTab: registerTab,
+        });
+      } else if (sameTabReloadWithinCase) {
+        addLog(caseNo, 'info', 'Same-case page reload detected: prefetch gate active', {
+          source: 'prefetch',
+          registerTab,
+        });
+      } else if (changed) {
+        addLog(caseNo, 'info', 'Case tab/page changed; auto prefetch skipped for this page session', {
+          source: 'prefetch',
+          registerTab,
         });
       }
       return;
