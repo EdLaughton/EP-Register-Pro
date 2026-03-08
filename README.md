@@ -91,6 +91,15 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.78
+- Fixed doclist response grouping edge-cases around intention-to-grant:
+  - applicant amendments/corrections in R71(3)/text-proposed-for-grant context now group with grant/intention-to-grant flow (not `Response to search`).
+- Fixed PDF-derived deadline resolution state:
+  - PDF hint cycles are now checked against subsequent applicant/EPO activity and can be auto-marked resolved when later response evidence exists.
+  - avoids stale historical R71(3) cycles appearing as still-open in actionable/deadline views.
+- Improved robustness in doclist parser fallback URL generation (no undefined case number in fallback URL path).
+- Detailed clocks now hide already-resolved deadlines for a cleaner actionable view.
+
 ### 7.0.77
 - Condensed filing metadata in Overview top summary:
   - combined `Filing date` and `20-year term from filing (reference)` into a single line for quicker scanning

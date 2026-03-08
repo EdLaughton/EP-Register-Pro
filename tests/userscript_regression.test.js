@@ -109,6 +109,8 @@ has(/extractPdfText\(resolvedUrl,\s*signal,\s*pdfjs\)/, 'PDF parse loop should r
 hasText('PDF deadline scan skipped: no communication-type documents found', 'PDF scan should report explicit skip when no communication-type docs are eligible');
 has(/\)\.slice\(0,\s*8\);/, 'PDF communication candidate selection should cover broader communication set (top 8 docs)');
 has(/parsePdfDeadlineHints\(text,\s*\{[\s\S]*docTitle:\s*doc\.title,[\s\S]*docProcedure:\s*doc\.procedure,[\s\S]*\}\)/, 'PDF hint parsing should receive document metadata context for category fallback');
+has(/const\s+resolvedByActivity\s*=\s*resolveHintByActivity\(label,\s*anchor\);/, 'PDF-derived deadlines should be re-checked against subsequent activity to mark older cycles resolved');
+hasText('resolved by subsequent activity', 'PDF-derived deadline method text should indicate when a deadline cycle has already been resolved');
 has(/withProofLine:\s*scanned\.filter\(/, 'PDF summary logging should include proof-line hit count');
 has(/withResponsePeriod:\s*scanned\.filter\(/, 'PDF summary logging should include response-period hit count');
 has(/withOcr:\s*scanned\.filter\(/, 'PDF summary logging should include OCR-path usage count');
@@ -179,6 +181,10 @@ hasText('[A-Z]{2}\\d[0-9A-Z\\/\\-]{4,}', 'Priority parser should require numeric
 hasText('Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event', 'Priority page-text fallback should stop at known next labels to avoid pulling publication rows');
 hasText('priority document|annex', 'Annex filings should be classed with the filing package when applicant-filed');
 hasText('Response to search', 'Search-response applicant bundle should exist for grouped amendments after search report');
+hasText('isGrantContext', 'Document classifier should detect intention-to-grant / text-proposed-for-grant context');
+hasText('isGrantResponse', 'Document classifier should detect applicant responses to intention-to-grant context');
+has(/isSearchResponseContext && !isGrantContext/, 'Search-response grouping should not swallow intention-to-grant responses');
+has(/return \{ bundle: 'Grant package', level: 'warn', actor: 'Applicant' \};/, 'Intention-to-grant responses should be grouped with grant package context');
 has(/annex to \(\?:the \)\?communication\|communication annex\|annex\.\*examining division/, 'Annex-to-communication should be classed as EPO examination material');
 has(/const\s+internationalField\s*=\s*dedupeMultiline\(fieldByLabel\(doc,\s*\[\/\^International application\\b\/i,\s*\/\^International publication\\b\/i,\s*\/\^PCT application\\b\/i\]\)\);/, 'E/PCT detection should use international-application scoped fields');
 notHas(/const\s+isEuroPct\s*=\s*!!internationalAppNo\s*\|\|\s*\/\\bPCT\\b\/i/, 'E/PCT detection should not rely on broad page-wide PCT token matching');
@@ -209,6 +215,7 @@ has(/const\s+filingSummary\s*=\s*normalize\(\[/, 'Overview should build a conden
 hasText('20-year term ${termReferenceText}', 'Overview filing summary should include the 20-year term reference inline');
 notHas(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Overview should not render a separate 20-year term row after condensing filing metadata');
 has(/if \(d\.reference && \/20-year term from filing\/i\.test\(String\(d\.label \|\| ''\)\)\) return false;/, 'Detailed clocks should avoid duplicating 20-year term reference row already shown in top summary');
+has(/if \(d\.resolved\) return false;/, 'Detailed clocks should hide deadlines already resolved by subsequent activity');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
 hasText('Recovery options', 'Actionable status should expose recovery guidance for loss-of-rights postures');
@@ -222,6 +229,8 @@ notHas(/<div class="epoRP-l">EPO last action<\/div>/, 'Actionable status should 
 notHas(/<div class="epoRP-l">Applicant last filing<\/div>/, 'Actionable status should not render a separate applicant last filing row after consolidation');
 notHas(/<div class="epoRP-l">Days since applicant response<\/div>/, 'Actionable status should not render a separate day-counter row after consolidation');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
+hasText('const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();', 'Doclist parser should use a safe fallback case number for sourceUrl generation');
+hasText("sourceUrl(fallbackCaseNo, 'doclist')", 'Doclist parser should avoid undefined caseNo when generating fallback doclist URLs');
 hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use explicit R71(3) wording for grant package groups');
 hasText('tr.epoRP-docgrp td:first-child{box-shadow:inset 3px 0 0 #3b82f6}', 'Doclist group header should show a strong blue left guide line');
 hasText('tr.epoRP-docgrp-item.epoRP-docgrp-open td:first-child{box-shadow:inset 3px 0 0 #93c5fd}', 'Doclist grouped child rows should show a lighter blue continuation guide line');

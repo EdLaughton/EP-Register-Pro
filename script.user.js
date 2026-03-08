@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.77
+// @version      7.0.78
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.77';
+  const VERSION = '7.0.78';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1101,13 +1101,19 @@
       /search\s*\/\s*examination|search\s*and\s*examination|search report|search opinion/.test(p)
       || /after receipt of \(?(?:european\)? )?search report|before examination/.test(t);
 
+    const isGrantContext = /rule\s*71\(3\)|intention to grant|text intended for grant|text proposed for grant|proposed for grant/.test(`${t} ${p}`);
+    const isGrantResponse = isGrantContext && /amend|correction|request|claims|description|translation|approval|text proposed for grant/.test(t);
+
     const isLossOfRights = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|noting of loss of rights|application refused|application rejected/.test(`${t} ${p}`);
     if (isLossOfRights) {
       return { bundle: 'Examination', level: 'bad', actor: 'EPO' };
     }
 
     if (/by applicant|amendment by applicant|filed by applicant|from applicant/.test(p)) {
-      if (isSearchResponseContext && /amend|claims|description|letter|annotations|subsequently filed items/.test(t)) {
+      if (isGrantResponse) {
+        return { bundle: 'Grant package', level: 'warn', actor: 'Applicant' };
+      }
+      if (isSearchResponseContext && !isGrantContext && /amend|claims|description|letter|annotations|subsequently filed items/.test(t)) {
         return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
       }
       if (/request for grant|description|claims|drawings|designation of inventor|priority document|annex/.test(t)) {
@@ -1120,12 +1126,18 @@
       return { bundle: 'Other', level: 'info', actor: 'System' };
     }
 
-    if (isSearchResponseContext && /amend|claims|description|letter accompanying subsequently filed items|annotations|amendments received before examination/.test(t)) {
+    if (isGrantResponse) {
+      return { bundle: 'Grant package', level: 'warn', actor: 'Applicant' };
+    }
+
+    if (isSearchResponseContext && !isGrantContext && /amend|claims|description|letter accompanying subsequently filed items|annotations|amendments received before examination/.test(t)) {
       return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
     }
 
     if (/amended claims filed|amendment by applicant|claims and\/or description|filed after receipt/i.test(t)) {
-      return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
+      return isGrantContext
+        ? { bundle: 'Grant package', level: 'warn', actor: 'Applicant' }
+        : { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
     }
 
     if (/search report|search opinion|written opinion|search strategy|esr/.test(t)) return { bundle: 'Search package', level: 'info', actor: 'EPO' };
@@ -1155,6 +1167,7 @@
     if (!table) return { docs: [] };
     const map = tableColumnMap(table);
     const docs = [];
+    const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();
 
     for (const row of table.querySelectorAll('tr')) {
       const cells = [...row.querySelectorAll('td')];
@@ -1169,7 +1182,7 @@
       if (!title) title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || '';
       if (!title) continue;
 
-      const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || sourceUrl(caseNo, 'doclist');
+      const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || sourceUrl(fallbackCaseNo, 'doclist');
       const procedure = getCell(map.procedure);
       const cls = classifyDocument(title, procedure);
       docs.push({
@@ -3330,6 +3343,31 @@
     const hasFeeSignalAfter = (anchorDate, regex = /payment|fee paid|paid|examination fee|designation fee|grant and publishing fee|grant and publication fee|renewal fee/i) =>
       hasAfter(anchorDate, (r) => regex.test(`${r.title} ${r.detail}`));
 
+    const resolveHintByActivity = (label, anchorDate) => {
+      const l = String(label || '').toLowerCase();
+      if (!anchorDate) return false;
+
+      if (/r71\(3\)|intention to grant/.test(l)) {
+        return hasFeeSignalAfter(anchorDate, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections|approval of text|text proposed for grant/i)
+          || hasApplicantResponseAfter(anchorDate, /reply|response|amend|correction|claims|translation|approval|text proposed for grant|request for correction/i);
+      }
+
+      if (/art\.?\s*94\(3\)|communication response period/.test(l)) {
+        return hasApplicantResponseAfter(anchorDate, /reply|response|observations|arguments|amend|claims|request|further processing|re-establishment/i);
+      }
+
+      if (/rule 161\/162/.test(l)) {
+        return hasApplicantResponseAfter(anchorDate, /reply|response|amend|claims|observations|arguments/i)
+          || hasFeeSignalAfter(anchorDate, /claims fee|fee payment received/i);
+      }
+
+      if (/rule 116/.test(l)) {
+        return hasApplicantResponseAfter(anchorDate, /response|request|submission|oral proceedings|withdrawal/i);
+      }
+
+      return hasApplicantResponseAfter(anchorDate);
+    };
+
     const addMonthsDeadline = ({ triggerRegex, label, months, level, confidence = 'medium', resolvedBy }) => {
       if (hasPdfHint(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) return;
       const rec = latestRecord(triggerRegex);
@@ -3356,15 +3394,24 @@
     };
 
     for (const hint of pdfHints) {
+      const label = String(hint.label || 'PDF-derived deadline');
+      const sourceDate = String(hint.sourceDate || '');
+      const anchor = parseDateString(sourceDate) || hint.date;
+      const resolvedByActivity = resolveHintByActivity(label, anchor);
+      const resolved = !!hint.resolved || resolvedByActivity;
+      const baseMethod = String(hint.evidence || 'PDF parse');
+
       push({
-        label: String(hint.label || 'PDF-derived deadline'),
+        label,
         date: hint.date,
         level: String(hint.level || 'bad'),
         confidence: String(hint.confidence || 'high'),
-        sourceDate: String(hint.sourceDate || ''),
-        resolved: !!hint.resolved,
+        sourceDate,
+        resolved,
         fromPdf: true,
-        method: String(hint.evidence || 'PDF parse'),
+        method: resolvedByActivity && !hint.resolved
+          ? `${baseMethod} · resolved by subsequent activity`
+          : baseMethod,
       });
     }
 
@@ -3953,6 +4000,7 @@
 
     const detailedDeadlines = m.deadlines.filter((d) => {
       if (d.reference && /20-year term from filing/i.test(String(d.label || ''))) return false;
+      if (d.resolved) return false;
       if (!m.nextDeadline) return true;
       const sameLabel = d.label === m.nextDeadline.label;
       const sameDate = formatDate(d.date) === formatDate(m.nextDeadline.date);
