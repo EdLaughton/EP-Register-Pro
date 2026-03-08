@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.67
+// @version      7.0.68
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.67';
+  const VERSION = '7.0.68';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -2099,6 +2099,21 @@
       push(m[1], 115, 'Dated communication line found in PDF');
     }
 
+    const registered = extractRegisteredLetterProofLine(textRaw);
+    const proofDate = normalizeDateString(String(registered.proofLine || '').match(DATE_RE)?.[1] || '');
+    if (proofDate) {
+      push(proofDate, 155, 'Date extracted from line below "Registered Letter" in PDF');
+    }
+
+    const registeredLineDate = normalizeDateString(String(registered.registeredLetterLine || '').match(DATE_RE)?.[1] || '');
+    if (registeredLineDate) {
+      push(registeredLineDate, 145, 'Date extracted from "Registered Letter" line in PDF');
+    }
+
+    for (const m of textRaw.matchAll(/epo\s*form[^\n\r]{0,80}\((\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})\)/gi)) {
+      push(m[1], 150, 'Date extracted from EPO form stamp near Registered Letter');
+    }
+
     if (docDateStr) {
       push(docDateStr, 30, 'Doclist date fallback for communication date');
     }
@@ -2240,6 +2255,9 @@
     if (/\brule\s*161\b|\brule\s*162\b/.test(low)) {
       return { category: 'Rule 161/162 response period', evidence: 'Inferred from document title/procedure metadata (Rule 161/162 signal)' };
     }
+    if (/\bcommunication\b|\bnotification\b|\bsummons\b|\binvitation\b|\bofficial communication\b|\boffice action\b/.test(low)) {
+      return { category: 'Communication response period', evidence: 'Inferred from document title/procedure metadata (generic communication signal)' };
+    }
 
     return { category: '', evidence: '' };
   }
@@ -2300,7 +2318,7 @@
             : '';
 
     const categoryFromContext = inferDeadlineCategoryFromContext(context);
-    const category = categoryFromText || categoryFromContext.category;
+    let category = categoryFromText || categoryFromContext.category;
 
     diagnostics.category = category;
     diagnostics.categoryEvidence = categoryFromText
@@ -2335,6 +2353,15 @@
     diagnostics.explicitDeadlineDate = explicitDue.dateStr || '';
     diagnostics.explicitDeadlineEvidence = explicitDue.evidence || '';
 
+    const genericCommunicationSignal = /\bcommunication\b|\bnotification\b|\bsummons\b|\binvitation\b/.test(textLower);
+    if (!category && (monthPeriod.months || explicitDue.dateStr || genericCommunicationSignal) && communicationDateStr) {
+      category = 'Communication response period';
+      diagnostics.category = category;
+      diagnostics.categoryEvidence = monthPeriod.months || explicitDue.dateStr
+        ? 'Inferred from communication-period evidence in document text'
+        : 'Inferred from generic communication text signal';
+    }
+
     if (!category) {
       return { hints: [], diagnostics };
     }
@@ -2354,8 +2381,9 @@
 
     if (!explicitAdded && responseMonths && communicationDate) {
       const calc = addCalendarMonthsDetailed(communicationDate, responseMonths);
+      const communicationFromDocFallback = /doclist date fallback/i.test(String(diagnostics.communicationEvidence || ''));
       const confidence = monthPeriod.months
-        ? (communication.dateStr ? 'high' : 'medium')
+        ? (communicationFromDocFallback ? 'medium' : 'high')
         : 'low';
 
       pushHint({
@@ -2813,8 +2841,22 @@
     const docs = [...(c.sources.doclist?.data?.docs || [])].sort(compareDateDesc);
     if (!docs.length) return;
 
-    const candidates = docs.filter((d) => /rule\s*71\(3\)|rule\s*116|summons to oral proceedings|article\s*94\(3\)|art\.\s*94\(3\)|rule\s*161|rule\s*162|communication from the examining/i.test(`${d.title || ''} ${d.procedure || ''}`)).slice(0, 5);
-    if (!candidates.length) return;
+    const candidates = docs.filter((d) => {
+      const actor = String(d.actor || '').toLowerCase();
+      const text = normalize(`${d.title || ''} ${d.procedure || ''}`).toLowerCase();
+      if (!text) return false;
+
+      const ruleSignal = /rule\s*71\s*\(\s*3\s*\)|\brule\s*116\b|\brule\s*161\b|\brule\s*162\b|\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)/.test(text);
+      const communicationSignal = /\bcommunication\b|\bnotification\b|\bsummons\b|\binvitation\b|\bintention to grant\b|\bexamining division\b|\bopposition division\b/.test(text);
+
+      if (ruleSignal) return true;
+      if (communicationSignal && actor !== 'applicant') return true;
+      return false;
+    }).slice(0, 8);
+    if (!candidates.length) {
+      addLog(caseNo, 'info', 'PDF deadline scan skipped: no communication-type documents found', { source: 'pdfDeadlines' });
+      return;
+    }
 
     let pdfjs = null;
     try {
@@ -2923,6 +2965,17 @@
           registeredLetterProofLine: String(diagnostics.registeredLetterProofLine || '').slice(0, 180),
           textChars: text.length,
         });
+
+        const doclistDate = normalizeDateString(doc.dateStr || '');
+        const commDate = normalizeDateString(diagnostics.communicationDate || '');
+        if (doclistDate && commDate && doclistDate !== commDate) {
+          addLog(caseNo, 'warn', 'PDF communication date differs from doclist date (using PDF date for deadline derivation)', {
+            source: 'pdfDeadlines',
+            doc: doc.title || '',
+            doclistDate,
+            pdfCommunicationDate: commDate,
+          });
+        }
 
         if (parsedHints.length) {
           hints.push(...parsedHints);

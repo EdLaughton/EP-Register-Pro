@@ -68,6 +68,7 @@ has(/function\s+extractCommunicationDateFromPdf\s*\(/, 'PDF parser should extrac
 has(/function\s+extractResponseMonthsFromPdf\s*\(/, 'PDF parser should extract response-period month count from communication text');
 has(/function\s+extractExplicitDeadlineDateFromPdf\s*\(/, 'PDF parser should support explicit deadline dates when present in the communication');
 has(/function\s+inferDeadlineCategoryFromContext\s*\(/, 'PDF parser should infer category from document title/procedure metadata when text lacks legal markers');
+hasText('Communication response period', 'PDF parser should support generic communication-category fallback for broader communication types');
 has(/function\s+defaultResponseMonthsForCategory\s*\(/, 'PDF parser should provide conservative default response periods for key categories');
 has(/function\s+extractRegisteredLetterProofLine\s*\(/, 'PDF parser should extract proof line below Registered Letter for logging');
 hasText('registered\\s+letter\\b[:\\s\\-]*', 'Registered Letter parser should handle same-line payload patterns');
@@ -83,6 +84,9 @@ hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-d
 hasText('categoryEvidence', 'PDF parse diagnostics should expose whether category came from text or document metadata');
 hasText('registeredLetterLine', 'PDF diagnostics should include captured Registered Letter line snippet');
 hasText('registeredLetterProofLine', 'PDF diagnostics should include captured Registered Letter proof-line snippet');
+hasText('Date extracted from line below "Registered Letter" in PDF', 'Communication date extraction should prioritize Registered Letter proof-line date when available');
+hasText('Date extracted from EPO form stamp near Registered Letter', 'Communication date extraction should use EPO form stamp date cues when available');
+hasText('PDF communication date differs from doclist date (using PDF date for deadline derivation)', 'PDF diagnostics should flag and prefer PDF communication date when it differs from doclist date');
 hasText('Default ${fallbackMonths}-month period inferred for ${category}', 'PDF parser should support conservative default response-period fallback when explicit month phrases are missing');
 hasText('Derived from fragmented phrase', 'PDF parser should detect fragmented month phrase patterns such as "of 4 months"');
 hasText('(?:2|3|5|6|two|three|five|six)', 'PDF parser should include explicit fragmented target month detection for 2/3/5/6 month phrases');
@@ -97,6 +101,8 @@ hasText('PDF OCR fallback used', 'PDF parser should explicitly log when OCR extr
 hasText('PDF parser unavailable:', 'PDF parser should log explicit engine-loader failures');
 hasText('PDF deadline parse aborted (parser engine unavailable)', 'PDF parser should stop clearly when engine is unavailable');
 has(/extractPdfText\(resolvedUrl,\s*signal,\s*pdfjs\)/, 'PDF parse loop should reuse a preloaded pdf.js engine instance');
+hasText('PDF deadline scan skipped: no communication-type documents found', 'PDF scan should report explicit skip when no communication-type docs are eligible');
+has(/\)\.slice\(0,\s*8\);/, 'PDF communication candidate selection should cover broader communication set (top 8 docs)');
 has(/parsePdfDeadlineHints\(text,\s*\{[\s\S]*docTitle:\s*doc\.title,[\s\S]*docProcedure:\s*doc\.procedure,[\s\S]*\}\)/, 'PDF hint parsing should receive document metadata context for category fallback');
 has(/withProofLine:\s*scanned\.filter\(/, 'PDF summary logging should include proof-line hit count');
 has(/withResponsePeriod:\s*scanned\.filter\(/, 'PDF summary logging should include response-period hit count');

@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.68
+- Expanded PDF/OCR candidate selection to cover broader communication-type documents (not only a narrow rule list).
+- Communication date extraction now prioritizes PDF-derived date evidence from **Registered Letter** / EPO form stamp lines before doclist fallback.
+- Added diagnostics for doclist-vs-PDF date divergence and explicitly prefers PDF communication date for deadline derivation when they differ.
+- Added generic communication category fallback (`Communication response period`) when communication-period evidence exists without a specific rule label.
+
 ### 7.0.67
 - Moved **20-year term from filing (reference)** into the top overview summary directly after **Filing date**.
 - Removed duplicate display of that same 20-year reference term from the inline detailed clocks section.
