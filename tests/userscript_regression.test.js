@@ -28,7 +28,7 @@ hasText("upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out
 hasText('opt(?:ed)?[\\s-]*out(?:\\s+\\w+){0,8}\\s+(?:register', 'UPC positive matcher should allow words between opt-out and registered/entered/effective');
 
 // Timeline grouped items UX (collapsible + arrow)
-has(/<details class="epoRP-grp" data-group-key=/, 'Timeline groups should render as keyed <details> for persisted collapse state');
+has(/<details class="epoRP-grp" data-group-key=/, 'Timeline groups should render as keyed <details> containers');
 has(/class="epoRP-garrow"/, 'Timeline group arrow indicator missing');
 has(/\.epoRP-grp\[open\]\s+\.epoRP-garrow\{transform:rotate\(90deg\)/, 'Timeline arrow rotation style missing');
 has(/timelineItemHtml\(item, compact = false, inGroup = false\)/, 'Timeline item renderer should support in-group styling');
@@ -36,15 +36,13 @@ has(/\.epoRP-it\.in-group\{/, 'Grouped timeline items should have dedicated styl
 has(/\.epoRP-grph::marker\{content:''\}/, 'Timeline group summary should hide default marker to avoid native grey button artefacts');
 has(/function\s+timelineGroupKey\s*\(/, 'Timeline group key helper missing');
 has(/data-group-key="\$\{esc\(groupKey\)\}"/, 'Timeline groups should render stable key attributes');
-has(/function\s+wireTimeline\s*\(caseNo\)/, 'Timeline wire-up helper missing');
-has(/function\s+persistLiveTimelineGroups\s*\(/, 'Timeline open-group helper missing');
 has(/function\s+persistLiveDoclistGroups\s*\(/, 'Doclist open-group persistence helper missing');
 has(/function\s+timelineAttorneyImportance\s*\(/, 'Timeline importance classifier helper missing');
 hasText('deemed to be withdrawn|application deemed to be withdrawn|loss of rights', 'Timeline importance classifier should escalate loss-of-rights events for attorney triage');
 hasText('deadline|time limit|final date|summons to oral proceedings|rule\\s*116', 'Timeline importance classifier should mark prosecution-critical events as warn-level');
 hasText('const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;', 'Doclist grouping should auto-expand by default when no saved state exists');
 hasText('if (!hasSavedOpenState) openGroups.add(groupKey);', 'Doclist auto-expanded state should seed open-groups set on first grouping pass');
-hasText('// Timeline groups should start collapsed on each render.', 'Timeline groups should default to collapsed on render');
+notHas(/persistLiveTimelineGroups\(/, 'Timeline open-state persistence should be removed so timeline groups start collapsed on each render');
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
 has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');
 has(/function\s+timelineCacheKey\s*\(/, 'Timeline model should expose a cache key for memoization');

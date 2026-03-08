@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.72
+// @version      7.0.73
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.72';
+  const VERSION = '7.0.73';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -554,28 +554,6 @@
       topTitles,
     ];
     return parts.map((v) => normalize(String(v))).join('|');
-  }
-
-  function getTimelineOpenGroups(caseNo) {
-    // Timeline groups should start collapsed on each render.
-    return new Set();
-  }
-
-  function setTimelineOpenGroups(caseNo, groupSet) {
-    // Intentionally no-op: do not persist timeline open state.
-  }
-
-  function persistLiveTimelineGroups(caseNo) {
-    const b = runtime.body;
-    if (!b || runtime.activeView !== 'timeline') return;
-    const openGroups = getTimelineOpenGroups(caseNo);
-    b.querySelectorAll('details.epoRP-grp[data-group-key]').forEach((el) => {
-      const key = String(el.getAttribute('data-group-key') || '');
-      if (!key) return;
-      if (el.open) openGroups.add(key);
-      else openGroups.delete(key);
-    });
-    setTimelineOpenGroups(caseNo, openGroups);
   }
 
   function getDoclistOpenGroups(caseNo) {
@@ -4112,7 +4090,6 @@
 
     let insertedToday = false;
     const out = [];
-    const openGroups = getTimelineOpenGroups(caseNo);
 
     for (const item of items) {
       if (!insertedToday) {
@@ -4128,8 +4105,7 @@
       if (item.type === 'group') {
         const actorClass = item.actor === 'Applicant' ? 'actor-applicant' : item.actor === 'EPO' ? 'actor-epo' : item.actor === 'Third party' ? 'actor-third' : '';
         const groupKey = timelineGroupKey(caseNo, item);
-        const openAttr = openGroups.has(groupKey) ? ' open' : '';
-        out.push(`<details class="epoRP-grp" data-group-key="${esc(groupKey)}"${openAttr}>
+        out.push(`<details class="epoRP-grp" data-group-key="${esc(groupKey)}">
           <summary class="epoRP-grph">
             <div class="epoRP-dot ${esc(item.level || 'info')} ${esc(actorClass)}"></div>
             <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
@@ -4251,22 +4227,6 @@
     return panel;
   }
 
-  function wireTimeline(caseNo) {
-    const b = runtime.body;
-    if (!b) return;
-
-    const openGroups = getTimelineOpenGroups(caseNo);
-    b.querySelectorAll('details.epoRP-grp[data-group-key]').forEach((el) => {
-      el.addEventListener('toggle', () => {
-        const key = String(el.getAttribute('data-group-key') || '');
-        if (!key) return;
-        if (el.open) openGroups.add(key);
-        else openGroups.delete(key);
-        setTimelineOpenGroups(caseNo, openGroups);
-      });
-    });
-  }
-
   function wireOptions() {
     const b = runtime.body;
     if (!b) return;
@@ -4350,7 +4310,6 @@
     const previousView = runtime.activeView || 'overview';
     if (runtime.body && previousCaseNo && !runtime.collapsed) {
       setPanelScroll(previousCaseNo, previousView, runtime.body.scrollTop || 0);
-      if (previousView === 'timeline') persistLiveTimelineGroups(previousCaseNo);
     }
 
     const caseNo = detectAppNo();
@@ -4387,7 +4346,6 @@
     logViewContext(caseNo, activeView);
     if (activeView === 'timeline') {
       body.innerHTML = renderTimeline(caseNo);
-      wireTimeline(caseNo);
       restorePanelScroll(caseNo, activeView);
       return;
     }
@@ -4630,7 +4588,6 @@
 
     if (document.visibilityState === 'hidden') {
       persistCurrentPanelScroll();
-      if (runtime.appNo && runtime.activeView === 'timeline') persistLiveTimelineGroups(runtime.appNo);
       if (runtime.appNo) persistLiveDoclistGroups(runtime.appNo);
       return;
     }
@@ -4647,7 +4604,6 @@
       runtime.scrollSaveTimer = null;
     }
     persistCurrentPanelScroll();
-    if (runtime.appNo && runtime.activeView === 'timeline') persistLiveTimelineGroups(runtime.appNo);
     if (runtime.appNo) persistLiveDoclistGroups(runtime.appNo);
     flushNow();
   });

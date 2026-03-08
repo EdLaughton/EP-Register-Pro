@@ -25,9 +25,11 @@ for (const pdfHook of ['@grant        unsafeWindow', 'PDF_JS_CANDIDATES', 'OCR_T
   assert(src.includes(pdfHook), `Missing PDF diagnostics hook ${pdfHook}`);
 }
 
-for (const diagnosticsHook of ['sourceDiagnostics', 'autoPrefetchDoneByCase', 'lastRegisterTabByCase', 'SESSION_KEY', 'loadSessionJson', 'patchCaseSession', 'timelineAttorneyImportance', 'slice(-MAX_LOGS_PER_APP).reverse()', 'Case tab/page changed; auto prefetch skipped for this page session', 'Same-case tab switch detected: prefetch gate active', 'Same-case page reload detected: prefetch gate active', 'UPC registry check skipped: no EP publication numbers available', 'Intention to grant (R71(3) EPC)', 'Recovery options', 'const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;', 'Timeline groups should start collapsed on each render.']) {
+for (const diagnosticsHook of ['sourceDiagnostics', 'autoPrefetchDoneByCase', 'lastRegisterTabByCase', 'SESSION_KEY', 'loadSessionJson', 'patchCaseSession', 'timelineAttorneyImportance', 'slice(-MAX_LOGS_PER_APP).reverse()', 'Case tab/page changed; auto prefetch skipped for this page session', 'Same-case tab switch detected: prefetch gate active', 'Same-case page reload detected: prefetch gate active', 'UPC registry check skipped: no EP publication numbers available', 'Intention to grant (R71(3) EPC)', 'Recovery options', 'const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;']) {
   assert(src.includes(diagnosticsHook), `Missing diagnostics coverage hook ${diagnosticsHook}`);
 }
+
+assert(!src.includes('persistLiveTimelineGroups('), 'Timeline open-state persistence should be removed (timeline groups collapse by default)');
 
 assert(!src.includes('IPC/CPC'), 'IPC/CPC block should be removed from sidebar UI');
 
