@@ -96,6 +96,10 @@ has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-do
 has(/function\s+epRenewalDueDate\s*\(/, 'Renewal model should compute EP due dates from filing-anniversary month');
 has(/feeForum\s*=\s*'EPO central \(Unitary Patent\)'/, 'Renewal model should distinguish UP central-fee forum');
 has(/graceUntil\s*=\s*nextDue\s*\?\s*addMonths\(nextDue,\s*6\)\s*:\s*null;/, 'Renewal model should include 6-month grace-period calculation');
+has(/const\s+graceText\s*=\s*m\.renewal\.graceUntil[\s\S]*?`Grace until \$\{esc\(formatDate\(m\.renewal\.graceUntil\)\)\}/, 'Renewals overview should fold grace-period text into the next-due row');
+hasText('Latest paid event:', 'Renewals overview should surface latest renewal inside patent year status');
+notHas(/<div class="epoRP-l">Latest renewal<\/div>/, 'Renewals overview should not render a separate Latest renewal row');
+notHas(/<div class="epoRP-l">Grace period until<\/div>/, 'Renewals overview should not render a separate Grace period row');
 has(/return 'Post-publication';/, 'Stage mapping should avoid using "Published" as a stage label');
 has(/return 'Closed';/, 'Stage mapping should classify withdrawn/refused/revoked outcomes as Closed');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');

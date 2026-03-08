@@ -91,6 +91,11 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.46
+- Tidied the **Overview → Renewals** panel to reduce duplicate rows.
+- Folded latest paid renewal event into **Patent year status** and removed the separate **Latest renewal** line.
+- Merged grace-period timing into **Next fee year / due** for a more compact renewal summary.
+
 ### 7.0.45
 - Added a **Current option values** block in **Options** listing all sidebar parameters and their effective values.
 
