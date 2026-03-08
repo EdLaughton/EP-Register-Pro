@@ -17,6 +17,10 @@ for (const option of ['preloadAllTabs', 'showPublications', 'showEventHistory', 
   assert(src.includes(option), `Missing option ${option}`);
 }
 
+for (const diagnosticsHook of ['epoRP-log-console', 'epoRP-clear-logs', 'epoRP-optvals', 'renderOptionSnapshot']) {
+  assert(src.includes(diagnosticsHook), `Missing diagnostics hook ${diagnosticsHook}`);
+}
+
 assert(!src.includes('IPC/CPC'), 'IPC/CPC block should be removed from sidebar UI');
 
 console.log('userscript smoke checks passed');

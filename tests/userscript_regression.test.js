@@ -50,11 +50,18 @@ has(/id="epoRP-opt-legal-level"/, 'Timeline legal level selector missing from op
 
 // Options diagnostics console + effective key/value snapshot
 has(/function\s+renderLogConsole\s*\(caseNo\)/, 'Operation console renderer missing');
+has(/function\s+formatLogClock\s*\(/, 'Operation console should include timestamp formatter helper');
+has(/function\s+safeInlineJson\s*\(/, 'Operation console should include safe JSON serializer helper');
+has(/function\s+optionValueText\s*\(/, 'Option snapshot should include value-normalization helper');
+has(/function\s+renderOptions\s*\(caseNo\)/, 'Options renderer should accept caseNo to scope diagnostics to current case');
 has(/id="epoRP-log-console"/, 'Operation console container missing from options view');
 has(/id="epoRP-clear-logs"/, 'Clear operation console button missing from options view');
 has(/function\s+renderOptionSnapshot\s*\(/, 'Option snapshot renderer missing');
 has(/Object\.keys\(o\)\.sort\(/, 'Option snapshot should enumerate and sort all option keys');
 has(/id="epoRP-optvals"/, 'Option key/value list container missing from options view');
+has(/renderOptionSnapshot\(\)/, 'Options view should render option key/value snapshot output');
+has(/renderLogConsole\(caseNo\)/, 'Options view should render operation console scoped to current case');
+has(/b\.querySelector\('#epoRP-clear-logs'\)\?\.addEventListener\('click',\s*\(\)\s*=>\s*\{[\s\S]*?c\.logs\s*=\s*\[\];[\s\S]*?renderPanel\(\);[\s\S]*?\}\);/, 'Clear operation console control should empty case logs and rerender options');
 hasText('Current option values', 'Options view should show a section listing effective option values');
 
 // UI removals requested
