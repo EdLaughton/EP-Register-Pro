@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.71
+- Rebalanced communication-date extraction priority for OCR-derived letters:
+  - prioritizes central communication/header table date patterns (`Application No. / Ref. / Date` and `Date of communication` fields)
+  - keeps Registered Letter / EPO form stamp dates as lower-priority dispatch-proof context
+- This reduces risk of using dispatch/stamp dates when the communication table date is available.
+
 ### 7.0.70
 - Improved actionability heuristics for deemed-withdrawn / loss-of-rights postures:
   - classifies loss-of-rights style communications as EPO actions (avoids false applicant attribution)

@@ -84,8 +84,9 @@ hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-d
 hasText('categoryEvidence', 'PDF parse diagnostics should expose whether category came from text or document metadata');
 hasText('registeredLetterLine', 'PDF diagnostics should include captured Registered Letter line snippet');
 hasText('registeredLetterProofLine', 'PDF diagnostics should include captured Registered Letter proof-line snippet');
-hasText('Date extracted from line below "Registered Letter" in PDF', 'Communication date extraction should prioritize Registered Letter proof-line date when available');
-hasText('Date extracted from EPO form stamp near Registered Letter', 'Communication date extraction should use EPO form stamp date cues when available');
+hasText('Date extracted from Application/Ref/Date header table in PDF', 'Communication date extraction should prioritize central letter-header table date fields when available');
+hasText('Date extracted from line below "Registered Letter" in PDF (dispatch proof context)', 'Communication date extraction should still capture Registered Letter proof-line date as lower-priority dispatch evidence');
+hasText('Date extracted from EPO form stamp near Registered Letter (dispatch proof context)', 'Communication date extraction should keep EPO form stamp date cues as lower-priority dispatch evidence');
 hasText('PDF communication date differs from doclist date (using PDF date for deadline derivation)', 'PDF diagnostics should flag and prefer PDF communication date when it differs from doclist date');
 hasText('Default ${fallbackMonths}-month period inferred for ${category}', 'PDF parser should support conservative default response-period fallback when explicit month phrases are missing');
 hasText('Derived from fragmented phrase', 'PDF parser should detect fragmented month phrase patterns such as "of 4 months"');

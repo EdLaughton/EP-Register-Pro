@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.70
+// @version      7.0.71
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.70';
+  const VERSION = '7.0.71';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -2118,33 +2118,38 @@
       candidates.push({ dateStr, score, evidence });
     };
 
-    for (const m of textRaw.matchAll(/\bdate\b\s*[:\-]?\s*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
-      const idx = m.index || 0;
-      const snippet = textRaw.slice(Math.max(0, idx - 24), Math.min(textRaw.length, idx + String(m[0] || '').length + 24));
-      push(m[1], 125, 'Date field found in PDF communication header', snippet);
+    // Common letter header table: Application No. / Ref. / Date
+    for (const m of textRaw.matchAll(/application\s*no\.?[\s\S]{0,120}?\bref\.?[\s\S]{0,80}?\bdate\b[^\d]{0,16}(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 185, 'Date extracted from Application/Ref/Date header table in PDF');
     }
 
     for (const m of textRaw.matchAll(/(?:date\s+of\s+(?:this\s+)?(?:communication|notification|letter)[\s\S]{0,20}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
-      push(m[1], 140, 'Date of communication field found in PDF');
+      push(m[1], 180, 'Date of communication field found in PDF');
+    }
+
+    for (const m of textRaw.matchAll(/\bdate\b\s*[:\-]?\s*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      const idx = m.index || 0;
+      const snippet = textRaw.slice(Math.max(0, idx - 24), Math.min(textRaw.length, idx + String(m[0] || '').length + 24));
+      push(m[1], 150, 'Date field found in PDF communication header', snippet);
     }
 
     for (const m of textRaw.matchAll(/(?:communication(?:\s+pursuant\s+to[^\n]{0,40})?[^\n]{0,80}?\bdated\b[^\d]{0,12})(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
-      push(m[1], 115, 'Dated communication line found in PDF');
+      push(m[1], 145, 'Dated communication line found in PDF');
     }
 
     const registered = extractRegisteredLetterProofLine(textRaw);
     const proofDate = normalizeDateString(String(registered.proofLine || '').match(DATE_RE)?.[1] || '');
     if (proofDate) {
-      push(proofDate, 155, 'Date extracted from line below "Registered Letter" in PDF');
+      push(proofDate, 105, 'Date extracted from line below "Registered Letter" in PDF (dispatch proof context)');
     }
 
     const registeredLineDate = normalizeDateString(String(registered.registeredLetterLine || '').match(DATE_RE)?.[1] || '');
     if (registeredLineDate) {
-      push(registeredLineDate, 145, 'Date extracted from "Registered Letter" line in PDF');
+      push(registeredLineDate, 95, 'Date extracted from "Registered Letter" line in PDF (dispatch proof context)');
     }
 
     for (const m of textRaw.matchAll(/epo\s*form[^\n\r]{0,80}\((\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})\)/gi)) {
-      push(m[1], 150, 'Date extracted from EPO form stamp near Registered Letter');
+      push(m[1], 100, 'Date extracted from EPO form stamp near Registered Letter (dispatch proof context)');
     }
 
     if (docDateStr) {
