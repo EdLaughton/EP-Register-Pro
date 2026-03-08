@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.56
+// @version      7.0.57
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -9,6 +9,7 @@
 // @run-at       document-idle
 // @grant        GM_addStyle
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      unifiedpatentcourt.org
 // @connect      cdnjs.cloudflare.com
 // @connect      cdn.jsdelivr.net
@@ -22,7 +23,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.56';
+  const VERSION = '7.0.57';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1623,9 +1624,71 @@
     });
   }
 
+  function getUnsafeWindow() {
+    try {
+      return typeof unsafeWindow !== 'undefined' ? unsafeWindow : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function getPdfJsGlobal() {
+    const uw = getUnsafeWindow();
+    const candidates = [
+      window?.pdfjsLib,
+      globalThis?.pdfjsLib,
+      window?.['pdfjs-dist/build/pdf'],
+      globalThis?.['pdfjs-dist/build/pdf'],
+      uw?.pdfjsLib,
+      uw?.['pdfjs-dist/build/pdf'],
+    ];
+    return candidates.find((lib) => lib && typeof lib.getDocument === 'function') || null;
+  }
+
+  function clearPdfJsGlobals() {
+    const uw = getUnsafeWindow();
+    const holders = [window, globalThis, uw].filter(Boolean);
+    for (const holder of holders) {
+      if (holder.pdfjsLib && typeof holder.pdfjsLib.getDocument !== 'function') {
+        try { delete holder.pdfjsLib; } catch { holder.pdfjsLib = undefined; }
+      }
+      if (holder['pdfjs-dist/build/pdf'] && typeof holder['pdfjs-dist/build/pdf'].getDocument !== 'function') {
+        try { delete holder['pdfjs-dist/build/pdf']; } catch { holder['pdfjs-dist/build/pdf'] = undefined; }
+      }
+    }
+  }
+
+  function registerPdfJsGlobal(lib) {
+    if (!lib || typeof lib.getDocument !== 'function') return null;
+    const uw = getUnsafeWindow();
+    try { window.pdfjsLib = lib; } catch {}
+    try { globalThis.pdfjsLib = lib; } catch {}
+    if (uw) {
+      try { uw.pdfjsLib = lib; } catch {}
+    }
+    return lib;
+  }
+
   function evaluateExternalScriptCode(code, label = 'external-script') {
     const source = `${String(code || '')}\n//# sourceURL=${label}.js`;
     let lastError = null;
+
+    const existing = getPdfJsGlobal();
+    if (existing) return existing;
+
+    try {
+      // eslint-disable-next-line no-new-func
+      const commonJsRunner = new Function('window', 'globalThis', 'self', `${source}\nreturn (typeof module !== 'undefined' && module && module.exports) ? module.exports : null;`);
+      const mod = commonJsRunner(window, globalThis, self);
+      const lib = mod && typeof mod.getDocument === 'function'
+        ? mod
+        : (mod?.pdfjsLib && typeof mod.pdfjsLib.getDocument === 'function')
+          ? mod.pdfjsLib
+          : null;
+      if (lib) return registerPdfJsGlobal(lib);
+    } catch (error) {
+      lastError = error;
+    }
 
     try {
       // eslint-disable-next-line no-new-func
@@ -1634,7 +1697,8 @@
       lastError = error;
     }
 
-    if (window.pdfjsLib?.getDocument) return true;
+    const afterFunction = getPdfJsGlobal();
+    if (afterFunction) return registerPdfJsGlobal(afterFunction);
 
     try {
       // eslint-disable-next-line no-eval
@@ -1643,7 +1707,8 @@
       lastError = error;
     }
 
-    if (window.pdfjsLib?.getDocument) return true;
+    const afterEval = getPdfJsGlobal();
+    if (afterEval) return registerPdfJsGlobal(afterEval);
 
     try {
       const root = document.head || document.documentElement || document.body;
@@ -1656,13 +1721,15 @@
       lastError = error;
     }
 
-    if (window.pdfjsLib?.getDocument) return true;
+    const afterInlineScript = getPdfJsGlobal();
+    if (afterInlineScript) return registerPdfJsGlobal(afterInlineScript);
     if (lastError) throw lastError;
-    throw new Error('Script evaluated but pdf.js global was not exposed');
+    throw new Error('Script evaluated but pdf.js global/module was not exposed');
   }
 
   async function ensurePdfJs(signal) {
-    if (window.pdfjsLib?.getDocument) return window.pdfjsLib;
+    const existing = getPdfJsGlobal();
+    if (existing) return existing;
     if (runtime.pdfjsPromise) return runtime.pdfjsPromise;
 
     runtime.pdfjsPromise = (async () => {
@@ -1671,9 +1738,7 @@
       for (const candidate of PDF_JS_CANDIDATES) {
         if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
-        if (window.pdfjsLib && !window.pdfjsLib.getDocument) {
-          try { delete window.pdfjsLib; } catch { window.pdfjsLib = undefined; }
-        }
+        clearPdfJsGlobals();
 
         try {
           const code = await loadExternalScriptText(candidate.lib, signal);
@@ -1681,19 +1746,20 @@
           if (!code || code.length < 1000 || /<html|<!doctype/i.test(head)) {
             throw new Error('non-script payload received');
           }
-          evaluateExternalScriptCode(code, `eporp-pdfjs-${candidate.id}-text`);
-          if (!window.pdfjsLib?.getDocument) throw new Error('pdf.js global not available after text load/eval');
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc = candidate.worker;
-          return window.pdfjsLib;
+          const lib = evaluateExternalScriptCode(code, `eporp-pdfjs-${candidate.id}-text`);
+          if (!lib?.getDocument) throw new Error('pdf.js global not available after text load/eval');
+          lib.GlobalWorkerOptions.workerSrc = candidate.worker;
+          return registerPdfJsGlobal(lib);
         } catch (error) {
           errors.push(`${candidate.id}/text: ${error?.message || error}`);
         }
 
         try {
           await loadExternalScriptTag(candidate.lib, signal);
-          if (!window.pdfjsLib?.getDocument) throw new Error('pdf.js global not available after script-tag load');
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc = candidate.worker;
-          return window.pdfjsLib;
+          const lib = getPdfJsGlobal();
+          if (!lib?.getDocument) throw new Error('pdf.js global not available after script-tag load');
+          lib.GlobalWorkerOptions.workerSrc = candidate.worker;
+          return registerPdfJsGlobal(lib);
         } catch (error) {
           errors.push(`${candidate.id}/tag: ${error?.message || error}`);
         }

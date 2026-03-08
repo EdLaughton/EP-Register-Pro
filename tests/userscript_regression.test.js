@@ -38,7 +38,12 @@ has(/function\s+persistLiveDoclistGroups\s*\(/, 'Doclist open-group persistence 
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
 has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');
 has(/function\s+timelineCacheKey\s*\(/, 'Timeline model should expose a cache key for memoization');
+has(/@grant\s+unsafeWindow/, 'Userscript metadata should grant unsafeWindow for sandbox/page pdf.js bridging');
 has(/const\s+PDF_JS_CANDIDATES\s*=\s*\[/, 'PDF parser should define multi-CDN loader candidates');
+has(/function\s+getUnsafeWindow\s*\(/, 'PDF parser should expose unsafeWindow bridge helper');
+has(/function\s+getPdfJsGlobal\s*\(/, 'PDF parser should resolve pdf.js globals across sandbox/page scopes');
+has(/function\s+clearPdfJsGlobals\s*\(/, 'PDF parser should clear stale pdf.js globals before retries');
+has(/function\s+registerPdfJsGlobal\s*\(/, 'PDF parser should normalize discovered pdf.js globals back into known scope');
 has(/function\s+ensurePdfJs\s*\(/, 'PDF parser loader helper missing');
 has(/function\s+loadExternalScriptTag\s*\(/, 'PDF parser should support script-tag fallback loading');
 has(/function\s+evaluateExternalScriptCode\s*\(/, 'PDF parser should support multi-strategy script evaluation fallback');

@@ -21,7 +21,7 @@ for (const diagnosticsHook of ['epoRP-log-console', 'epoRP-clear-logs', 'epoRP-o
   assert(src.includes(diagnosticsHook), `Missing diagnostics hook ${diagnosticsHook}`);
 }
 
-for (const pdfHook of ['PDF_JS_CANDIDATES', 'loadExternalScriptTag', 'evaluateExternalScriptCode', 'extractRegisteredLetterProofLine', 'normalizePdfDocumentUrl', 'PDF parse diagnostics', 'PDF proof line (below "Registered Letter")']) {
+for (const pdfHook of ['@grant        unsafeWindow', 'PDF_JS_CANDIDATES', 'getPdfJsGlobal', 'registerPdfJsGlobal', 'loadExternalScriptTag', 'evaluateExternalScriptCode', 'extractRegisteredLetterProofLine', 'normalizePdfDocumentUrl', 'PDF parse diagnostics', 'PDF proof line (below "Registered Letter")']) {
   assert(src.includes(pdfHook), `Missing PDF diagnostics hook ${pdfHook}`);
 }
 

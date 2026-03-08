@@ -91,6 +91,13 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.57
+- Improved pdf.js compatibility in Tampermonkey sandbox contexts:
+  - Added `unsafeWindow` bridge support for detecting/registering `pdfjsLib` globals across sandbox/page scopes.
+  - Added resilient global detection (`window`, `globalThis`, `unsafeWindow`, UMD key variants).
+  - Added CommonJS/UMD-aware evaluation fallback to capture module-style exports when no window-global is emitted.
+  - Kept multi-CDN and script-tag fallback behavior.
+
 ### 7.0.56
 - Fixed same-case tab-switch gate detection across full Register page reloads.
   - Gate logs now correctly classify:
