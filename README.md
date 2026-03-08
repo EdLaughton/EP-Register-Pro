@@ -94,6 +94,13 @@ node tests/userscript_lifecycle.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.83
+- Fifth-pass maintainability refactor:
+  - split deadline derivation into focused helper stages (`buildDeadlineComputationContext`, PDF/core/PCT/post-grant/reference appenders) so `inferProceduralDeadlines()` is no longer one monolith
+  - split PDF deadline refresh into candidate selection, per-document scanning, status derivation, and summary helpers
+  - split doclist grouping into filter setup, row modelling, run building, and per-group DOM wiring helpers
+  - kept behavior stable and extended lifecycle structural coverage for the new helper boundaries
+
 ### 7.0.82
 - Fourth-pass maintainability refactor:
   - centralized case-source reads behind `caseSnapshot()` / `caseSourceData()` / `caseDocs()` helpers

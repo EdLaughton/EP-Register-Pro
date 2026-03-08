@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.82
+// @version      7.0.83
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.82';
+  const VERSION = '7.0.83';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1364,6 +1364,145 @@
     return `${rows.length}|${sample}`;
   }
 
+  function ensureDoclistFilterWrap(table) {
+    let filterWrap = document.getElementById('epoRP-doclist-filter-wrap');
+    if (filterWrap) return filterWrap;
+
+    filterWrap = document.createElement('div');
+    filterWrap.id = 'epoRP-doclist-filter-wrap';
+    filterWrap.className = 'epoRP-doclist-filter-wrap';
+    filterWrap.innerHTML = `<input id="epoRP-doclist-filter" class="epoRP-doclist-filter" placeholder="Filter documents by name…" />`;
+    table.parentElement?.insertBefore(filterWrap, table);
+    filterWrap.querySelector('#epoRP-doclist-filter')?.addEventListener('input', (event) => {
+      const liveTable = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
+      if (!liveTable) return;
+      applyDoclistFilter(liveTable, event.target.value || '');
+    });
+    return filterWrap;
+  }
+
+  function resetDoclistGrouping(table) {
+    table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
+    table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
+      row.classList.remove('epoRP-docgrp-item', 'collapsed', 'epoRP-filter-hidden', 'epoRP-docgrp-open', 'epoRP-docgrp-last');
+      row.removeAttribute('data-eporp-group');
+    });
+  }
+
+  function doclistRowModels(rows) {
+    const rowModels = [];
+    for (const row of rows) {
+      const cells = [...row.querySelectorAll('td')];
+      if (!cells.length) continue;
+      const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[1] || cells[0] || row);
+      const rowText = text(row);
+      const dateStr = rowText.match(DATE_RE)?.[1] || '';
+      const bundle = classifyDocument(title, rowText).bundle || 'Other';
+      rowModels.push({ row, title, dateStr, rowText, bundle });
+    }
+    return rowModels;
+  }
+
+  function normalizeGrantPackageRowModels(rowModels) {
+    for (const model of rowModels) {
+      if (!/bibliographic data of the european patent application/i.test(model.title || '')) continue;
+      const sameDateGrantSignals = rowModels.some((other) => {
+        if (other === model) return false;
+        if (other.dateStr !== model.dateStr) return false;
+        return /intention to grant|rule\s*71\(3\)|text intended for grant|communication about intention to grant|annex to the communication about intention to grant/i.test(other.title || '');
+      });
+      if (sameDateGrantSignals) model.bundle = 'Grant package';
+    }
+    return rowModels;
+  }
+
+  function doclistRuns(rowModels) {
+    const runs = [];
+    let run = null;
+    for (const model of rowModels) {
+      if (!run || run.bundle !== model.bundle) {
+        run = { bundle: model.bundle, rows: [model.row] };
+        runs.push(run);
+      } else {
+        run.rows.push(model.row);
+      }
+    }
+    return runs;
+  }
+
+  function attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState) {
+    const groupId = `g${gid}`;
+    const groupKey = doclistGroupKey(caseNo, run.bundle, gid);
+    const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;
+    if (!hasSavedOpenState) openGroups.add(groupKey);
+    const firstRow = run.rows[0];
+    const cells = [...firstRow.querySelectorAll('td')];
+
+    const headerRow = document.createElement('tr');
+    headerRow.className = 'epoRP-docgrp';
+    headerRow.classList.toggle('open', isOpen);
+
+    const td = document.createElement('td');
+    td.colSpan = Math.max(1, cells.length);
+    const bundleLabel = doclistBundleLabel(run.bundle);
+    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)} (${run.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
+    headerRow.appendChild(td);
+    firstRow.parentElement?.insertBefore(headerRow, firstRow);
+
+    const rowCheckboxes = [];
+    run.rows.forEach((row, idx) => {
+      row.setAttribute('data-eporp-group', groupId);
+      row.classList.add('epoRP-docgrp-item');
+      row.classList.toggle('collapsed', !isOpen);
+      row.classList.toggle('epoRP-docgrp-open', isOpen);
+      row.classList.toggle('epoRP-docgrp-last', idx === run.rows.length - 1);
+      const cb = row.querySelector("input[type='checkbox']");
+      if (cb) rowCheckboxes.push(cb);
+    });
+
+    const button = td.querySelector('button.epoRP-docgrp-btn');
+    const headerCheckbox = td.querySelector('input.epoRP-docgrp-check');
+
+    const syncHeaderCheckbox = () => {
+      if (!headerCheckbox || !rowCheckboxes.length) return;
+      const checked = rowCheckboxes.filter((cb) => !!cb.checked).length;
+      headerCheckbox.indeterminate = checked > 0 && checked < rowCheckboxes.length;
+      headerCheckbox.checked = checked > 0 && checked === rowCheckboxes.length;
+    };
+
+    if (button) {
+      button.addEventListener('click', (event) => {
+        const btn = event.currentTarget;
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        const nextExpanded = !expanded;
+        btn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+        headerRow.classList.toggle('open', nextExpanded);
+        for (const row of run.rows) {
+          row.classList.toggle('collapsed', !nextExpanded);
+          row.classList.toggle('epoRP-docgrp-open', nextExpanded);
+        }
+        if (nextExpanded) openGroups.add(groupKey);
+        else openGroups.delete(groupKey);
+        if (caseNo) setDoclistOpenGroups(caseNo, openGroups);
+      });
+    }
+
+    if (headerCheckbox) {
+      headerCheckbox.addEventListener('change', () => {
+        const shouldCheck = !!headerCheckbox.checked;
+        for (const cb of rowCheckboxes) {
+          if (cb.checked === shouldCheck) continue;
+          cb.checked = shouldCheck;
+          cb.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        syncHeaderCheckbox();
+      });
+    }
+
+    rowCheckboxes.forEach((cb) => cb.addEventListener('change', syncHeaderCheckbox));
+    syncHeaderCheckbox();
+  }
+
   function enhanceDoclistGrouping() {
     if (tabSlug() !== 'doclist') return;
 
@@ -1371,20 +1510,7 @@
     const table = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
     if (!table) return;
 
-    let filterWrap = document.getElementById('epoRP-doclist-filter-wrap');
-    if (!filterWrap) {
-      filterWrap = document.createElement('div');
-      filterWrap.id = 'epoRP-doclist-filter-wrap';
-      filterWrap.className = 'epoRP-doclist-filter-wrap';
-      filterWrap.innerHTML = `<input id="epoRP-doclist-filter" class="epoRP-doclist-filter" placeholder="Filter documents by name…" />`;
-      table.parentElement?.insertBefore(filterWrap, table);
-      filterWrap.querySelector('#epoRP-doclist-filter')?.addEventListener('input', (event) => {
-        const liveTable = bestTable(document, ['date', 'document']) || bestTable(document, ['document type']);
-        if (!liveTable) return;
-        applyDoclistFilter(liveTable, event.target.value || '');
-      });
-    }
-
+    const filterWrap = ensureDoclistFilterWrap(table);
     const currentQuery = (filterWrap.querySelector('#epoRP-doclist-filter')?.value || '');
     const signature = doclistGroupingSignature(table);
 
@@ -1398,127 +1524,23 @@
     const doclistOpenByCase = uiState().doclistOpenByCase || {};
     const hasSavedOpenState = Array.isArray(doclistOpenByCase[caseNo]);
 
-    table.querySelectorAll('tr.epoRP-docgrp').forEach((row) => row.remove());
-    table.querySelectorAll('tr[data-eporp-group]').forEach((row) => {
-      row.classList.remove('epoRP-docgrp-item', 'collapsed', 'epoRP-filter-hidden', 'epoRP-docgrp-open', 'epoRP-docgrp-last');
-      row.removeAttribute('data-eporp-group');
-    });
+    resetDoclistGrouping(table);
 
     const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
     const groupable = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
-
-    const rowModels = [];
-    for (const row of rows) {
-      const cells = [...row.querySelectorAll('td')];
-      if (!cells.length) continue;
-      const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[1] || cells[0] || row);
-      const rowText = text(row);
-      const dateStr = rowText.match(DATE_RE)?.[1] || '';
-      const bundle = classifyDocument(title, rowText).bundle || 'Other';
-      rowModels.push({ row, title, dateStr, rowText, bundle });
-    }
-
-    for (const model of rowModels) {
-      if (!/bibliographic data of the european patent application/i.test(model.title || '')) continue;
-      const sameDateGrantSignals = rowModels.some((other) => {
-        if (other === model) return false;
-        if (other.dateStr !== model.dateStr) return false;
-        return /intention to grant|rule\s*71\(3\)|text intended for grant|communication about intention to grant|annex to the communication about intention to grant/i.test(other.title || '');
-      });
-      if (sameDateGrantSignals) model.bundle = 'Grant package';
-    }
-
-    const runs = [];
-    let run = null;
-
-    for (const model of rowModels) {
-      if (!run || run.bundle !== model.bundle) {
-        run = { bundle: model.bundle, rows: [model.row] };
-        runs.push(run);
-      } else {
-        run.rows.push(model.row);
-      }
-    }
+    const runs = doclistRuns(normalizeGrantPackageRowModels(doclistRowModels(rows)));
 
     let gid = 0;
-    for (const r of runs) {
-      if (!groupable.has(r.bundle) || r.rows.length < 2) continue;
+    for (const run of runs) {
+      if (!groupable.has(run.bundle) || run.rows.length < 2) continue;
       gid += 1;
-      const groupId = `g${gid}`;
-      const groupKey = doclistGroupKey(caseNo, r.bundle, gid);
-      const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;
-      if (!hasSavedOpenState) openGroups.add(groupKey);
-      const firstRow = r.rows[0];
-      const cells = [...firstRow.querySelectorAll('td')];
-
-      const headerRow = document.createElement('tr');
-      headerRow.className = 'epoRP-docgrp';
-      headerRow.classList.toggle('open', isOpen);
-
-      const td = document.createElement('td');
-      td.colSpan = Math.max(1, cells.length);
-      const bundleLabel = doclistBundleLabel(r.bundle);
-      td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
-      headerRow.appendChild(td);
-      firstRow.parentElement?.insertBefore(headerRow, firstRow);
-
-      const rowCheckboxes = [];
-      r.rows.forEach((row, idx) => {
-        row.setAttribute('data-eporp-group', groupId);
-        row.classList.add('epoRP-docgrp-item');
-        row.classList.toggle('collapsed', !isOpen);
-        row.classList.toggle('epoRP-docgrp-open', isOpen);
-        row.classList.toggle('epoRP-docgrp-last', idx === r.rows.length - 1);
-        const cb = row.querySelector("input[type='checkbox']");
-        if (cb) rowCheckboxes.push(cb);
-      });
-
-      const button = td.querySelector('button.epoRP-docgrp-btn');
-      const headerCheckbox = td.querySelector('input.epoRP-docgrp-check');
-
-      const syncHeaderCheckbox = () => {
-        if (!headerCheckbox || !rowCheckboxes.length) return;
-        const checked = rowCheckboxes.filter((cb) => !!cb.checked).length;
-        headerCheckbox.indeterminate = checked > 0 && checked < rowCheckboxes.length;
-        headerCheckbox.checked = checked > 0 && checked === rowCheckboxes.length;
-      };
-
-      if (button) {
-        button.addEventListener('click', (event) => {
-          const btn = event.currentTarget;
-          const expanded = btn.getAttribute('aria-expanded') === 'true';
-          const nextExpanded = !expanded;
-          btn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
-          headerRow.classList.toggle('open', nextExpanded);
-          for (const row of r.rows) {
-            row.classList.toggle('collapsed', !nextExpanded);
-            row.classList.toggle('epoRP-docgrp-open', nextExpanded);
-          }
-          if (nextExpanded) openGroups.add(groupKey);
-          else openGroups.delete(groupKey);
-          if (caseNo) setDoclistOpenGroups(caseNo, openGroups);
-        });
-      }
-
-      if (headerCheckbox) {
-        headerCheckbox.addEventListener('change', () => {
-          const shouldCheck = !!headerCheckbox.checked;
-          for (const cb of rowCheckboxes) {
-            if (cb.checked === shouldCheck) continue;
-            cb.checked = shouldCheck;
-            cb.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-          syncHeaderCheckbox();
-        });
-      }
-
-      rowCheckboxes.forEach((cb) => cb.addEventListener('change', syncHeaderCheckbox));
-      syncHeaderCheckbox();
+      attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState);
     }
 
     runtime.doclistGroupSigByCase[caseNo] = signature;
     applyDoclistFilter(table, currentQuery);
   }
+
 
   function parseDatedRows(doc, url) {
     const rows = [];
@@ -3005,27 +3027,8 @@
     throw new Error('Invalid PDF structure (HTML payload without readable text)');
   }
 
-  async function refreshPdfDeadlines(caseNo, signal, force = false) {
-    if (!caseNo) return;
-    const c = getCase(caseNo);
-    const dependencyStamp = derivedDependencyStamp(caseNo, 'pdfDeadlines');
-    const cached = c.sources.pdfDeadlines;
-    if (!force && isFresh(cached, options().refreshHours, { allowEmpty: true, dependencyStamp })) return;
-
-    const docs = [...(c.sources.doclist?.data?.docs || [])].sort(compareDateDesc);
-    if (!docs.length) {
-      storeCaseSource(caseNo, 'pdfDeadlines', {
-        title: 'PDF-derived deadlines',
-        status: 'empty',
-        transport: 'fetch+pdfjs',
-        dependencyStamp,
-        data: { hints: [], scanned: [] },
-      });
-      addLog(caseNo, 'info', 'PDF deadline scan skipped: doclist cache is empty', { source: 'pdfDeadlines' });
-      return;
-    }
-
-    const candidates = docs.filter((d) => {
+  function pdfDeadlineCandidates(docs = []) {
+    return docs.filter((d) => {
       const actor = String(d.actor || '').toLowerCase();
       const text = normalize(`${d.title || ''} ${d.procedure || ''}`).toLowerCase();
       if (!text) return false;
@@ -3037,14 +3040,184 @@
       if (communicationSignal && actor !== 'applicant') return true;
       return false;
     }).slice(0, 8);
-    if (!candidates.length) {
-      storeCaseSource(caseNo, 'pdfDeadlines', {
-        title: 'PDF-derived deadlines',
-        status: 'empty',
-        transport: 'fetch+pdfjs',
-        dependencyStamp,
-        data: { hints: [], scanned: [] },
+  }
+
+  function storePdfDeadlineSource(caseNo, dependencyStamp, status, data = { hints: [], scanned: [] }, error = '') {
+    storeCaseSource(caseNo, 'pdfDeadlines', {
+      title: 'PDF-derived deadlines',
+      status,
+      transport: 'fetch+pdfjs',
+      dependencyStamp,
+      error,
+      data,
+    });
+  }
+
+  function derivePdfDeadlineStatus(hints, scanned, successfulCandidates) {
+    if ((hints || []).length) return 'ok';
+    if ((successfulCandidates || 0) > 0 || (scanned || []).length > 0) return 'empty';
+    return 'error';
+  }
+
+  function buildPdfDeadlineSummary(scanned, successfulCandidates, failedCandidates) {
+    return {
+      scannedDocs: scanned.length,
+      successfulCandidates,
+      failedCandidates,
+      withHints: scanned.filter((x) => (x.hintCount || 0) > 0).length,
+      withCommunicationDate: scanned.filter((x) => !!x.communicationDate).length,
+      withResponsePeriod: scanned.filter((x) => Number(x.responseMonths || 0) > 0).length,
+      withProofLine: scanned.filter((x) => !!x.registeredLetterProofLine).length,
+      withOcr: scanned.filter((x) => !!x.usedOcr).length,
+    };
+  }
+
+  async function scanPdfDeadlineCandidate(caseNo, doc, signal, pdfjs) {
+    addLog(caseNo, 'info', 'PDF candidate scan start', { source: 'pdfDeadlines', doc: doc.title || '', docDate: doc.dateStr || '' });
+
+    const resolvedUrl = await resolvePdfUrl(doc.url, signal);
+    if (!resolvedUrl) {
+      addLog(caseNo, 'warn', 'PDF URL could not be resolved from document page', {
+        source: 'pdfDeadlines',
+        doc: doc.title || '',
+        docUrl: doc.url || '',
+        normalizedDocUrl: normalizePdfDocumentUrl(doc.url || ''),
       });
+      return { scanSucceeded: false, parsedHints: [], scannedEntry: null };
+    }
+
+    const extracted = await extractPdfText(resolvedUrl, signal, pdfjs);
+    const text = normalize(String(extracted?.text || ''));
+    const parseTransport = String(extracted?.transport || 'unknown');
+    const parseUrl = String(extracted?.resolvedUrl || resolvedUrl);
+
+    if (extracted?.usedOcr) {
+      addLog(caseNo, 'ok', 'PDF OCR fallback used', {
+        source: 'pdfDeadlines',
+        doc: doc.title || '',
+        url: parseUrl,
+        transport: parseTransport,
+        ocrPages: Number(extracted?.ocrPages || 0),
+      });
+    }
+
+    if (!text) {
+      addLog(caseNo, 'warn', 'PDF opened but extracted text was empty', { source: 'pdfDeadlines', doc: doc.title || '', url: parseUrl, transport: parseTransport });
+      return { scanSucceeded: true, parsedHints: [], scannedEntry: null };
+    }
+
+    if (!extracted?.isPdf) {
+      addLog(caseNo, 'warn', 'PDF binary unavailable; using HTML fallback text extraction', {
+        source: 'pdfDeadlines',
+        doc: doc.title || '',
+        url: parseUrl,
+        transport: parseTransport,
+      });
+    }
+
+    const parsed = parsePdfDeadlineHints(text, {
+      docDateStr: doc.dateStr,
+      docTitle: doc.title,
+      docProcedure: doc.procedure,
+    });
+    const parsedHints = Array.isArray(parsed?.hints) ? parsed.hints : [];
+    const diagnostics = parsed?.diagnostics || {};
+
+    const proofLine = normalize(diagnostics.registeredLetterProofLine || '');
+    addLog(caseNo, proofLine ? 'ok' : 'warn', `PDF proof line (below "Registered Letter"): ${proofLine || 'not found'}`, {
+      source: 'pdfDeadlines',
+      doc: doc.title || '',
+      docDate: doc.dateStr || '',
+      transport: parseTransport,
+      url: parseUrl,
+    });
+
+    addLog(caseNo, 'info', 'PDF parse diagnostics', {
+      source: 'pdfDeadlines',
+      doc: doc.title || '',
+      transport: parseTransport,
+      url: parseUrl,
+      usedOcr: !!extracted?.usedOcr,
+      ocrPages: Number(extracted?.ocrPages || 0),
+      category: diagnostics.category || '',
+      categoryEvidence: diagnostics.categoryEvidence || '',
+      communicationDate: diagnostics.communicationDate || '',
+      communicationEvidence: diagnostics.communicationEvidence || '',
+      responseMonths: Number(diagnostics.responseMonths || 0),
+      responseEvidence: diagnostics.responseEvidence || '',
+      explicitDeadlineDate: diagnostics.explicitDeadlineDate || '',
+      explicitDeadlineEvidence: diagnostics.explicitDeadlineEvidence || '',
+      registeredLetterLine: String(diagnostics.registeredLetterLine || '').slice(0, 180),
+      registeredLetterProofLine: String(diagnostics.registeredLetterProofLine || '').slice(0, 180),
+      textChars: text.length,
+    });
+
+    const doclistDate = normalizeDateString(doc.dateStr || '');
+    const commDate = normalizeDateString(diagnostics.communicationDate || '');
+    if (doclistDate && commDate && doclistDate !== commDate) {
+      addLog(caseNo, 'warn', 'PDF communication date differs from doclist date (using PDF date for deadline derivation)', {
+        source: 'pdfDeadlines',
+        doc: doc.title || '',
+        doclistDate,
+        pdfCommunicationDate: commDate,
+      });
+    }
+
+    if (parsedHints.length) {
+      addLog(caseNo, 'ok', `PDF deadline hints parsed: ${parsedHints.length}`, {
+        source: 'pdfDeadlines',
+        doc: doc.title || '',
+        transport: parseTransport,
+        url: parseUrl,
+        hints: parsedHints.map((h) => `${h.label}=${h.dateStr}`),
+      });
+    } else {
+      addLog(caseNo, 'info', 'PDF opened but no deadline hint produced for this document', {
+        source: 'pdfDeadlines',
+        doc: doc.title || '',
+        transport: parseTransport,
+        url: parseUrl,
+        category: diagnostics.category || '',
+      });
+    }
+
+    return {
+      scanSucceeded: true,
+      parsedHints,
+      scannedEntry: {
+        title: doc.title,
+        dateStr: doc.dateStr,
+        url: parseUrl,
+        transport: parseTransport,
+        usedOcr: !!extracted?.usedOcr,
+        ocrPages: Number(extracted?.ocrPages || 0),
+        hintCount: parsedHints.length,
+        category: String(diagnostics.category || ''),
+        communicationDate: String(diagnostics.communicationDate || ''),
+        responseMonths: Number(diagnostics.responseMonths || 0),
+        explicitDeadlineDate: String(diagnostics.explicitDeadlineDate || ''),
+        registeredLetterProofLine: proofLine,
+      },
+    };
+  }
+
+  async function refreshPdfDeadlines(caseNo, signal, force = false) {
+    if (!caseNo) return;
+    const c = getCase(caseNo);
+    const dependencyStamp = derivedDependencyStamp(caseNo, 'pdfDeadlines');
+    const cached = c.sources.pdfDeadlines;
+    if (!force && isFresh(cached, options().refreshHours, { allowEmpty: true, dependencyStamp })) return;
+
+    const docs = caseDocs(c);
+    if (!docs.length) {
+      storePdfDeadlineSource(caseNo, dependencyStamp, 'empty');
+      addLog(caseNo, 'info', 'PDF deadline scan skipped: doclist cache is empty', { source: 'pdfDeadlines' });
+      return;
+    }
+
+    const candidates = pdfDeadlineCandidates(docs);
+    if (!candidates.length) {
+      storePdfDeadlineSource(caseNo, dependencyStamp, 'empty');
       addLog(caseNo, 'info', 'PDF deadline scan skipped: no communication-type documents found', { source: 'pdfDeadlines' });
       return;
     }
@@ -3056,14 +3229,7 @@
     } catch (error) {
       const errText = String(error?.message || error || 'unknown error');
       addLog(caseNo, 'error', `PDF parser unavailable: ${errText}`, { source: 'pdfDeadlines' });
-      storeCaseSource(caseNo, 'pdfDeadlines', {
-        title: 'PDF-derived deadlines',
-        status: 'error',
-        transport: 'fetch+pdfjs',
-        dependencyStamp,
-        error: errText,
-        data: { hints: [], scanned: [] },
-      });
+      storePdfDeadlineSource(caseNo, dependencyStamp, 'error', { hints: [], scanned: [] }, errText);
       addLog(caseNo, 'warn', 'PDF deadline parse aborted (parser engine unavailable)', { source: 'pdfDeadlines' });
       return;
     }
@@ -3077,130 +3243,10 @@
     for (const doc of candidates) {
       if (signal?.aborted) return;
       try {
-        addLog(caseNo, 'info', 'PDF candidate scan start', { source: 'pdfDeadlines', doc: doc.title || '', docDate: doc.dateStr || '' });
-
-        const resolvedUrl = await resolvePdfUrl(doc.url, signal);
-        if (!resolvedUrl) {
-          addLog(caseNo, 'warn', 'PDF URL could not be resolved from document page', {
-            source: 'pdfDeadlines',
-            doc: doc.title || '',
-            docUrl: doc.url || '',
-            normalizedDocUrl: normalizePdfDocumentUrl(doc.url || ''),
-          });
-          continue;
-        }
-
-        const extracted = await extractPdfText(resolvedUrl, signal, pdfjs);
-        const text = normalize(String(extracted?.text || ''));
-        const parseTransport = String(extracted?.transport || 'unknown');
-        const parseUrl = String(extracted?.resolvedUrl || resolvedUrl);
-        successfulCandidates += 1;
-
-        if (extracted?.usedOcr) {
-          addLog(caseNo, 'ok', 'PDF OCR fallback used', {
-            source: 'pdfDeadlines',
-            doc: doc.title || '',
-            url: parseUrl,
-            transport: parseTransport,
-            ocrPages: Number(extracted?.ocrPages || 0),
-          });
-        }
-
-        if (!text) {
-          addLog(caseNo, 'warn', 'PDF opened but extracted text was empty', { source: 'pdfDeadlines', doc: doc.title || '', url: parseUrl, transport: parseTransport });
-          continue;
-        }
-
-        if (!extracted?.isPdf) {
-          addLog(caseNo, 'warn', 'PDF binary unavailable; using HTML fallback text extraction', {
-            source: 'pdfDeadlines',
-            doc: doc.title || '',
-            url: parseUrl,
-            transport: parseTransport,
-          });
-        }
-
-        const parsed = parsePdfDeadlineHints(text, {
-          docDateStr: doc.dateStr,
-          docTitle: doc.title,
-          docProcedure: doc.procedure,
-        });
-        const parsedHints = Array.isArray(parsed?.hints) ? parsed.hints : [];
-        const diagnostics = parsed?.diagnostics || {};
-
-        const proofLine = normalize(diagnostics.registeredLetterProofLine || '');
-        addLog(caseNo, proofLine ? 'ok' : 'warn', `PDF proof line (below "Registered Letter"): ${proofLine || 'not found'}`, {
-          source: 'pdfDeadlines',
-          doc: doc.title || '',
-          docDate: doc.dateStr || '',
-          transport: parseTransport,
-          url: parseUrl,
-        });
-
-        addLog(caseNo, 'info', 'PDF parse diagnostics', {
-          source: 'pdfDeadlines',
-          doc: doc.title || '',
-          transport: parseTransport,
-          url: parseUrl,
-          usedOcr: !!extracted?.usedOcr,
-          ocrPages: Number(extracted?.ocrPages || 0),
-          category: diagnostics.category || '',
-          categoryEvidence: diagnostics.categoryEvidence || '',
-          communicationDate: diagnostics.communicationDate || '',
-          communicationEvidence: diagnostics.communicationEvidence || '',
-          responseMonths: Number(diagnostics.responseMonths || 0),
-          responseEvidence: diagnostics.responseEvidence || '',
-          explicitDeadlineDate: diagnostics.explicitDeadlineDate || '',
-          explicitDeadlineEvidence: diagnostics.explicitDeadlineEvidence || '',
-          registeredLetterLine: String(diagnostics.registeredLetterLine || '').slice(0, 180),
-          registeredLetterProofLine: String(diagnostics.registeredLetterProofLine || '').slice(0, 180),
-          textChars: text.length,
-        });
-
-        const doclistDate = normalizeDateString(doc.dateStr || '');
-        const commDate = normalizeDateString(diagnostics.communicationDate || '');
-        if (doclistDate && commDate && doclistDate !== commDate) {
-          addLog(caseNo, 'warn', 'PDF communication date differs from doclist date (using PDF date for deadline derivation)', {
-            source: 'pdfDeadlines',
-            doc: doc.title || '',
-            doclistDate,
-            pdfCommunicationDate: commDate,
-          });
-        }
-
-        if (parsedHints.length) {
-          hints.push(...parsedHints);
-          addLog(caseNo, 'ok', `PDF deadline hints parsed: ${parsedHints.length}`, {
-            source: 'pdfDeadlines',
-            doc: doc.title || '',
-            transport: parseTransport,
-            url: parseUrl,
-            hints: parsedHints.map((h) => `${h.label}=${h.dateStr}`),
-          });
-        } else {
-          addLog(caseNo, 'info', 'PDF opened but no deadline hint produced for this document', {
-            source: 'pdfDeadlines',
-            doc: doc.title || '',
-            transport: parseTransport,
-            url: parseUrl,
-            category: diagnostics.category || '',
-          });
-        }
-
-        scanned.push({
-          title: doc.title,
-          dateStr: doc.dateStr,
-          url: parseUrl,
-          transport: parseTransport,
-          usedOcr: !!extracted?.usedOcr,
-          ocrPages: Number(extracted?.ocrPages || 0),
-          hintCount: parsedHints.length,
-          category: String(diagnostics.category || ''),
-          communicationDate: String(diagnostics.communicationDate || ''),
-          responseMonths: Number(diagnostics.responseMonths || 0),
-          explicitDeadlineDate: String(diagnostics.explicitDeadlineDate || ''),
-          registeredLetterProofLine: proofLine,
-        });
+        const result = await scanPdfDeadlineCandidate(caseNo, doc, signal, pdfjs);
+        if (result.scanSucceeded) successfulCandidates += 1;
+        if (Array.isArray(result.parsedHints) && result.parsedHints.length) hints.push(...result.parsedHints);
+        if (result.scannedEntry) scanned.push(result.scannedEntry);
       } catch (error) {
         failedCandidates += 1;
         lastCandidateError = error;
@@ -3209,38 +3255,23 @@
     }
 
     const dedupedHints = dedupe(hints, (h) => `${h.label}|${h.dateStr}`);
-    const pdfStatus = dedupedHints.length
-      ? 'ok'
-      : (successfulCandidates > 0 || scanned.length > 0)
-        ? 'empty'
-        : 'error';
-
-    storeCaseSource(caseNo, 'pdfDeadlines', {
-      title: 'PDF-derived deadlines',
-      status: pdfStatus,
-      transport: 'fetch+pdfjs',
+    const pdfStatus = derivePdfDeadlineStatus(dedupedHints, scanned, successfulCandidates);
+    storePdfDeadlineSource(
+      caseNo,
       dependencyStamp,
-      error: pdfStatus === 'error' ? String(lastCandidateError?.message || lastCandidateError || 'PDF deadline scan failed') : '',
-      data: { hints: dedupedHints, scanned },
-    });
+      pdfStatus,
+      { hints: dedupedHints, scanned },
+      pdfStatus === 'error' ? String(lastCandidateError?.message || lastCandidateError || 'PDF deadline scan failed') : '',
+    );
 
-    const summary = {
-      scannedDocs: scanned.length,
-      successfulCandidates,
-      failedCandidates,
-      withHints: scanned.filter((x) => (x.hintCount || 0) > 0).length,
-      withCommunicationDate: scanned.filter((x) => !!x.communicationDate).length,
-      withResponsePeriod: scanned.filter((x) => Number(x.responseMonths || 0) > 0).length,
-      withProofLine: scanned.filter((x) => !!x.registeredLetterProofLine).length,
-      withOcr: scanned.filter((x) => !!x.usedOcr).length,
-    };
-
+    const summary = buildPdfDeadlineSummary(scanned, successfulCandidates, failedCandidates);
     const summaryLevel = pdfStatus === 'error' ? 'error' : (dedupedHints.length ? 'ok' : 'info');
     const summaryMessage = pdfStatus === 'error'
       ? 'PDF deadline parse failed for all candidate documents'
       : `PDF deadline parse ${dedupedHints.length ? `found ${dedupedHints.length} hint(s)` : 'found no explicit hints'}`;
     addLog(caseNo, summaryLevel, summaryMessage, { source: 'pdfDeadlines', ...summary });
   }
+
 
   async function fetchWithRetry(url, signal) {
     let lastError;
@@ -3452,11 +3483,10 @@
     return endOfMonth(anniversaryYear, filingDate.getMonth());
   }
 
-  function inferProceduralDeadlines(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
-    const out = [];
+  function buildDeadlineRecords(docs, eventHistory = {}, legal = {}) {
     const sortedDocs = [...(docs || [])].sort(compareDateDesc);
     const sortedEvents = dedupe([...(eventHistory.events || []), ...(legal.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}`).sort(compareDateDesc);
-    const records = dedupe([
+    return dedupe([
       ...sortedDocs.map((d) => ({
         dateStr: d.dateStr,
         title: d.title || '',
@@ -3472,19 +3502,26 @@
         source: 'Event',
       })),
     ], (r) => `${r.dateStr}|${r.title}|${r.detail}|${r.source}`).sort(compareDateDesc);
+  }
 
-    const appType = normalize(main.applicationType || '').toLowerCase();
-    const isEuroPct = /e\/pct/.test(appType);
-    const isDivisional = /divisional/.test(appType);
-
-    const pdfHints = (Array.isArray(pdfData?.hints) ? pdfData.hints : [])
+  function pdfHintsWithParsedDates(pdfData = {}) {
+    return (Array.isArray(pdfData?.hints) ? pdfData.hints : [])
       .map((h) => ({
         ...h,
         date: parseDateString(h.dateStr),
       }))
       .filter((h) => h.date);
+  }
 
-    const hasPdfHint = (regex) => pdfHints.some((h) => regex.test(String(h.label || '')));
+  function buildDeadlineComputationContext(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
+    const out = [];
+    const records = buildDeadlineRecords(docs, eventHistory, legal);
+    const pdfHints = pdfHintsWithParsedDates(pdfData);
+    const appType = normalize(main.applicationType || '').toLowerCase();
+    const isEuroPct = /e\/pct/.test(appType);
+    const isDivisional = /divisional/.test(appType);
+    const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
+    const filingDate = parseDateString(main.filingDate);
 
     const push = (entry) => {
       if (!entry?.date || Number.isNaN(entry.date.getTime())) return;
@@ -3492,7 +3529,7 @@
     };
 
     const latestRecord = (regex) => records.find((r) => regex.test(`${r.title || ''} ${r.detail || ''}`));
-
+    const hasPdfHint = (regex) => pdfHints.some((h) => regex.test(String(h.label || '')));
     const hasAfter = (anchorDate, predicate) => {
       const ts = anchorDate?.getTime?.() || 0;
       if (!ts) return false;
@@ -3558,7 +3595,30 @@
       });
     };
 
-    for (const hint of pdfHints) {
+    return {
+      out,
+      main,
+      docs,
+      records,
+      pdfHints,
+      isEuroPct,
+      isDivisional,
+      priorityDate,
+      filingDate,
+      push,
+      latestRecord,
+      hasPdfHint,
+      hasAfter,
+      hasApplicantResponseAfter,
+      hasFeeSignalAfter,
+      resolveHintByActivity,
+      addMonthsDeadline,
+    };
+  }
+
+  function appendPdfDerivedDeadlines(ctx) {
+    const resolveHintByActivity = ctx.resolveHintByActivity;
+    for (const hint of ctx.pdfHints) {
       const label = String(hint.label || 'PDF-derived deadline');
       const sourceDate = String(hint.sourceDate || '');
       const anchor = parseDateString(sourceDate) || hint.date;
@@ -3566,7 +3626,7 @@
       const resolved = !!hint.resolved || resolvedByActivity;
       const baseMethod = String(hint.evidence || 'PDF parse');
 
-      push({
+      ctx.push({
         label,
         date: hint.date,
         level: String(hint.level || 'bad'),
@@ -3579,18 +3639,19 @@
           : baseMethod,
       });
     }
+  }
 
-    // Core prosecution communications (notification-based, computed as calendar-month periods)
-    addMonthsDeadline({
+  function appendCoreCommunicationDeadlines(ctx) {
+    ctx.addMonthsDeadline({
       triggerRegex: /rule\s*71\(3\)|intention to grant|text intended for grant/i,
       label: 'R71(3) response period',
       months: 4,
       level: 'bad',
       confidence: 'high',
-      resolvedBy: (anchor) => hasFeeSignalAfter(anchor, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections/i) || hasApplicantResponseAfter(anchor),
+      resolvedBy: (anchor) => ctx.hasFeeSignalAfter(anchor, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections/i) || ctx.hasApplicantResponseAfter(anchor),
     });
 
-    addMonthsDeadline({
+    ctx.addMonthsDeadline({
       triggerRegex: /article\s*94\(3\)|art\.\s*94\(3\)|communication from (?:the )?examining/i,
       label: 'Art. 94(3) response period',
       months: 4,
@@ -3598,7 +3659,7 @@
       confidence: 'medium',
     });
 
-    addMonthsDeadline({
+    ctx.addMonthsDeadline({
       triggerRegex: /rule\s*70\(2\)|confirm.*proceed|wish to proceed|proceed further/i,
       label: 'Rule 70(2) confirmation/response period',
       months: 6,
@@ -3606,87 +3667,86 @@
       confidence: 'high',
     });
 
-    addMonthsDeadline({
+    ctx.addMonthsDeadline({
       triggerRegex: /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/i,
       label: 'Rule 161/162 response period',
       months: 6,
       level: 'bad',
       confidence: 'high',
-      resolvedBy: (anchor) => hasApplicantResponseAfter(anchor, /reply|response|amend|claims|observations|arguments/i) || hasFeeSignalAfter(anchor, /claims fee|fee payment received/i),
+      resolvedBy: (anchor) => ctx.hasApplicantResponseAfter(anchor, /reply|response|amend|claims|observations|arguments/i) || ctx.hasFeeSignalAfter(anchor, /claims fee|fee payment received/i),
     });
+  }
 
-    // EP direct/divisional: 6 months from ESR publication mention for exam/designation/search-opinion response bundle.
-    if (!isEuroPct) {
-      const esrMention = latestRecord(/mention of publication of (?:the )?european search report|publication of (?:the )?european search report/i);
+  function appendDirectOrPctDeadlines(ctx) {
+    if (!ctx.isEuroPct) {
+      const esrMention = ctx.latestRecord(/mention of publication of (?:the )?european search report|publication of (?:the )?european search report/i);
       if (esrMention) {
         const anchor = parseDateString(esrMention.dateStr);
         if (anchor) {
           const calc = addCalendarMonthsDetailed(anchor, 6);
-          push({
-            label: `${isDivisional ? 'Divisional ' : ''}exam/designation + search-opinion bundle`,
+          ctx.push({
+            label: `${ctx.isDivisional ? 'Divisional ' : ''}exam/designation + search-opinion bundle`,
             date: calc.date,
             level: 'bad',
             confidence: 'high',
             sourceDate: esrMention.dateStr,
-            resolved: hasFeeSignalAfter(anchor, /request for examination|examination fee|designation fee|extension fee|validation fee|fee payment received/i) || hasApplicantResponseAfter(anchor),
+            resolved: ctx.hasFeeSignalAfter(anchor, /request for examination|examination fee|designation fee|extension fee|validation fee|fee payment received/i) || ctx.hasApplicantResponseAfter(anchor),
             method: 'Rule-based: +6 months from ESR publication mention',
             rolledOver: calc.rolledOver,
             rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
           });
         }
       }
+      return;
     }
 
-    // Euro-PCT later-of formula for exam/designation and core 31-month entry stop.
-    const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
-    const filingDate = parseDateString(main.filingDate);
-    const base31Date = priorityDate || filingDate;
+    const base31Date = ctx.priorityDate || ctx.filingDate;
+    if (!base31Date) return;
 
-    if (isEuroPct && base31Date) {
-      const calc31 = addCalendarMonthsDetailed(base31Date, 31);
-      const due31 = calc31.date;
-      const isr = latestRecord(/international search report|\bisr\b|written opinion/i);
-      const isrDate = parseDateString(isr?.dateStr || '');
-      const calcIsr = isrDate ? addCalendarMonthsDetailed(isrDate, 6) : null;
-      const isrPlus6 = calcIsr?.date || null;
-      const dueLater = isrPlus6 && isrPlus6 > due31 ? isrPlus6 : due31;
-      const dueLaterRolled = isrPlus6 && isrPlus6 > due31 ? !!calcIsr?.rolledOver : calc31.rolledOver;
-      const dueLaterRollNote = isrPlus6 && isrPlus6 > due31
-        ? (calcIsr?.rolledOver ? `day ${calcIsr.fromDay}→${calcIsr.toDay}` : '')
-        : (calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '');
+    const calc31 = addCalendarMonthsDetailed(base31Date, 31);
+    const due31 = calc31.date;
+    const isr = ctx.latestRecord(/international search report|\bisr\b|written opinion/i);
+    const isrDate = parseDateString(isr?.dateStr || '');
+    const calcIsr = isrDate ? addCalendarMonthsDetailed(isrDate, 6) : null;
+    const isrPlus6 = calcIsr?.date || null;
+    const dueLater = isrPlus6 && isrPlus6 > due31 ? isrPlus6 : due31;
+    const dueLaterRolled = isrPlus6 && isrPlus6 > due31 ? !!calcIsr?.rolledOver : calc31.rolledOver;
+    const dueLaterRollNote = isrPlus6 && isrPlus6 > due31
+      ? (calcIsr?.rolledOver ? `day ${calcIsr.fromDay}→${calcIsr.toDay}` : '')
+      : (calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '');
 
-      push({
-        label: 'Euro-PCT entry acts (31-month stop)',
-        date: due31,
-        level: 'bad',
-        confidence: 'high',
-        sourceDate: priorityDate ? main.priorities?.[0]?.dateStr || '' : main.filingDate || '',
-        resolved: hasFeeSignalAfter(base31Date, /translation|entry into european phase|rule 159|filing fee|page fee|request for examination/i),
-        method: 'Rule-based: priority/filing date +31 months',
-        rolledOver: calc31.rolledOver,
-        rolloverNote: calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '',
-      });
+    ctx.push({
+      label: 'Euro-PCT entry acts (31-month stop)',
+      date: due31,
+      level: 'bad',
+      confidence: 'high',
+      sourceDate: ctx.priorityDate ? ctx.main.priorities?.[0]?.dateStr || '' : ctx.main.filingDate || '',
+      resolved: ctx.hasFeeSignalAfter(base31Date, /translation|entry into european phase|rule 159|filing fee|page fee|request for examination/i),
+      method: 'Rule-based: priority/filing date +31 months',
+      rolledOver: calc31.rolledOver,
+      rolloverNote: calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '',
+    });
 
-      push({
-        label: 'Euro-PCT exam/designation deadline (later-of formula)',
-        date: dueLater,
-        level: 'bad',
-        confidence: isrDate ? 'high' : 'medium',
-        sourceDate: isrDate ? `${formatDate(base31Date)} / ${isr?.dateStr || ''}` : formatDate(base31Date),
-        resolved: hasFeeSignalAfter(base31Date, /request for examination|examination fee|designation fee|extension fee|validation fee/i),
-        method: isrDate ? 'Rule-based: max(31 months from priority/filing, ISR +6 months)' : 'Rule-based: 31 months from priority/filing (ISR date unavailable)',
-        rolledOver: dueLaterRolled,
-        rolloverNote: dueLaterRollNote,
-      });
-    }
+    ctx.push({
+      label: 'Euro-PCT exam/designation deadline (later-of formula)',
+      date: dueLater,
+      level: 'bad',
+      confidence: isrDate ? 'high' : 'medium',
+      sourceDate: isrDate ? `${formatDate(base31Date)} / ${isr?.dateStr || ''}` : formatDate(base31Date),
+      resolved: ctx.hasFeeSignalAfter(base31Date, /request for examination|examination fee|designation fee|extension fee|validation fee/i),
+      method: isrDate ? 'Rule-based: max(31 months from priority/filing, ISR +6 months)' : 'Rule-based: 31 months from priority/filing (ISR date unavailable)',
+      rolledOver: dueLaterRolled,
+      rolloverNote: dueLaterRollNote,
+    });
+  }
 
-    // Post-grant monitors.
-    const grantMention = latestRecord(/mention of grant|patent has been granted|granted/i);
+  function appendPostGrantDeadlines(ctx) {
+    const grantMention = ctx.latestRecord(/mention of grant|patent has been granted|granted/i);
     if (grantMention) {
       const anchor = parseDateString(grantMention.dateStr);
       if (anchor) {
         const calcOpp = addCalendarMonthsDetailed(anchor, 9);
-        push({
+        ctx.push({
           label: 'Opposition period (third-party monitor)',
           date: calcOpp.date,
           level: 'warn',
@@ -3698,13 +3758,13 @@
           rolloverNote: calcOpp.rolledOver ? `day ${calcOpp.fromDay}→${calcOpp.toDay}` : '',
         });
         const calcUe = addCalendarMonthsDetailed(anchor, 1);
-        push({
+        ctx.push({
           label: 'Unitary effect request window',
           date: calcUe.date,
           level: 'warn',
           confidence: 'high',
           sourceDate: grantMention.dateStr,
-          resolved: hasAfter(anchor, (r) => /unitary effect/i.test(`${r.title} ${r.detail}`)),
+          resolved: ctx.hasAfter(anchor, (r) => /unitary effect/i.test(`${r.title} ${r.detail}`)),
           method: 'Rule-based: grant mention +1 month',
           rolledOver: calcUe.rolledOver,
           rolloverNote: calcUe.rolledOver ? `day ${calcUe.fromDay}→${calcUe.toDay}` : '',
@@ -3712,49 +3772,49 @@
       }
     }
 
-    // Appeal windows from decisions.
-    const decision = latestRecord(/\bdecision\b.*(?:refus|grant|revok|maintain)|\bdecision\b/i);
+    const decision = ctx.latestRecord(/\bdecision\b.*(?:refus|grant|revok|maintain)|\bdecision\b/i);
     if (decision) {
       const anchor = parseDateString(decision.dateStr);
       if (anchor) {
         const calcNotice = addCalendarMonthsDetailed(anchor, 2);
-        push({
+        ctx.push({
           label: 'Appeal notice + fee',
           date: calcNotice.date,
           level: 'bad',
           confidence: 'high',
           sourceDate: decision.dateStr,
-          resolved: hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)),
+          resolved: ctx.hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)),
           method: 'Rule-based: decision date +2 months',
           rolledOver: calcNotice.rolledOver,
           rolloverNote: calcNotice.rolledOver ? `day ${calcNotice.fromDay}→${calcNotice.toDay}` : '',
         });
         const calcGrounds = addCalendarMonthsDetailed(anchor, 4);
-        push({
+        ctx.push({
           label: 'Appeal grounds',
           date: calcGrounds.date,
           level: 'bad',
           confidence: 'high',
           sourceDate: decision.dateStr,
-          resolved: hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)),
+          resolved: ctx.hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)),
           method: 'Rule-based: decision date +4 months',
           rolledOver: calcGrounds.rolledOver,
           rolloverNote: calcGrounds.rolledOver ? `day ${calcGrounds.fromDay}→${calcGrounds.toDay}` : '',
         });
       }
     }
+  }
 
-    // Priority + patent-term references.
-    if (priorityDate) {
-      const calcPriority = addCalendarMonthsDetailed(priorityDate, 12);
+  function appendReferenceDeadlines(ctx) {
+    if (ctx.priorityDate) {
+      const calcPriority = addCalendarMonthsDetailed(ctx.priorityDate, 12);
       const due = calcPriority.date;
       if (due > new Date()) {
-        push({
+        ctx.push({
           label: 'Priority year ends',
           date: due,
           level: 'warn',
           confidence: 'high',
-          sourceDate: main.priorities?.[0]?.dateStr || '',
+          sourceDate: ctx.main.priorities?.[0]?.dateStr || '',
           resolved: false,
           method: 'Rule-based: earliest priority date +12 months',
           rolledOver: calcPriority.rolledOver,
@@ -3763,9 +3823,9 @@
       }
     }
 
-    if (filingDate) {
-      const calcTerm = addCalendarMonthsDetailed(filingDate, 12 * 20);
-      push({
+    if (ctx.filingDate) {
+      const calcTerm = addCalendarMonthsDetailed(ctx.filingDate, 12 * 20);
+      ctx.push({
         label: '20-year term from filing (reference)',
         date: calcTerm.date,
         level: 'info',
@@ -3777,9 +3837,18 @@
         rolloverNote: calcTerm.rolledOver ? `day ${calcTerm.fromDay}→${calcTerm.toDay}` : '',
       });
     }
-
-    return dedupe(out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}`);
   }
+
+  function inferProceduralDeadlines(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
+    const ctx = buildDeadlineComputationContext(main, docs, eventHistory, legal, pdfData);
+    appendPdfDerivedDeadlines(ctx);
+    appendCoreCommunicationDeadlines(ctx);
+    appendDirectOrPctDeadlines(ctx);
+    appendPostGrantDeadlines(ctx);
+    appendReferenceDeadlines(ctx);
+    return dedupe(ctx.out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}`);
+  }
+
 
   function inferRenewalModel(main, legal, ue) {
     const now = new Date();

@@ -41,7 +41,7 @@ hasText("await refreshUpcRegistry(caseNo, controller.signal, force);", 'Prefetch
 hasText('let hadResponse = false;', 'UPC refresh should distinguish real empty results from complete request failure');
 hasText("status: 'error'", 'Derived-source refreshers should persist error states when all candidate requests fail');
 hasText('let failedCandidates = 0;', 'PDF refresh should track per-candidate failures instead of collapsing all-zero-hint outcomes into empty');
-hasText("const pdfStatus = dedupedHints.length", 'PDF refresh should derive status from successful-vs-failed candidate scans');
+has(/function\s+derivePdfDeadlineStatus\s*\(/, 'PDF refresh should derive status from successful-vs-failed candidate scans through a dedicated helper');
 
 // Overview-model memoization
 has(/function\s+caseSnapshot\s*\(/, 'Case-source reads should be centralized behind a caseSnapshot helper');
@@ -53,5 +53,13 @@ has(/function\s+renderOverviewActionableCard\s*\(/, 'Actionable-status overview 
 
 // Publication hydration should merge fallback evidence instead of only replacing on total miss
 hasText('const publicationFallback = includeDocFallback ? inferPublicationsFromDocs(docs) : [];', 'Publication fallback should always be available as centralized supplemental evidence');
+
+// Fifth-pass structural refactors
+has(/function\s+buildDeadlineComputationContext\s*\(/, 'Deadline derivation should be organized around a shared computation context');
+has(/function\s+appendCoreCommunicationDeadlines\s*\(/, 'Core deadline families should be factored out of inferProceduralDeadlines');
+has(/function\s+pdfDeadlineCandidates\s*\(/, 'PDF deadline candidate selection should be isolated from the main refresh flow');
+has(/function\s+scanPdfDeadlineCandidate\s*\(/, 'Per-document PDF scanning should be isolated from refresh orchestration');
+has(/function\s+ensureDoclistFilterWrap\s*\(/, 'Doclist filter UI setup should be isolated from group rebuild logic');
+has(/function\s+attachDoclistGroupRun\s*\(/, 'Doclist group DOM wiring should be isolated from group discovery');
 
 console.log('userscript lifecycle checks passed');
