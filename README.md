@@ -91,6 +91,10 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.67
+- Moved **20-year term from filing (reference)** into the top overview summary directly after **Filing date**.
+- Removed duplicate display of that same 20-year reference term from the inline detailed clocks section.
+
 ### 7.0.66
 - Combined previously separate overview blocks into a single **Actionable status** card:
   - actionable next-deadline summary + latest actions + waiting-party state

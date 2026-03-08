@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.66
+// @version      7.0.67
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.66';
+  const VERSION = '7.0.67';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -3797,11 +3797,19 @@
     const opts = options();
     const m = overviewModel(caseNo);
 
+    const termReference = m.deadlines.find((d) => d.reference && /20-year term from filing/i.test(String(d.label || '')));
+    const termReferenceDate = termReference?.date ? formatDate(termReference.date) : '';
+    const termReferenceDays = termReference?.date ? Math.ceil((termReference.date.getTime() - Date.now()) / 86400000) : null;
+    const termReferenceText = termReferenceDate
+      ? `${termReferenceDate}${Number.isFinite(termReferenceDays) ? ` · ${termReferenceDays >= 0 ? formatDaysHuman(termReferenceDays) : `${formatDaysHuman(termReferenceDays).slice(1)} overdue`}` : ''}`
+      : '—';
+
     let html = `<div class="epoRP-c"><div class="epoRP-g">
       <div class="epoRP-l">Title</div><div class="epoRP-v">${esc(m.title)}</div>
       <div class="epoRP-l">Applicant</div><div class="epoRP-v">${esc(m.applicant)}</div>
       <div class="epoRP-l">Application #</div><div class="epoRP-v">${esc(m.appNo)}</div>
       <div class="epoRP-l">Filing date</div><div class="epoRP-v">${esc(m.filingDate)}</div>
+      <div class="epoRP-l">20-year term from filing (reference)</div><div class="epoRP-v">${esc(termReferenceText)}</div>
       <div class="epoRP-l">Priority</div><div class="epoRP-v">${esc(m.priority)}</div>
       <div class="epoRP-l">Type / stage</div><div class="epoRP-v">${esc(m.applicationType)}${m.parentCase ? ` (<a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>)` : ''} · ${esc(m.stage)}</div>
       ${m.divisionalChildren?.length ? `<div class="epoRP-l">Divisionals</div><div class="epoRP-v">${m.divisionalChildren.map((ep) => `<a class="epoRP-a" href="${esc(sourceUrl(ep, 'main'))}">${esc(ep)}</a>`).join(', ')}</div>` : ''}
@@ -3809,6 +3817,7 @@
     </div></div>`;
 
     const detailedDeadlines = m.deadlines.filter((d) => {
+      if (d.reference && /20-year term from filing/i.test(String(d.label || ''))) return false;
       if (!m.nextDeadline) return true;
       const sameLabel = d.label === m.nextDeadline.label;
       const sameDate = formatDate(d.date) === formatDate(m.nextDeadline.date);
