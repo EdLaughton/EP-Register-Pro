@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.43
+// @version      7.0.44
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.43';
+  const VERSION = '7.0.44';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -282,6 +282,41 @@
     } catch {
       // logging must never break script
     }
+  }
+
+  function formatLogClock(ts) {
+    const dt = new Date(ts || '');
+    if (Number.isNaN(dt.getTime())) return '--:--:--';
+    return `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}:${String(dt.getSeconds()).padStart(2, '0')}`;
+  }
+
+  function safeInlineJson(value) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+
+  function renderLogConsole(caseNo) {
+    const logs = (getCase(caseNo).logs || []).slice(-120);
+    if (!logs.length) {
+      return `<div class="epoRP-log-empty">No operation logs yet for this case.</div>`;
+    }
+
+    return logs.map((entry) => {
+      const level = String(entry?.level || 'info').toLowerCase();
+      const levelClass = ['ok', 'info', 'warn', 'bad', 'error'].includes(level) ? level : 'info';
+      const message = normalize(String(entry?.message || '')) || '(no message)';
+      const meta = entry?.meta && typeof entry.meta === 'object' && !Array.isArray(entry.meta) ? entry.meta : {};
+      const metaText = Object.keys(meta).length ? ` ${safeInlineJson(meta)}` : '';
+
+      return `<div class="epoRP-log-row ${esc(levelClass)}">
+        <div class="epoRP-log-ts">${esc(formatLogClock(entry?.ts))}</div>
+        <div class="epoRP-log-lv">${esc(levelClass.toUpperCase())}</div>
+        <div class="epoRP-log-msg">${esc(message)}${metaText ? `<span class="epoRP-log-meta">${esc(metaText)}</span>` : ''}</div>
+      </div>`;
+    }).join('');
   }
 
   function isFresh(src, refreshHours) {
@@ -2659,7 +2694,7 @@
     return `<div class="epoRP-c">${out.join('')}</div>`;
   }
 
-  function renderOptions() {
+  function renderOptions(caseNo) {
     const o = options();
     const checkbox = (id, key, title, help) => `<label class="epoRP-or"><div><div class="epoRP-ol">${esc(title)}</div><div class="epoRP-oh">${esc(help)}</div></div><input id="${id}" type="checkbox" ${o[key] ? 'checked' : ''}></label>`;
 
@@ -2680,7 +2715,12 @@
       <label class="epoRP-or"><div><div class="epoRP-ol">Timeline legal importance</div><div class="epoRP-oh">Visual severity for legal-status items.</div></div>
         <select id="epoRP-opt-legal-level" class="epoRP-in"><option value="warn" ${o.timelineLegalLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="info" ${o.timelineLegalLevel === 'info' ? 'selected' : ''}>Info</option><option value="bad" ${o.timelineLegalLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${o.timelineLegalLevel === 'ok' ? 'selected' : ''}>Low</option></select>
       </label>
-      <div class="epoRP-actions"><button class="epoRP-btn" id="epoRP-reload">Reload all background pages</button><button class="epoRP-btn" id="epoRP-clear">Clear this case cache</button></div>
+      <div class="epoRP-actions"><button class="epoRP-btn" id="epoRP-reload">Reload all background pages</button><button class="epoRP-btn" id="epoRP-clear">Clear this case cache</button><button class="epoRP-btn" id="epoRP-clear-logs">Clear operation console</button></div>
+      <div class="epoRP-console-wrap">
+        <div class="epoRP-ol">Operation console</div>
+        <div class="epoRP-oh">Live sidebar activity for this application (latest 120 entries).</div>
+        <div class="epoRP-log" id="epoRP-log-console">${renderLogConsole(caseNo)}</div>
+      </div>
     </div>`;
   }
 
@@ -2802,6 +2842,7 @@
 
     b.querySelector('#epoRP-reload')?.addEventListener('click', () => {
       addLog(runtime.appNo, 'info', 'Manual reload all background pages');
+      renderPanel();
       prefetchCase(runtime.appNo, true);
     });
 
@@ -2814,6 +2855,14 @@
       captureLiveSource(runtime.appNo);
       renderPanel();
       prefetchCase(runtime.appNo, true);
+    });
+
+    b.querySelector('#epoRP-clear-logs')?.addEventListener('click', () => {
+      patchCase(runtime.appNo, (c) => {
+        c.logs = [];
+      });
+      flushNow();
+      renderPanel();
     });
   }
 
@@ -2871,7 +2920,7 @@
       return;
     }
     if (activeView === 'options') {
-      body.innerHTML = renderOptions();
+      body.innerHTML = renderOptions(caseNo);
       wireOptions();
       restorePanelScroll(caseNo, activeView);
       return;
@@ -2993,6 +3042,19 @@
     .epoRP-ol{font-weight:700;font-size:11px}
     .epoRP-oh{font-size:10px;color:#64748b}
     .epoRP-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .epoRP-console-wrap{margin-top:10px}
+    .epoRP-log{margin-top:6px;max-height:230px;overflow:auto;border:1px solid #1e293b;border-radius:8px;background:#0f172a;color:#e2e8f0;font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .epoRP-log-row{display:grid;grid-template-columns:58px 48px 1fr;gap:8px;padding:4px 6px;border-bottom:1px solid #1e293b;align-items:start}
+    .epoRP-log-row:last-child{border-bottom:0}
+    .epoRP-log-ts{color:#94a3b8;font-variant-numeric:tabular-nums}
+    .epoRP-log-lv{font-weight:700}
+    .epoRP-log-row.ok .epoRP-log-lv{color:#86efac}
+    .epoRP-log-row.info .epoRP-log-lv{color:#93c5fd}
+    .epoRP-log-row.warn .epoRP-log-lv{color:#fcd34d}
+    .epoRP-log-row.bad .epoRP-log-lv,.epoRP-log-row.error .epoRP-log-lv{color:#fca5a5}
+    .epoRP-log-msg{white-space:pre-wrap;word-break:break-word}
+    .epoRP-log-meta{color:#94a3b8}
+    .epoRP-log-empty{padding:8px;color:#94a3b8}
     .epoRP-in{border:1px solid #cbd5e1;border-radius:8px;padding:5px 7px;font-size:12px;width:100%}
     .epoRP-deadlineRow{display:grid;grid-template-columns:12px 72px 1fr;gap:8px;padding:6px 4px;border-bottom:1px dashed #cbd5e1;align-items:start;background:#f8fafc}
     tr.epoRP-docgrp td{background:#eff6ff;color:#1e3a8a;font-weight:700;border-top:2px solid #bfdbfe;border-bottom:1px solid #dbeafe;padding:4px 8px}

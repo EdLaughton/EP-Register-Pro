@@ -91,6 +91,10 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.44
+- Added an **Operation console** under the **Options** tab to show live sidebar activity (prefetch/fetch/parse/cache/manual actions) for the current application.
+- Added a one-click **Clear operation console** action in Options.
+
 ### 7.0.9
 - Restored visual document grouping headers on the native **All documents** page (`tab=doclist`).
 - Added stable regrouping behavior on init/focus/visibility updates.
