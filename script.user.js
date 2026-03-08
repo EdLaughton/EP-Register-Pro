@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.44
+// @version      7.0.45
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.44';
+  const VERSION = '7.0.45';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -317,6 +317,19 @@
         <div class="epoRP-log-msg">${esc(message)}${metaText ? `<span class="epoRP-log-meta">${esc(metaText)}</span>` : ''}</div>
       </div>`;
     }).join('');
+  }
+
+  function optionValueText(value) {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (value == null) return 'null';
+    return safeInlineJson(value);
+  }
+
+  function renderOptionSnapshot() {
+    const o = options();
+    const keys = Object.keys(o).sort((a, b) => a.localeCompare(b));
+    return keys.map((key) => `<div class="epoRP-optval-row"><div class="epoRP-optval-k">${esc(key)}</div><div class="epoRP-optval-v">${esc(optionValueText(o[key]))}</div></div>`).join('');
   }
 
   function isFresh(src, refreshHours) {
@@ -2717,6 +2730,11 @@
       </label>
       <div class="epoRP-actions"><button class="epoRP-btn" id="epoRP-reload">Reload all background pages</button><button class="epoRP-btn" id="epoRP-clear">Clear this case cache</button><button class="epoRP-btn" id="epoRP-clear-logs">Clear operation console</button></div>
       <div class="epoRP-console-wrap">
+        <div class="epoRP-ol">Current option values</div>
+        <div class="epoRP-oh">Effective values for all sidebar parameters.</div>
+        <div class="epoRP-optvals" id="epoRP-optvals">${renderOptionSnapshot()}</div>
+      </div>
+      <div class="epoRP-console-wrap">
         <div class="epoRP-ol">Operation console</div>
         <div class="epoRP-oh">Live sidebar activity for this application (latest 120 entries).</div>
         <div class="epoRP-log" id="epoRP-log-console">${renderLogConsole(caseNo)}</div>
@@ -3043,6 +3061,11 @@
     .epoRP-oh{font-size:10px;color:#64748b}
     .epoRP-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .epoRP-console-wrap{margin-top:10px}
+    .epoRP-optvals{margin-top:6px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;max-height:220px;overflow:auto}
+    .epoRP-optval-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:5px 8px;border-bottom:1px solid #e2e8f0;font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .epoRP-optval-row:last-child{border-bottom:0}
+    .epoRP-optval-k{color:#1e293b;font-weight:700}
+    .epoRP-optval-v{color:#334155;text-align:right;white-space:pre-wrap;word-break:break-word}
     .epoRP-log{margin-top:6px;max-height:230px;overflow:auto;border:1px solid #1e293b;border-radius:8px;background:#0f172a;color:#e2e8f0;font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
     .epoRP-log-row{display:grid;grid-template-columns:58px 48px 1fr;gap:8px;padding:4px 6px;border-bottom:1px solid #1e293b;align-items:start}
     .epoRP-log-row:last-child{border-bottom:0}

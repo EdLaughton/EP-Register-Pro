@@ -91,6 +91,9 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.45
+- Added a **Current option values** block in **Options** listing all sidebar parameters and their effective values.
+
 ### 7.0.44
 - Added an **Operation console** under the **Options** tab to show live sidebar activity (prefetch/fetch/parse/cache/manual actions) for the current application.
 - Added a one-click **Clear operation console** action in Options.
