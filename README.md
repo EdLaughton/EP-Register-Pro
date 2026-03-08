@@ -91,6 +91,13 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.63
+- Added OCR fallback path for image-only prosecution PDFs:
+  - loads `tesseract.js` (with sandbox-safe fallback loading) when pdf.js text extraction is empty
+  - OCRs first pages of image-only PDFs and feeds extracted text into existing deadline parsing logic
+  - supports linked PDF OCR fallback (`pdfjs-via-linked-url-ocr`) and logs OCR usage metadata
+- Added OCR transport diagnostics and summary counters (`withOcr`) in PDF parse logs.
+
 ### 7.0.62
 - Expanded fragmented month-phrase detection to explicitly catch additional response periods often seen in OCR/HTML fallbacks:
   - `2 months`, `3 months`, `5 months`, `6 months`

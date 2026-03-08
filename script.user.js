@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.62
+// @version      7.0.63
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -14,6 +14,7 @@
 // @connect      cdnjs.cloudflare.com
 // @connect      cdn.jsdelivr.net
 // @connect      unpkg.com
+// @connect      tessdata.projectnaptha.com
 // ==/UserScript==
 
 (() => {
@@ -23,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.62';
+  const VERSION = '7.0.63';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -53,6 +54,18 @@
       worker: 'https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js',
     },
   ];
+  const OCR_TESSERACT_CANDIDATES = [
+    { id: 'jsdelivr', lib: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js' },
+    { id: 'unpkg', lib: 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js' },
+  ];
+  const OCR_MAX_PAGES = 2;
+  const OCR_RENDER_SCALE = 2;
+  const OCR_RECOGNIZE_OPTIONS = {
+    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
+    langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+    logger: () => {},
+  };
 
   const SOURCES = [
     { key: 'main', slug: 'main', title: 'EP About this file' },
@@ -95,6 +108,7 @@
     timelineCache: { key: '', items: [] },
     doclistGroupSigByCase: {},
     pdfjsPromise: null,
+    tesseractPromise: null,
     autoPrefetchDoneByCase: {},
     lastRegisterTabByCase: {},
     lastViewLogKey: '',
@@ -1774,6 +1788,122 @@
     return runtime.pdfjsPromise;
   }
 
+  function getTesseractGlobal() {
+    const uw = getUnsafeWindow();
+    const candidates = [window?.Tesseract, globalThis?.Tesseract, uw?.Tesseract];
+    return candidates.find((lib) => lib && typeof lib.recognize === 'function') || null;
+  }
+
+  function clearTesseractGlobals() {
+    const uw = getUnsafeWindow();
+    const holders = [window, globalThis, uw].filter(Boolean);
+    for (const holder of holders) {
+      if (holder.Tesseract && typeof holder.Tesseract.recognize !== 'function') {
+        try { delete holder.Tesseract; } catch { holder.Tesseract = undefined; }
+      }
+    }
+  }
+
+  function registerTesseractGlobal(lib) {
+    if (!lib || typeof lib.recognize !== 'function') return null;
+    const uw = getUnsafeWindow();
+    try { window.Tesseract = lib; } catch {}
+    try { globalThis.Tesseract = lib; } catch {}
+    if (uw) {
+      try { uw.Tesseract = lib; } catch {}
+    }
+    return lib;
+  }
+
+  function evaluateTesseractScriptCode(code, label = 'external-tesseract') {
+    const source = `${String(code || '')}\n//# sourceURL=${label}.js`;
+    let lastError = null;
+
+    const existing = getTesseractGlobal();
+    if (existing) return existing;
+
+    try {
+      // eslint-disable-next-line no-new-func
+      Function(source)();
+    } catch (error) {
+      lastError = error;
+    }
+
+    const afterFunction = getTesseractGlobal();
+    if (afterFunction) return registerTesseractGlobal(afterFunction);
+
+    try {
+      // eslint-disable-next-line no-eval
+      (0, eval)(source);
+    } catch (error) {
+      lastError = error;
+    }
+
+    const afterEval = getTesseractGlobal();
+    if (afterEval) return registerTesseractGlobal(afterEval);
+
+    try {
+      const root = document.head || document.documentElement || document.body;
+      if (!root) throw new Error('Document root unavailable for inline script evaluation');
+      const script = document.createElement('script');
+      script.textContent = source;
+      root.appendChild(script);
+      script.remove();
+    } catch (error) {
+      lastError = error;
+    }
+
+    const afterInline = getTesseractGlobal();
+    if (afterInline) return registerTesseractGlobal(afterInline);
+    if (lastError) throw lastError;
+    throw new Error('Script evaluated but tesseract global/module was not exposed');
+  }
+
+  async function ensureTesseract(signal) {
+    const existing = getTesseractGlobal();
+    if (existing) return existing;
+    if (runtime.tesseractPromise) return runtime.tesseractPromise;
+
+    runtime.tesseractPromise = (async () => {
+      const errors = [];
+
+      for (const candidate of OCR_TESSERACT_CANDIDATES) {
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+        clearTesseractGlobals();
+
+        try {
+          const code = await loadExternalScriptText(candidate.lib, signal);
+          const head = String(code || '').slice(0, 400);
+          if (!code || code.length < 900 || /<html|<!doctype/i.test(head)) {
+            throw new Error('non-script payload received');
+          }
+          const lib = evaluateTesseractScriptCode(code, `eporp-tesseract-${candidate.id}-text`);
+          if (!lib?.recognize) throw new Error('Tesseract global not available after text load/eval');
+          return registerTesseractGlobal(lib);
+        } catch (error) {
+          errors.push(`${candidate.id}/text: ${error?.message || error}`);
+        }
+
+        try {
+          await loadExternalScriptTag(candidate.lib, signal);
+          const lib = getTesseractGlobal();
+          if (!lib?.recognize) throw new Error('Tesseract global not available after script-tag load');
+          return registerTesseractGlobal(lib);
+        } catch (error) {
+          errors.push(`${candidate.id}/tag: ${error?.message || error}`);
+        }
+      }
+
+      throw new Error(`Tesseract load failed (${errors.join(' | ') || 'unknown error'})`);
+    })().catch((error) => {
+      runtime.tesseractPromise = null;
+      throw error;
+    });
+
+    return runtime.tesseractPromise;
+  }
+
   function fetchCrossOrigin(url, signal) {
     if (typeof GM_xmlhttpRequest !== 'function') return fetchWithRetry(url, signal);
     return new Promise((resolve, reject) => {
@@ -2510,6 +2640,49 @@
     return '';
   }
 
+  async function extractTextFromPdfViaOcr(binary, pdfjs, signal) {
+    const tesseract = await ensureTesseract(signal);
+    const data = binary instanceof Uint8Array ? binary : new Uint8Array(binary);
+    const loadingTask = pdfjs.getDocument({ data, disableWorker: true, useWorkerFetch: false, isEvalSupported: false });
+    const pdf = await loadingTask.promise;
+
+    try {
+      const maxPages = Math.min(pdf.numPages || 0, OCR_MAX_PAGES);
+      const chunks = [];
+      let pagesUsed = 0;
+
+      for (let i = 1; i <= maxPages; i++) {
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: OCR_RENDER_SCALE });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.floor(viewport.width));
+        canvas.height = Math.max(1, Math.floor(viewport.height));
+        const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+        if (!ctx) continue;
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        const result = await tesseract.recognize(canvas, 'eng', OCR_RECOGNIZE_OPTIONS);
+        const pageText = normalize(String(result?.data?.text || ''));
+        if (pageText) chunks.push(pageText);
+        pagesUsed += 1;
+
+        canvas.width = 1;
+        canvas.height = 1;
+
+        const joined = normalize(chunks.join('\n'));
+        if (/\bregistered\s+letter\b|\btime\s+limit\b|\bwithin\b|\barticle\s*94\s*\(\s*3\s*\)\b|\bart\.?\s*94\s*\(\s*3\s*\)\b/i.test(joined) && joined.length > 120) {
+          break;
+        }
+      }
+
+      return { text: normalize(chunks.join('\n')), pagesUsed };
+    } finally {
+      try { await pdf.destroy(); } catch {}
+    }
+  }
+
   async function extractPdfText(url, signal, pdfjsInstance = null) {
     const pdfjs = pdfjsInstance || await ensurePdfJs(signal);
 
@@ -2536,7 +2709,7 @@
       const raw = bodyText(parseHtml(String(html || '')));
       const focused = focusCommunicationContextText(raw);
       if (!hasMeaningfulCommunicationText(focused)) return null;
-      return { text: focused, transport, resolvedUrl, isPdf: false };
+      return { text: focused, transport, resolvedUrl, isPdf: false, usedOcr: false, ocrPages: 0 };
     };
 
     const tryDocumentPageFallback = async (seedUrl, transport) => {
@@ -2554,13 +2727,30 @@
     if (isPdfBinaryData(binary)) {
       const text = normalize(await parsePdfBinaryToText(binary));
       if (text) {
-        return { text, transport: 'pdfjs', resolvedUrl: url, isPdf: true };
+        return { text, transport: 'pdfjs', resolvedUrl: url, isPdf: true, usedOcr: false, ocrPages: 0 };
+      }
+
+      try {
+        const ocr = await extractTextFromPdfViaOcr(binary, pdfjs, signal);
+        const ocrText = focusCommunicationContextText(ocr?.text || '');
+        if (hasMeaningfulCommunicationText(ocrText)) {
+          return {
+            text: ocrText,
+            transport: 'pdfjs-ocr',
+            resolvedUrl: url,
+            isPdf: true,
+            usedOcr: true,
+            ocrPages: Number(ocr?.pagesUsed || 0),
+          };
+        }
+      } catch {
+        // continue with HTML fallbacks
       }
 
       const docPageFallback = await tryDocumentPageFallback(url, 'html-fallback-from-document-page-after-empty-pdf-text');
       if (docPageFallback) return docPageFallback;
 
-      return { text: '', transport: 'pdfjs-empty-text', resolvedUrl: url, isPdf: true };
+      return { text: '', transport: 'pdfjs-empty-text', resolvedUrl: url, isPdf: true, usedOcr: false, ocrPages: 0 };
     }
 
     const htmlPayload = binaryToUtf8(binary);
@@ -2577,7 +2767,24 @@
       if (isPdfBinaryData(linkedBinary)) {
         const linkedText = normalize(await parsePdfBinaryToText(linkedBinary));
         if (linkedText) {
-          return { text: linkedText, transport: 'pdfjs-via-linked-url', resolvedUrl: linkedUrl, isPdf: true };
+          return { text: linkedText, transport: 'pdfjs-via-linked-url', resolvedUrl: linkedUrl, isPdf: true, usedOcr: false, ocrPages: 0 };
+        }
+
+        try {
+          const linkedOcr = await extractTextFromPdfViaOcr(linkedBinary, pdfjs, signal);
+          const linkedOcrText = focusCommunicationContextText(linkedOcr?.text || '');
+          if (hasMeaningfulCommunicationText(linkedOcrText)) {
+            return {
+              text: linkedOcrText,
+              transport: 'pdfjs-via-linked-url-ocr',
+              resolvedUrl: linkedUrl,
+              isPdf: true,
+              usedOcr: true,
+              ocrPages: Number(linkedOcr?.pagesUsed || 0),
+            };
+          }
+        } catch {
+          // continue with HTML fallbacks
         }
 
         const parentHtmlFallback = htmlFallbackFromPayload(htmlPayload, 'html-fallback-from-document-page-after-empty-linked-pdf-text', url);
@@ -2586,7 +2793,7 @@
         const linkedDocPageFallback = await tryDocumentPageFallback(linkedUrl, 'html-fallback-from-linked-document-page-after-empty-pdf-text');
         if (linkedDocPageFallback) return linkedDocPageFallback;
 
-        return { text: '', transport: 'pdfjs-via-linked-url-empty-text', resolvedUrl: linkedUrl, isPdf: true };
+        return { text: '', transport: 'pdfjs-via-linked-url-empty-text', resolvedUrl: linkedUrl, isPdf: true, usedOcr: false, ocrPages: 0 };
       }
 
       const linkedHtml = binaryToUtf8(linkedBinary);
@@ -2658,6 +2865,16 @@
         const parseTransport = String(extracted?.transport || 'unknown');
         const parseUrl = String(extracted?.resolvedUrl || resolvedUrl);
 
+        if (extracted?.usedOcr) {
+          addLog(caseNo, 'ok', 'PDF OCR fallback used', {
+            source: 'pdfDeadlines',
+            doc: doc.title || '',
+            url: parseUrl,
+            transport: parseTransport,
+            ocrPages: Number(extracted?.ocrPages || 0),
+          });
+        }
+
         if (!text) {
           addLog(caseNo, 'warn', 'PDF opened but extracted text was empty', { source: 'pdfDeadlines', doc: doc.title || '', url: parseUrl, transport: parseTransport });
           continue;
@@ -2694,6 +2911,8 @@
           doc: doc.title || '',
           transport: parseTransport,
           url: parseUrl,
+          usedOcr: !!extracted?.usedOcr,
+          ocrPages: Number(extracted?.ocrPages || 0),
           category: diagnostics.category || '',
           categoryEvidence: diagnostics.categoryEvidence || '',
           communicationDate: diagnostics.communicationDate || '',
@@ -2731,6 +2950,8 @@
           dateStr: doc.dateStr,
           url: parseUrl,
           transport: parseTransport,
+          usedOcr: !!extracted?.usedOcr,
+          ocrPages: Number(extracted?.ocrPages || 0),
           hintCount: parsedHints.length,
           category: String(diagnostics.category || ''),
           communicationDate: String(diagnostics.communicationDate || ''),
@@ -2763,6 +2984,7 @@
       withCommunicationDate: scanned.filter((x) => !!x.communicationDate).length,
       withResponsePeriod: scanned.filter((x) => Number(x.responseMonths || 0) > 0).length,
       withProofLine: scanned.filter((x) => !!x.registeredLetterProofLine).length,
+      withOcr: scanned.filter((x) => !!x.usedOcr).length,
     };
 
     addLog(caseNo, dedupedHints.length ? 'ok' : 'info', `PDF deadline parse ${dedupedHints.length ? `found ${dedupedHints.length} hint(s)` : 'found no explicit hints'}`, { source: 'pdfDeadlines', ...summary });
