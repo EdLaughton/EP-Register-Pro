@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.48
+// @version      7.0.49
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.48';
+  const VERSION = '7.0.49';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1599,6 +1599,27 @@
     return m[n] || 0;
   }
 
+  function parseSmallNumberToken(token) {
+    const t = String(token || '').trim().toLowerCase();
+    if (!t) return 0;
+    if (/^\d{1,2}$/.test(t)) return Number(t);
+    const map = {
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+      eleven: 11,
+      twelve: 12,
+    };
+    return map[t] || 0;
+  }
+
   function extractDateCandidates(textBlock) {
     const out = [];
     const t = String(textBlock || '');
@@ -1618,6 +1639,110 @@
     return dedupe(out, (d) => d);
   }
 
+  function extractExplicitDeadlineDateFromPdf(textBlock) {
+    const textRaw = String(textBlock || '');
+    if (!textRaw) return { dateStr: '', evidence: '' };
+
+    const candidates = [];
+    const push = (rawDate, evidence, score = 100) => {
+      const dateStr = normalizeDateString(rawDate);
+      if (!dateStr) return;
+      candidates.push({ dateStr, evidence, score });
+    };
+
+    for (const m of textRaw.matchAll(/(?:\bfinal\s+date\b[\s\S]{0,32}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 'Explicit final date found in PDF communication text', 130);
+    }
+    for (const m of textRaw.matchAll(/(?:\bdeadline\b[\s\S]{0,32}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 'Explicit deadline date found in PDF communication text', 120);
+    }
+    for (const m of textRaw.matchAll(/(?:\btime\s+limit\s+(?:expires?|expiring|ending)\b[\s\S]{0,24}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 'Explicit time-limit expiry date found in PDF communication text', 125);
+    }
+    for (const m of textRaw.matchAll(/(?:\bno\s+later\s+than\b|\bat\s+the\s+latest(?:\s+by|\s+on)?\b|\blatest\s+by\b)\s*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 'Explicit latest-by date found in PDF communication text', 135);
+    }
+
+    if (!candidates.length) return { dateStr: '', evidence: '' };
+
+    const best = candidates
+      .map((c) => ({ ...c, ts: parseDateString(c.dateStr)?.getTime() || 0 }))
+      .sort((a, b) => (b.score - a.score) || (b.ts - a.ts))[0];
+
+    return { dateStr: best?.dateStr || '', evidence: best?.evidence || '' };
+  }
+
+  function extractCommunicationDateFromPdf(textBlock, context = {}) {
+    const textRaw = String(textBlock || '');
+    const docDateStr = normalizeDateString(context.docDateStr || '');
+    const candidates = [];
+
+    const push = (rawDate, score, evidence, contextText = '') => {
+      const dateStr = normalizeDateString(rawDate);
+      if (!dateStr) return;
+      const veto = /final\s+date|deadline|latest\s+by|no\s+later\s+than|time\s+limit\s+(?:expires?|expiring|ending)/i;
+      if (veto.test(contextText || '')) return;
+      candidates.push({ dateStr, score, evidence });
+    };
+
+    for (const m of textRaw.matchAll(/\bdate\b\s*[:\-]?\s*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      const idx = m.index || 0;
+      const snippet = textRaw.slice(Math.max(0, idx - 24), Math.min(textRaw.length, idx + String(m[0] || '').length + 24));
+      push(m[1], 125, 'Date field found in PDF communication header', snippet);
+    }
+
+    for (const m of textRaw.matchAll(/(?:date\s+of\s+(?:this\s+)?(?:communication|notification|letter)[\s\S]{0,20}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 140, 'Date of communication field found in PDF');
+    }
+
+    for (const m of textRaw.matchAll(/(?:communication(?:\s+pursuant\s+to[^\n]{0,40})?[^\n]{0,80}?\bdated\b[^\d]{0,12})(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 115, 'Dated communication line found in PDF');
+    }
+
+    if (docDateStr) {
+      push(docDateStr, 30, 'Doclist date fallback for communication date');
+    }
+
+    if (!candidates.length) return { dateStr: '', evidence: '' };
+
+    const best = candidates
+      .map((c) => ({
+        ...c,
+        bonus: docDateStr && c.dateStr === docDateStr ? 8 : 0,
+        ts: parseDateString(c.dateStr)?.getTime() || 0,
+      }))
+      .sort((a, b) => ((b.score + b.bonus) - (a.score + a.bonus)) || (b.ts - a.ts))[0];
+
+    return { dateStr: best?.dateStr || '', evidence: best?.evidence || '' };
+  }
+
+  function extractResponseMonthsFromPdf(textBlock) {
+    const textRaw = String(textBlock || '');
+    if (!textRaw) return { months: 0, evidence: '' };
+
+    const candidates = [];
+    const push = (token, evidence, score) => {
+      const months = parseSmallNumberToken(token);
+      if (!Number.isFinite(months) || months <= 0 || months > 24) return;
+      candidates.push({ months, evidence, score });
+    };
+
+    for (const m of textRaw.matchAll(/\bwithin\s+(?:a\s+)?(?:period|time\s+limit)\s+of\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
+      push(m[1], `Derived from "${String(m[0] || '').trim()}" in PDF text`, 130);
+    }
+    for (const m of textRaw.matchAll(/\b(?:period|time\s+limit)\s+of\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
+      push(m[1], `Derived from "${String(m[0] || '').trim()}" in PDF text`, 120);
+    }
+    for (const m of textRaw.matchAll(/\bwithin\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
+      push(m[1], `Derived from "${String(m[0] || '').trim()}" in PDF text`, 110);
+    }
+
+    if (!candidates.length) return { months: 0, evidence: '' };
+
+    const best = candidates.sort((a, b) => b.score - a.score)[0];
+    return { months: best?.months || 0, evidence: best?.evidence || '' };
+  }
+
   function parsePdfDeadlineHints(pdfText, context = {}) {
     const textRaw = String(pdfText || '');
     const textLower = textRaw.toLowerCase();
@@ -1625,7 +1750,6 @@
 
     const hints = [];
     const docDateStr = normalizeDateString(context.docDateStr || '');
-    const docDate = parseDateString(docDateStr);
 
     const pushHint = (hint) => {
       const date = parseDateString(hint?.dateStr || '');
@@ -1633,7 +1757,7 @@
       hints.push({
         label: hint.label,
         dateStr: formatDate(date),
-        sourceDate: docDateStr || hint.sourceDate || '',
+        sourceDate: hint.sourceDate || '',
         confidence: hint.confidence || 'high',
         level: hint.level || 'bad',
         resolved: false,
@@ -1652,47 +1776,37 @@
             ? 'Rule 161/162 response period'
             : '';
 
-    const dateRegion = textRaw.match(/(?:final date|time limit|within)[\s\S]{0,260}/i)?.[0] || textRaw.slice(0, 1200);
-    const dateCandidates = extractDateCandidates(dateRegion);
+    if (!category) return [];
 
-    // Prefer explicit final dates near deadline language.
-    if (category && dateCandidates.length) {
-      const explicitDate = dateCandidates
-        .map((d) => ({ d, ts: parseDateString(d)?.getTime() || 0 }))
-        .filter((x) => x.ts)
-        .sort((a, b) => b.ts - a.ts)[0]?.d;
+    const communication = extractCommunicationDateFromPdf(textRaw, { docDateStr });
+    const communicationDateStr = communication.dateStr || docDateStr;
+    const communicationDate = parseDateString(communicationDateStr);
 
-      if (explicitDate) {
-        pushHint({
-          label: category,
-          dateStr: explicitDate,
-          confidence: 'high',
-          level: /rule\s*116/i.test(category) ? 'warn' : 'bad',
-          evidence: 'Explicit date found in PDF communication text',
-        });
-      }
+    const explicitDue = extractExplicitDeadlineDateFromPdf(textRaw);
+    let explicitAdded = false;
+    if (explicitDue.dateStr) {
+      pushHint({
+        label: category,
+        dateStr: explicitDue.dateStr,
+        sourceDate: communicationDateStr || docDateStr,
+        confidence: 'high',
+        level: /rule\s*116/i.test(category) ? 'warn' : 'bad',
+        evidence: explicitDue.evidence,
+      });
+      explicitAdded = true;
     }
 
-    // Fallback: "within X months" from document date.
-    const monthMatch = textLower.match(/within\s+(\d{1,2})\s+months?/i);
-    if (category && monthMatch?.[1] && docDate) {
-      const months = Number(monthMatch[1]);
-      if (Number.isFinite(months) && months > 0 && months <= 12) {
-        const calc = addCalendarMonthsDetailed(docDate, months);
-        const due = calc.date;
-        const already = hints.some((h) => h.label === category && h.dateStr === formatDate(due));
-        if (!already) {
-          pushHint({
-            label: category,
-            dateStr: formatDate(due),
-            confidence: 'medium',
-            level: 'bad',
-            evidence: `Derived from "within ${months} months" in PDF text${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
-            rolledOver: calc.rolledOver,
-            rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
-          });
-        }
-      }
+    const monthPeriod = extractResponseMonthsFromPdf(textRaw);
+    if (!explicitAdded && monthPeriod.months && communicationDate) {
+      const calc = addCalendarMonthsDetailed(communicationDate, monthPeriod.months);
+      pushHint({
+        label: category,
+        dateStr: formatDate(calc.date),
+        sourceDate: communicationDateStr,
+        confidence: communication.dateStr ? 'high' : 'medium',
+        level: /rule\s*116/i.test(category) ? 'warn' : 'bad',
+        evidence: `${monthPeriod.evidence || `Derived from ${monthPeriod.months} month response period in PDF text`} from communication date ${communicationDateStr}${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
+      });
     }
 
     return dedupe(hints, (h) => `${h.label}|${h.dateStr}`);
@@ -1714,6 +1828,62 @@
     }
   }
 
+  function pdfContentToStructuredText(content) {
+    const rawItems = Array.isArray(content?.items) ? content.items : [];
+    const items = rawItems
+      .map((it, idx) => ({
+        str: String(it?.str || '').trim(),
+        x: Number(it?.transform?.[4] || 0),
+        y: Number(it?.transform?.[5] || 0),
+        idx,
+      }))
+      .filter((it) => !!it.str);
+
+    if (!items.length) return '';
+
+    const hasCoords = items.some((it) => Number.isFinite(it.x) && Number.isFinite(it.y) && (it.x !== 0 || it.y !== 0));
+    if (!hasCoords) return items.map((it) => it.str).join(' ');
+
+    items.sort((a, b) => {
+      const dy = b.y - a.y;
+      if (Math.abs(dy) > 2.5) return dy;
+      const dx = a.x - b.x;
+      if (Math.abs(dx) > 0.5) return dx;
+      return a.idx - b.idx;
+    });
+
+    const lines = [];
+    let current = [];
+    let lineY = null;
+
+    const flush = () => {
+      if (!current.length) return;
+      current.sort((a, b) => (a.x - b.x) || (a.idx - b.idx));
+      lines.push(current.map((it) => it.str).join(' '));
+      current = [];
+      lineY = null;
+    };
+
+    for (const item of items) {
+      if (lineY == null) {
+        current.push(item);
+        lineY = item.y;
+        continue;
+      }
+      if (Math.abs(item.y - lineY) <= 2.5) {
+        current.push(item);
+        lineY = (lineY + item.y) / 2;
+        continue;
+      }
+      flush();
+      current.push(item);
+      lineY = item.y;
+    }
+    flush();
+
+    return lines.join('\n');
+  }
+
   async function extractPdfText(url, signal) {
     const pdfjs = await ensurePdfJs(signal);
     const binary = await fetchBinaryWithRetry(url, signal);
@@ -1727,7 +1897,7 @@
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        const txt = (content.items || []).map((it) => String(it.str || '')).join(' ');
+        const txt = pdfContentToStructuredText(content);
         if (txt) chunks.push(txt);
       }
       return chunks.join('\n');

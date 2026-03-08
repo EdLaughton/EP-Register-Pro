@@ -91,6 +91,14 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.49
+- Improved PDF deadline parsing for prosecution communications:
+  - Better extraction of the **communication date** from PDF header/table fields (e.g. `Date 14.11.2025`).
+  - Better extraction of response periods phrased as **"within a period of X months"** / **"period of X months"**.
+  - Deadlines are now derived from the extracted communication date + response period (with doclist date fallback).
+  - Added stronger explicit-deadline detection (`final date`, `no later than`, `latest by`) when present.
+  - Switched PDF text extraction to layout-aware line reconstruction for more reliable pattern matching.
+
 ### 7.0.48
 - Improved publication extraction robustness (handles spaced/formatted publication numbers and date/number order variations).
 - Broadened publication label matching on the main page (`Publication*` variants).

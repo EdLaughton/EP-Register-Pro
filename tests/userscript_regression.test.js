@@ -40,6 +40,14 @@ has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation hel
 has(/function\s+timelineCacheKey\s*\(/, 'Timeline model should expose a cache key for memoization');
 has(/function\s+ensurePdfJs\s*\(/, 'PDF parser loader helper missing');
 has(/function\s+refreshPdfDeadlines\s*\(/, 'PDF deadline refresh pipeline missing');
+has(/function\s+pdfContentToStructuredText\s*\(/, 'PDF text extraction should include layout-aware line reconstruction helper');
+has(/const\s+txt\s*=\s*pdfContentToStructuredText\(content\);/, 'PDF extraction should use structured line reconstruction per page');
+has(/function\s+extractCommunicationDateFromPdf\s*\(/, 'PDF parser should extract communication date explicitly');
+has(/function\s+extractResponseMonthsFromPdf\s*\(/, 'PDF parser should extract response-period month count from communication text');
+has(/function\s+extractExplicitDeadlineDateFromPdf\s*\(/, 'PDF parser should support explicit deadline dates when present in the communication');
+hasText('within\\s+(?:a\\s+)?(?:period|time\\s+limit)\\s+of\\s+([a-z]+|\\d{1,2})\\s+months?', 'PDF month parser should match "within a period of X months" wording');
+has(/communicationDateStr\s*=\s*communication\.dateStr\s*\|\|\s*docDateStr/, 'PDF hint derivation should anchor to communication date with doclist fallback');
+has(/addCalendarMonthsDetailed\(communicationDate,\s*monthPeriod\.months\)/, 'PDF month-based deadline should be computed from communication date + response period');
 has(/inferProceduralDeadlines\(main,\s*docs,\s*eventHistory,\s*legal,\s*pdfDeadlines\)/, 'Overview deadline model should include PDF-derived hints');
 
 // Timeline controls (include/exclude + importance)
