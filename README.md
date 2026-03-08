@@ -91,6 +91,15 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.60
+- Improved deadline inference when PDF/HTML fallback text lacks explicit legal markers:
+  - Adds category fallback from document metadata (`doc title`/`procedure`) when communication text does not contain `Art. 94(3)`/rule tags.
+  - Adds conservative default response-period fallback for key response categories when no explicit month phrase is present:
+    - Art. 94(3): 4 months
+    - R71(3): 4 months
+    - Rule 161/162: 6 months
+  - Logs `categoryEvidence` so diagnostics show whether category came from communication text or document metadata.
+
 ### 7.0.59
 - Improved empty-PDF handling when linked document endpoints return PDF bytes with no extractable text layer:
   - Adds secondary fallback to parse communication context from document-page HTML when pdf.js text extraction returns empty.

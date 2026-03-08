@@ -60,6 +60,8 @@ has(/const\s+txt\s*=\s*pdfContentToStructuredText\(content\);/, 'PDF extraction 
 has(/function\s+extractCommunicationDateFromPdf\s*\(/, 'PDF parser should extract communication date explicitly');
 has(/function\s+extractResponseMonthsFromPdf\s*\(/, 'PDF parser should extract response-period month count from communication text');
 has(/function\s+extractExplicitDeadlineDateFromPdf\s*\(/, 'PDF parser should support explicit deadline dates when present in the communication');
+has(/function\s+inferDeadlineCategoryFromContext\s*\(/, 'PDF parser should infer category from document title/procedure metadata when text lacks legal markers');
+has(/function\s+defaultResponseMonthsForCategory\s*\(/, 'PDF parser should provide conservative default response periods for key categories');
 has(/function\s+extractRegisteredLetterProofLine\s*\(/, 'PDF parser should extract proof line below Registered Letter for logging');
 has(/function\s+normalizePdfDocumentUrl\s*\(/, 'PDF resolver should normalize javascript-based document links');
 hasText('/^javascript:/i.test(raw)', 'PDF URL normalizer should detect javascript pseudo-links from doclist');
@@ -67,9 +69,11 @@ hasText('source.match(/\\/?application\\?documentId=', 'PDF URL normalizer shoul
 hasText('/[?&]documentId=/i.test(normalized)', 'PDF resolver should allow direct EPO documentId endpoints without requiring .pdf suffix');
 hasText('within\\s+(?:a\\s+)?(?:period|time\\s+limit)\\s+of\\s+([a-z]+|\\d{1,2})\\s+months?', 'PDF month parser should match "within a period of X months" wording');
 has(/communicationDateStr\s*=\s*communication\.dateStr\s*\|\|\s*docDateStr/, 'PDF hint derivation should anchor to communication date with doclist fallback');
-has(/addCalendarMonthsDetailed\(communicationDate,\s*monthPeriod\.months\)/, 'PDF month-based deadline should be computed from communication date + response period');
+has(/addCalendarMonthsDetailed\(communicationDate,\s*responseMonths\)/, 'PDF month-based deadline should be computed from communication date + response period (explicit or fallback)');
 hasText('PDF proof line (below "Registered Letter")', 'PDF parser logging should report line below Registered Letter to prove document was opened');
 hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-date/response-period diagnostics');
+hasText('categoryEvidence', 'PDF parse diagnostics should expose whether category came from text or document metadata');
+hasText('Default ${fallbackMonths}-month period inferred for ${category}', 'PDF parser should support conservative default response-period fallback when explicit month phrases are missing');
 hasText('PDF binary unavailable; using HTML fallback text extraction', 'PDF parser should log explicit HTML fallback path when binary response is not a valid PDF');
 hasText('pdfjs-via-linked-url-empty-text', 'PDF parser should expose explicit transport tag when linked PDF has no extractable text layer');
 hasText('html-fallback-from-document-page-after-empty-linked-pdf-text', 'PDF parser should support fallback from document-page HTML after empty linked-PDF text extraction');
@@ -78,6 +82,7 @@ hasText('PDF parser engine ready', 'PDF parser should log successful engine init
 hasText('PDF parser unavailable:', 'PDF parser should log explicit engine-loader failures');
 hasText('PDF deadline parse aborted (parser engine unavailable)', 'PDF parser should stop clearly when engine is unavailable');
 has(/extractPdfText\(resolvedUrl,\s*signal,\s*pdfjs\)/, 'PDF parse loop should reuse a preloaded pdf.js engine instance');
+has(/parsePdfDeadlineHints\(text,\s*\{[\s\S]*docTitle:\s*doc\.title,[\s\S]*docProcedure:\s*doc\.procedure,[\s\S]*\}\)/, 'PDF hint parsing should receive document metadata context for category fallback');
 has(/withProofLine:\s*scanned\.filter\(/, 'PDF summary logging should include proof-line hit count');
 has(/withResponsePeriod:\s*scanned\.filter\(/, 'PDF summary logging should include response-period hit count');
 has(/function\s+sourceDiagnostics\s*\(/, 'Source diagnostics helper should summarize parsed feature payloads');

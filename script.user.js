@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.59
+// @version      7.0.60
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -23,7 +23,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.59';
+  const VERSION = '7.0.60';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -2052,6 +2052,34 @@
     return { registeredLetterLine: '', proofLine: '' };
   }
 
+  function inferDeadlineCategoryFromContext(context = {}) {
+    const low = `${String(context.docTitle || '')} ${String(context.docProcedure || '')}`.toLowerCase();
+    if (!normalize(low)) return { category: '', evidence: '' };
+
+    if (/rule\s*71\s*\(\s*3\s*\)|intention to grant|text intended for grant/.test(low)) {
+      return { category: 'R71(3) response period', evidence: 'Inferred from document title/procedure metadata (Rule 71(3) / intention to grant signal)' };
+    }
+    if (/\brule\s*116\b|summons to oral proceedings/.test(low)) {
+      return { category: 'Rule 116 final date', evidence: 'Inferred from document title/procedure metadata (Rule 116 / summons signal)' };
+    }
+    if (/\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)|communication from (?:the )?examining|examining division/.test(low)) {
+      return { category: 'Art. 94(3) response period', evidence: 'Inferred from document title/procedure metadata (examining-division communication signal)' };
+    }
+    if (/\brule\s*161\b|\brule\s*162\b/.test(low)) {
+      return { category: 'Rule 161/162 response period', evidence: 'Inferred from document title/procedure metadata (Rule 161/162 signal)' };
+    }
+
+    return { category: '', evidence: '' };
+  }
+
+  function defaultResponseMonthsForCategory(category) {
+    const c = String(category || '').toLowerCase();
+    if (c.includes('art. 94(3)')) return 4;
+    if (c.includes('r71(3)')) return 4;
+    if (c.includes('rule 161/162')) return 6;
+    return 0;
+  }
+
   function parsePdfDeadlineHints(pdfText, context = {}) {
     const textRaw = String(pdfText || '');
     const textLower = textRaw.toLowerCase();
@@ -2059,6 +2087,7 @@
 
     const diagnostics = {
       category: '',
+      categoryEvidence: '',
       communicationDate: '',
       communicationEvidence: '',
       responseMonths: 0,
@@ -2088,7 +2117,7 @@
       });
     };
 
-    const category = /rule\s*71\s*\(\s*3\s*\)|intention to grant/.test(textLower)
+    const categoryFromText = /rule\s*71\s*\(\s*3\s*\)|intention to grant/.test(textLower)
       ? 'R71(3) response period'
       : /\brule\s*116\b|summons to oral proceedings/.test(textLower)
         ? 'Rule 116 final date'
@@ -2098,7 +2127,13 @@
             ? 'Rule 161/162 response period'
             : '';
 
+    const categoryFromContext = inferDeadlineCategoryFromContext(context);
+    const category = categoryFromText || categoryFromContext.category;
+
     diagnostics.category = category;
+    diagnostics.categoryEvidence = categoryFromText
+      ? 'Detected from communication text'
+      : (categoryFromContext.evidence || '');
 
     const registeredLetter = extractRegisteredLetterProofLine(textRaw);
     diagnostics.registeredLetterLine = registeredLetter.registeredLetterLine || '';
@@ -2111,8 +2146,18 @@
     diagnostics.communicationEvidence = communication.evidence || (docDateStr ? 'Doclist date fallback for communication date' : '');
 
     const monthPeriod = extractResponseMonthsFromPdf(textRaw);
-    diagnostics.responseMonths = monthPeriod.months || 0;
-    diagnostics.responseEvidence = monthPeriod.evidence || '';
+    let responseMonths = monthPeriod.months || 0;
+    let responseEvidence = monthPeriod.evidence || '';
+    if (!responseMonths && category) {
+      const fallbackMonths = defaultResponseMonthsForCategory(category);
+      if (fallbackMonths > 0) {
+        responseMonths = fallbackMonths;
+        responseEvidence = `Default ${fallbackMonths}-month period inferred for ${category}${diagnostics.categoryEvidence ? ` (${diagnostics.categoryEvidence})` : ''}`;
+      }
+    }
+
+    diagnostics.responseMonths = responseMonths;
+    diagnostics.responseEvidence = responseEvidence;
 
     const explicitDue = extractExplicitDeadlineDateFromPdf(textRaw);
     diagnostics.explicitDeadlineDate = explicitDue.dateStr || '';
@@ -2135,15 +2180,19 @@
       explicitAdded = true;
     }
 
-    if (!explicitAdded && monthPeriod.months && communicationDate) {
-      const calc = addCalendarMonthsDetailed(communicationDate, monthPeriod.months);
+    if (!explicitAdded && responseMonths && communicationDate) {
+      const calc = addCalendarMonthsDetailed(communicationDate, responseMonths);
+      const confidence = monthPeriod.months
+        ? (communication.dateStr ? 'high' : 'medium')
+        : 'low';
+
       pushHint({
         label: category,
         dateStr: formatDate(calc.date),
         sourceDate: communicationDateStr,
-        confidence: communication.dateStr ? 'high' : 'medium',
+        confidence,
         level: /rule\s*116/i.test(category) ? 'warn' : 'bad',
-        evidence: `${monthPeriod.evidence || `Derived from ${monthPeriod.months} month response period in PDF text`} from communication date ${communicationDateStr}${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
+        evidence: `${responseEvidence || `Derived from ${responseMonths} month response period`} from communication date ${communicationDateStr}${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
       });
     }
 
@@ -2570,7 +2619,11 @@
           });
         }
 
-        const parsed = parsePdfDeadlineHints(text, { docDateStr: doc.dateStr });
+        const parsed = parsePdfDeadlineHints(text, {
+          docDateStr: doc.dateStr,
+          docTitle: doc.title,
+          docProcedure: doc.procedure,
+        });
         const parsedHints = Array.isArray(parsed?.hints) ? parsed.hints : [];
         const diagnostics = parsed?.diagnostics || {};
 
@@ -2589,6 +2642,7 @@
           transport: parseTransport,
           url: parseUrl,
           category: diagnostics.category || '',
+          categoryEvidence: diagnostics.categoryEvidence || '',
           communicationDate: diagnostics.communicationDate || '',
           communicationEvidence: diagnostics.communicationEvidence || '',
           responseMonths: Number(diagnostics.responseMonths || 0),
