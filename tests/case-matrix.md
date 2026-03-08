@@ -4,12 +4,14 @@ This matrix is used to validate sidebar correctness across different prosecution
 
 ## Core Cases
 
-| Case | Purpose | Key Checks |
-|---|---|---|
-| `EP25203732` | Active polishing target (title/status/deadline/divisional behavior) | English title selection, non-duplicated status, divisional type+parent link, applicant-vs-EPO waiting logic, renewal countdown |
-| `EP19205846` | Withdrawn/deemed-withdrawn behavior | Status simplification, stage vs status separation, event/timeline cleanup, publication fallback behavior |
-| `EP4438108` | UPC opt-out positive control | UPC registry lookup should resolve as opted out |
-| `EP3816364` | UPC opt-out negative control | UPC registry lookup should resolve as no opt-out found |
+> **Matrix rule:** the primary case identifier must be the **EP application number** (not publication number).
+
+| Application # | Purpose | Key Checks | Publication Ref (optional) |
+|---|---|---|---|
+| `EP25203732` | Active polishing target (title/status/deadline/divisional behavior) | English title selection, non-duplicated status, divisional type+parent link, applicant-vs-EPO waiting logic, renewal countdown | — |
+| `EP19205846` | Withdrawn/deemed-withdrawn behavior | Status simplification, stage vs status separation, event/timeline cleanup, publication fallback behavior | — |
+| `TODO_APP_NO_FOR_UPC_POSITIVE` | UPC opt-out positive control | UPC registry lookup should resolve as opted out | `EP4438108` |
+| `TODO_APP_NO_FOR_UPC_NEGATIVE` | UPC opt-out negative control | UPC registry lookup should resolve as no opt-out found | `EP3816364` |
 
 ---
 
@@ -66,8 +68,8 @@ For each case, verify these fields:
 
 ### UPC / UE
 - [ ] Opt-out status is registry-backed when lookup succeeds.
-- [ ] Positive control (`EP4438108`) resolves as opted out.
-- [ ] Negative control (`EP3816364`) resolves as no opt-out found.
+- [ ] Positive control (`TODO_APP_NO_FOR_UPC_POSITIVE`; publication ref `EP4438108`) resolves as opted out.
+- [ ] Negative control (`TODO_APP_NO_FOR_UPC_NEGATIVE`; publication ref `EP3816364`) resolves as no opt-out found.
 
 ### All Documents page (`tab=doclist`)
 - [ ] Bundle grouping headers are present and stable after focus/visibility changes.
@@ -86,5 +88,6 @@ node tests/userscript_regression.test.js
 ## Notes
 
 - Deadlines are heuristic unless explicit legal/date anchors exist.
+- Use **application numbers** as matrix case IDs; if a publication reference is needed, store it in the `Publication Ref` column.
 - UPC registry checks depend on endpoint availability and parseable result markup.
 - Case-specific anomalies should be recorded with screenshot + URL + timestamp.
