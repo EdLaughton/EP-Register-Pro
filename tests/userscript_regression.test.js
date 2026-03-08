@@ -188,6 +188,9 @@ hasText('Deadlines & clocks (detailed)', 'Overview should render a detailed dead
 hasText('Type / stage', 'Overview should combine type and stage in a single summary row');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
+has(/const\s+nextDeadlineMetaLines\s*=\s*\[\];/, 'Actionable status should build tidy next-deadline metadata lines');
+hasText('Basis: ${nextDeadlineMethod}', 'Actionable status should render method evidence as a dedicated Basis line');
+notHas(/nextDeadlineMeta\s*=\s*m\.nextDeadline/, 'Legacy one-line next-deadline metadata blob should be removed');
 hasText('since applicant response', 'Waiting-on summary should include elapsed applicant-response time when applicable');
 notHas(/<div class="epoRP-l">EPO last action<\/div>/, 'Actionable status should not render a separate EPO last action row after consolidation');
 notHas(/<div class="epoRP-l">Applicant last filing<\/div>/, 'Actionable status should not render a separate applicant last filing row after consolidation');

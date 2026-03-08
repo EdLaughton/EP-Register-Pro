@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.64
+- Tidied **Overview → Actionable status** formatting for readability:
+  - reformatted Next deadline supporting context into cleaner sub-lines (context + basis + status), instead of one long parenthesized sentence
+  - normalized whitespace/newlines in parsed deadline evidence (e.g. OCR-derived `within a period of 4 months`)
+  - removed redundant source-date duplication when already embedded in method text
+
 ### 7.0.63
 - Added OCR fallback path for image-only prosecution PDFs:
   - loads `tesseract.js` (with sandbox-safe fallback loading) when pdf.js text extraction is empty

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.63
+// @version      7.0.64
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.63';
+  const VERSION = '7.0.64';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -3836,19 +3836,28 @@
       html += `</div><div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.${m.nextDeadline ? ' Next actionable due date is summarized in Actionable status.' : ''}</div></div>`;
     }
 
-    const nextDeadlineMeta = m.nextDeadline
-      ? [
-        `From ${m.nextDeadline.sourceDate || 'procedural event'}`,
-        m.nextDeadline.confidence ? `${m.nextDeadline.confidence} confidence` : '',
-        m.nextDeadline.method || '',
-        m.nextDeadline.rolledOver ? `rolled over${m.nextDeadline.rolloverNote ? ` (${m.nextDeadline.rolloverNote})` : ''}` : '',
-        m.nextDeadline.resolved ? 'responded' : '',
-      ].filter(Boolean).join(' · ')
-      : '';
-
     const nextDeadlineBadge = m.daysToDeadline != null
       ? `<span class="epoRP-bdg ${m.daysToDeadline < 0 ? 'bad' : m.daysToDeadline <= 14 ? 'bad' : m.daysToDeadline <= 45 ? 'warn' : 'ok'}">${m.daysToDeadline >= 0 ? formatDaysHuman(m.daysToDeadline) : `${formatDaysHuman(m.daysToDeadline).slice(1)} overdue`}</span>`
       : '';
+
+    let nextDeadlineMethod = normalize(m.nextDeadline?.method || '').replace(/\s*\n\s*/g, ' ');
+    const nextDeadlineSourceDate = normalize(m.nextDeadline?.sourceDate || '');
+    const sourceAlreadyInMethod = nextDeadlineSourceDate
+      && new RegExp(`from\\s+communication\\s+date\\s+${nextDeadlineSourceDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(nextDeadlineMethod);
+    if (sourceAlreadyInMethod && nextDeadlineSourceDate) {
+      nextDeadlineMethod = normalize(nextDeadlineMethod.replace(new RegExp(`\\s*from\\s+communication\\s+date\\s+${nextDeadlineSourceDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'), ''));
+    }
+
+    const nextDeadlineMetaLines = [];
+    const nextDeadlineContextBits = [];
+    if (nextDeadlineSourceDate && !sourceAlreadyInMethod) nextDeadlineContextBits.push(`From ${nextDeadlineSourceDate}`);
+    if (m.nextDeadline?.confidence) nextDeadlineContextBits.push(`${m.nextDeadline.confidence} confidence`);
+    if (nextDeadlineContextBits.length) nextDeadlineMetaLines.push(nextDeadlineContextBits.join(' · '));
+    if (nextDeadlineMethod) nextDeadlineMetaLines.push(`Basis: ${nextDeadlineMethod}`);
+    if (m.nextDeadline?.rolledOver) nextDeadlineMetaLines.push(`Calendar rollover${m.nextDeadline.rolloverNote ? ` (${m.nextDeadline.rolloverNote})` : ''}`);
+    if (m.nextDeadline?.resolved) nextDeadlineMetaLines.push('Marked as responded');
+
+    const nextDeadlineMetaHtml = nextDeadlineMetaLines.map((line) => `<div class="epoRP-m">${esc(line)}</div>`).join('');
 
     const latestEpoText = m.latestEpo ? `${m.latestEpo.dateStr} · ${m.latestEpo.title}` : '—';
     const latestApplicantText = m.latestApplicant ? `${m.latestApplicant.dateStr} · ${m.latestApplicant.title}` : '—';
@@ -3858,7 +3867,7 @@
       : 'Applicant';
 
     html += `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
-      <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}${nextDeadlineMeta ? `<div class="epoRP-m">${esc(`(${nextDeadlineMeta})`)}</div>` : ''}` : '—'}</div>
+      <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : '—'}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
       <div class="epoRP-l">Waiting on</div><div class="epoRP-v">${waitingSummary}</div>
     </div></div>`;
