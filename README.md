@@ -94,6 +94,12 @@ node tests/userscript_lifecycle.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.81
+- Third-pass cross-page hydration cleanup:
+  - UPC candidate-number selection now supplements main-page publication numbers with **case-local doclist-derived publication evidence**
+  - preserves the publication-number-only rule while improving UPC lookup coverage when the case was first hydrated from non-main tabs or partial main data
+  - still avoids family-wide publication fallback to reduce false positives
+
 ### 7.0.80
 - Second-pass cache/state hardening:
   - centralized source-cache writes behind a single helper to keep status/parserVersion/dependencyStamp handling consistent

@@ -31,6 +31,8 @@ hasText('scheduleInit(false);', 'Route/pageshow handling should use debounced in
 // Derived-source dedupe
 has(/function\s+storeCaseSource\s*\(/, 'Centralized source-write helper missing');
 hasText("const dependencyStamp = derivedDependencyStamp(caseNo, 'upcRegistry');", 'UPC refresh should compute dependency stamp from upstream state');
+hasText('const doclistPublications = inferPublicationsFromDocs(doclist.docs || []);', 'UPC candidate selection should supplement main-page publication numbers from case-local doclist evidence');
+hasText('Prefer explicit main-page publications, then supplement from case-local doclist evidence.', 'UPC candidate selection should document the main+doclist publication priority');
 hasText("isFresh(cached, options().refreshHours, { allowEmpty: true, dependencyStamp })", 'UPC/PDF derived refresh should reuse fresh empty/ok cache only when dependency stamp matches');
 hasText("status: 'empty'", 'Derived-source refreshers should cache explicit empty states when appropriate');
 hasText('dependencyStamp,', 'Derived-source cache entries should persist dependency stamps');
