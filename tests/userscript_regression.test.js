@@ -58,6 +58,15 @@ hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-d
 hasText('normalizedDocUrl', 'PDF URL failure logging should include normalized URL attempt for debugging');
 has(/withProofLine:\s*scanned\.filter\(/, 'PDF summary logging should include proof-line hit count');
 has(/withResponsePeriod:\s*scanned\.filter\(/, 'PDF summary logging should include response-period hit count');
+has(/function\s+sourceDiagnostics\s*\(/, 'Source diagnostics helper should summarize parsed feature payloads');
+has(/addLog\(caseNo,\s*'ok',\s*`Parse success \$\{src\.key\}`,[\s\S]*sourceDiagnostics\(src\.key,\s*parsed\)/, 'Fetch parse success logs should include feature-level source diagnostics');
+has(/addLog\(caseNo,\s*'info',\s*'Live parse success',[\s\S]*sourceDiagnostics\(sourceKey,\s*data\)/, 'Live parse logs should include feature-level source diagnostics');
+hasText('const logs = (getCase(caseNo).logs || []).slice(-120).reverse();', 'Operation console should render latest logs first');
+hasText('autoPrefetchDoneByCase', 'Init should track per-case auto-prefetch completion in current page session');
+hasText('Initial case load: stale/missing sources detected; running auto prefetch', 'Init should log initial auto-prefetch decisions');
+hasText('Case tab/page changed; auto prefetch skipped for this page session', 'Init should skip repeated auto-prefetch on same case during tab/page changes');
+hasText('Initial case load: cache is fresh; no auto prefetch needed', 'Init should log fresh-cache reuse on first case load');
+notHas(/addEventListener\('focus',[\s\S]*prefetchCase\(/, 'Focus handler should not auto-reload all sources after same-case tab/page changes');
 has(/inferProceduralDeadlines\(main,\s*docs,\s*eventHistory,\s*legal,\s*pdfDeadlines\)/, 'Overview deadline model should include PDF-derived hints');
 
 // Timeline controls (include/exclude + importance)

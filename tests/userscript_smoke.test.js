@@ -25,6 +25,10 @@ for (const pdfHook of ['extractRegisteredLetterProofLine', 'normalizePdfDocument
   assert(src.includes(pdfHook), `Missing PDF diagnostics hook ${pdfHook}`);
 }
 
+for (const diagnosticsHook of ['sourceDiagnostics', 'autoPrefetchDoneByCase', 'slice(-120).reverse()', 'Case tab/page changed; auto prefetch skipped for this page session']) {
+  assert(src.includes(diagnosticsHook), `Missing diagnostics coverage hook ${diagnosticsHook}`);
+}
+
 assert(!src.includes('IPC/CPC'), 'IPC/CPC block should be removed from sidebar UI');
 
 console.log('userscript smoke checks passed');

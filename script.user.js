@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.51
+// @version      7.0.52
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.51';
+  const VERSION = '7.0.52';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -28,7 +28,7 @@
 
   const CACHE_SCHEMA = 2;
   const MAX_CASES = 30;
-  const MAX_LOGS_PER_APP = 180;
+  const MAX_LOGS_PER_APP = 500;
   const FETCH_CONCURRENCY = 2;
   const FETCH_TIMEOUT_MS = 15000;
   const FETCH_RETRIES = 1;
@@ -74,6 +74,8 @@
     timelineCache: { key: '', items: [] },
     doclistGroupSigByCase: {},
     pdfjsPromise: null,
+    autoPrefetchDoneByCase: {},
+    lastViewLogKey: '',
   };
 
   let memory = null;
@@ -299,7 +301,7 @@
   }
 
   function renderLogConsole(caseNo) {
-    const logs = (getCase(caseNo).logs || []).slice(-120);
+    const logs = (getCase(caseNo).logs || []).slice(-120).reverse();
     if (!logs.length) {
       return `<div class="epoRP-log-empty">No operation logs yet for this case.</div>`;
     }
@@ -578,6 +580,20 @@
         renderPanel();
       }, 60);
     }
+  }
+
+  function logViewContext(caseNo, view) {
+    if (!caseNo || !view) return;
+    const registerTab = tabSlug();
+    const key = `${caseNo}|${registerTab}|${view}|${runtime.collapsed ? 'collapsed' : 'expanded'}`;
+    if (runtime.lastViewLogKey === key) return;
+    runtime.lastViewLogKey = key;
+    addLog(caseNo, 'info', 'Sidebar context', {
+      source: 'ui',
+      registerTab,
+      view,
+      collapsed: !!runtime.collapsed,
+    });
   }
 
   function fieldByLabel(doc, regexes) {
@@ -1326,12 +1342,59 @@
     }
   }
 
+  function sourceDiagnostics(sourceKey, data) {
+    const d = data && typeof data === 'object' ? data : {};
+    if (sourceKey === 'main') {
+      return {
+        source: sourceKey,
+        titlePresent: !!normalize(d.title || ''),
+        priorities: Array.isArray(d.priorities) ? d.priorities.length : 0,
+        publications: Array.isArray(d.publications) ? d.publications.length : 0,
+        recentEvents: Array.isArray(d.recentEvents) ? d.recentEvents.length : 0,
+        status: d.statusSimple || 'Unknown',
+      };
+    }
+    if (sourceKey === 'doclist') {
+      return {
+        source: sourceKey,
+        docs: Array.isArray(d.docs) ? d.docs.length : 0,
+      };
+    }
+    if (sourceKey === 'event') {
+      return {
+        source: sourceKey,
+        events: Array.isArray(d.events) ? d.events.length : 0,
+      };
+    }
+    if (sourceKey === 'family') {
+      return {
+        source: sourceKey,
+        publications: Array.isArray(d.publications) ? d.publications.length : 0,
+      };
+    }
+    if (sourceKey === 'legal') {
+      return {
+        source: sourceKey,
+        events: Array.isArray(d.events) ? d.events.length : 0,
+        renewals: Array.isArray(d.renewals) ? d.renewals.length : 0,
+      };
+    }
+    if (sourceKey === 'ueMain') {
+      return {
+        source: sourceKey,
+        ueStatus: d.ueStatus || '',
+        upcOptOut: d.upcOptOut || '',
+      };
+    }
+    return { source: sourceKey };
+  }
+
   function captureLiveSource(caseNo) {
     const sourceKey = SOURCES.find((s) => s.slug === tabSlug())?.key;
     if (!sourceKey) return;
     try {
       const data = parseSource(sourceKey, document, caseNo);
-      addLog(caseNo, 'info', `Live parse success`, { source: sourceKey, transport: 'dom' });
+      addLog(caseNo, 'info', 'Live parse success', { transport: 'dom', ...sourceDiagnostics(sourceKey, data) });
       patchCase(caseNo, (c) => {
         c.sources[sourceKey] = {
           key: sourceKey,
@@ -2230,10 +2293,16 @@
 
   async function prefetchCase(caseNo, force = false) {
     const opts = options();
-    if (!opts.preloadAllTabs && !force) return;
     if (!caseNo) return;
+    if (!opts.preloadAllTabs && !force) {
+      addLog(caseNo, 'info', 'Auto prefetch skipped (preloadAllTabs disabled)', { source: 'prefetch' });
+      return;
+    }
 
-    if (runtime.fetchCaseNo === caseNo && runtime.fetching && !force) return;
+    if (runtime.fetchCaseNo === caseNo && runtime.fetching && !force) {
+      addLog(caseNo, 'info', 'Prefetch request ignored (already running for this case)', { source: 'prefetch' });
+      return;
+    }
 
     cancelPrefetch();
 
@@ -2253,6 +2322,15 @@
         const fresh = isFresh(cached, opts.refreshHours);
         if (fresh) addLog(caseNo, 'info', `Skip fresh source ${s.key}`);
         return !fresh;
+      });
+      const neededKeys = needed.map((s) => s.key);
+      const freshKeys = SOURCES.map((s) => s.key).filter((k) => !neededKeys.includes(k));
+
+      addLog(caseNo, 'info', 'Prefetch plan ready', {
+        source: 'prefetch',
+        force: !!force,
+        needed: neededKeys,
+        fresh: freshKeys,
       });
 
       if (!needed.length) {
@@ -2278,7 +2356,7 @@
 
           addLog(caseNo, 'ok', `Fetch success ${src.key}`, { source: src.key, sizeKb: +(html.length / 1024).toFixed(2), transport: 'fetch' });
           const parsed = parseSource(src.key, parseHtml(html), caseNo);
-          addLog(caseNo, 'ok', `Parse success ${src.key}`, { source: src.key });
+          addLog(caseNo, 'ok', `Parse success ${src.key}`, { transport: 'fetch', ...sourceDiagnostics(src.key, parsed) });
 
           patchCase(caseNo, (c) => {
             c.sources[src.key] = {
@@ -2334,7 +2412,8 @@
 
         const c = getCase(caseNo);
         const okCount = SOURCES.filter((s) => c.sources[s.key]?.status === 'ok').length;
-        addLog(caseNo, 'ok', `Background prefetch finish (${okCount}/${SOURCES.length} sources ok)`);
+        const statusBySource = Object.fromEntries(SOURCES.map((s) => [s.key, c.sources[s.key]?.status || 'missing']));
+        addLog(caseNo, 'ok', `Background prefetch finish (${okCount}/${SOURCES.length} sources ok)`, { source: 'prefetch', statusBySource });
         runtime.fetching = false;
         runtime.fetchLabel = 'Idle';
         runtime.abortController = null;
@@ -3385,6 +3464,7 @@
     }
 
     const activeView = runtime.activeView || 'overview';
+    logViewContext(caseNo, activeView);
     if (activeView === 'timeline') {
       body.innerHTML = renderTimeline(caseNo);
       wireTimeline(caseNo);
@@ -3427,13 +3507,41 @@
       enhanceDoclistGrouping();
     }, 1800);
 
+    const registerTab = tabSlug();
+
     if (force) {
+      addLog(caseNo, 'info', 'Forced data reload for case', { source: 'prefetch', registerTab });
+      runtime.autoPrefetchDoneByCase[caseNo] = Date.now();
       prefetchCase(caseNo, true);
       return;
     }
 
+    if (runtime.autoPrefetchDoneByCase[caseNo]) {
+      if (changed) {
+        addLog(caseNo, 'info', 'Case tab/page changed; auto prefetch skipped for this page session', {
+          source: 'prefetch',
+          registerTab,
+        });
+      }
+      return;
+    }
+
+    runtime.autoPrefetchDoneByCase[caseNo] = Date.now();
+
     const needsRefresh = SOURCES.some((s) => !isFresh(getCase(caseNo).sources[s.key], options().refreshHours));
-    if (needsRefresh) prefetchCase(caseNo, false);
+    if (needsRefresh) {
+      addLog(caseNo, 'info', 'Initial case load: stale/missing sources detected; running auto prefetch', {
+        source: 'prefetch',
+        registerTab,
+      });
+      prefetchCase(caseNo, false);
+      return;
+    }
+
+    addLog(caseNo, 'ok', 'Initial case load: cache is fresh; no auto prefetch needed', {
+      source: 'prefetch',
+      registerTab,
+    });
   }
 
   GM_addStyle(`
@@ -3569,12 +3677,6 @@
   addEventListener('focus', () => {
     if (!isCasePage()) return;
     enhanceDoclistGrouping();
-    const needsRefresh = SOURCES.some((s) => !isFresh(getCase(runtime.appNo).sources[s.key], options().refreshHours));
-    if (needsRefresh) {
-      renderPanel();
-      prefetchCase(runtime.appNo, false);
-      return;
-    }
     if (runtime.activeView !== 'timeline') renderPanel();
   });
 

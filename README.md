@@ -91,6 +91,17 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.52
+- Added broader feature diagnostics in operation logs:
+  - source-level parse summaries for main/doclist/event/family/legal/ueMain
+  - sidebar context logs (current Register tab + sidebar view)
+  - richer prefetch plan/finish logs with per-source status summaries
+- Operation console now renders **latest entries first**.
+- Prevented repeated automatic full-source reloads on same-case tab/page changes within the same browser page session.
+  - Auto prefetch now runs only on initial case load (or manual forced reload).
+  - Focus events no longer trigger background full-source reload checks.
+- Increased per-case log retention to reduce perceived console "clearing" from log rollover.
+
 ### 7.0.51
 - Fixed PDF URL resolution for EPO doclist links that use `javascript:NewPDFWindow(...)` handlers.
   - Extracts and normalizes `application?documentId=...` links from javascript pseudo-URLs.
