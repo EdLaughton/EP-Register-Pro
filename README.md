@@ -91,6 +91,11 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.77
+- Condensed filing metadata in Overview top summary:
+  - combined `Filing date` and `20-year term from filing (reference)` into a single line for quicker scanning
+  - format now reads as: `Filed <date> · 20-year term <expiry> · <remaining time>`
+
 ### 7.0.76
 - Fixed auto-load regression where prefetch session-gate could suppress background loading even when sources were stale/missing (e.g. sidebar stuck at `1/6`).
 - Gate now auto-bypasses when stale/missing sources are detected and runs a recovery prefetch.

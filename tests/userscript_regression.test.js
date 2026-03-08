@@ -205,7 +205,9 @@ hasText('Detailed clocks', 'Overview should embed detailed/reference clocks insi
 notHas(/Deadlines & clocks \(detailed\)/, 'Overview should no longer render a separate Deadlines & clocks section');
 hasText('Type / stage', 'Overview should combine type and stage in a single summary row');
 has(/const\s+termReference\s*=\s*m\.deadlines\.find\(/, 'Overview should compute 20-year term reference from deadline model');
-has(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Overview top summary should display 20-year term reference row after filing date');
+has(/const\s+filingSummary\s*=\s*normalize\(\[/, 'Overview should build a condensed filing summary line');
+hasText('20-year term ${termReferenceText}', 'Overview filing summary should include the 20-year term reference inline');
+notHas(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Overview should not render a separate 20-year term row after condensing filing metadata');
 has(/if \(d\.reference && \/20-year term from filing\/i\.test\(String\(d\.label \|\| ''\)\)\) return false;/, 'Detailed clocks should avoid duplicating 20-year term reference row already shown in top summary');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
