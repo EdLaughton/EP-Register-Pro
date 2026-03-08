@@ -120,6 +120,7 @@ At minimum run:
 
 Fixture expectation:
 - when touching parsers, page extraction, or PDF deadline logic, prefer representative saved fixtures under `tests/fixtures/` over adding only string-assertion tests
+- keep `tests/live-fixture-tracker.md` current when adding/retrying real Register or UPC captures; retry `missing` entries on future live-capture passes
 
 Also explicitly reason-check:
 - initial load on each supported page type

@@ -8,7 +8,7 @@ const hooks = loadUserscriptHooks();
 const caseNo = 'EP24837586';
 
 function realDoc(name) {
-  return loadFixtureDocument(['register-real', `${name}.html`], `https://register.epo.org/application?number=${caseNo}&tab=${name}&lng=en`);
+  return loadFixtureDocument(['cases', caseNo, `${name}.html`], `https://register.epo.org/application?number=${caseNo}&tab=${name}&lng=en`);
 }
 
 const main = hooks.parseMain(realDoc('main'), caseNo);
@@ -17,7 +17,7 @@ assert.strictEqual(main.title, 'FACADE', 'Real main capture should extract live 
 assert(main.applicant.includes('Mauer Limited'), 'Real main capture should extract applicant text');
 assert(main.representative.includes('J A Kemp LLP'), 'Real main capture should extract representative text');
 assert.strictEqual(main.filingDate, '19.12.2024', 'Real main capture should extract live filing date');
-assert.strictEqual(main.applicationType, 'Divisional', 'Real main capture should classify the live case as divisional');
+assert.strictEqual(main.applicationType, 'E/PCT regional phase', 'Real main capture should classify the live case as Euro-PCT regional phase');
 assert(main.divisionalChildren.includes('EP25203726') && main.divisionalChildren.includes('EP25203732'), 'Real main capture should retain live divisional child links');
 
 const doclist = hooks.parseDoclist(realDoc('doclist'));

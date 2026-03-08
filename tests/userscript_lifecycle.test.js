@@ -44,6 +44,8 @@ hasText('let failedCandidates = 0;', 'PDF refresh should track per-candidate fai
 has(/function\s+derivePdfDeadlineStatus\s*\(/, 'PDF refresh should derive status from successful-vs-failed candidate scans through a dedicated helper');
 
 // Overview-model memoization
+has(/function\s+sectionRowsByHeader\s*\(/, 'Header-rowspan section extraction should be centralized for real Register table parsing');
+has(/function\s+parseMainPublications\s*\(/, 'Main-page publication parsing should handle multi-row Register publication tables');
 has(/function\s+caseSnapshot\s*\(/, 'Case-source reads should be centralized behind a caseSnapshot helper');
 has(/function\s+overviewCacheKey\s*\(/, 'Overview cache key helper missing');
 hasText("runtime.overviewCache = { key: cacheKey, model };", 'Overview model should be memoized');

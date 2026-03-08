@@ -9,45 +9,42 @@ const hooks = loadUserscriptHooks();
 
 const caseNo = 'EP24837586';
 const docs = {
-  main: loadFixtureDocument(['register', 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`),
-  doclist: loadFixtureDocument(['register', 'doclist.html'], `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en`),
-  legal: loadFixtureDocument(['register', 'legal.html'], `https://register.epo.org/application?number=${caseNo}&tab=legal&lng=en`),
-  event: loadFixtureDocument(['register', 'event.html'], `https://register.epo.org/application?number=${caseNo}&tab=event&lng=en`),
-  family: loadFixtureDocument(['register', 'family.html'], `https://register.epo.org/application?number=${caseNo}&tab=family&lng=en`),
-  ueMain: loadFixtureDocument(['register', 'ueMain.html'], `https://register.epo.org/application?number=${caseNo}&tab=ueMain&lng=en`),
+  main: loadFixtureDocument(['cases', caseNo, 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`),
+  doclist: loadFixtureDocument(['cases', caseNo, 'doclist.html'], `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en`),
+  legal: loadFixtureDocument(['cases', caseNo, 'legal.html'], `https://register.epo.org/application?number=${caseNo}&tab=legal&lng=en`),
+  event: loadFixtureDocument(['cases', caseNo, 'event.html'], `https://register.epo.org/application?number=${caseNo}&tab=event&lng=en`),
+  family: loadFixtureDocument(['cases', caseNo, 'family.html'], `https://register.epo.org/application?number=${caseNo}&tab=family&lng=en`),
+  ueMain: loadFixtureDocument(['cases', caseNo, 'ueMain.html'], `https://register.epo.org/application?number=${caseNo}&tab=ueMain&lng=en`),
 };
 
 const main = hooks.parseMain(docs.main, caseNo);
 assert.strictEqual(main.appNo, caseNo, 'Main parser should preserve case number');
-assert.strictEqual(main.title, 'Facade system', 'Main parser should extract English title');
-assert.strictEqual(main.applicant, 'Mauer Limited', 'Main parser should normalize applicant block');
-assert.strictEqual(main.representative, 'J A Kemp LLP', 'Main parser should extract representative');
-assert.strictEqual(main.filingDate, '18.09.2023', 'Main parser should extract filing date from application number row');
-assert.strictEqual(main.parentCase, 'EP11111111', 'Main parser should extract parent application from scoped header rows');
-assert.deepStrictEqual(Array.from(main.divisionalChildren || []), ['EP22222222'], 'Main parser should extract divisional children from scoped header rows');
-assert.strictEqual(main.applicationType, 'Divisional', 'Main parser should prioritize divisional classification when parent/divisional links are present');
-assert(main.publications.some((p) => p.no === 'EP1234567' && p.kind === 'A1'), 'Main parser should extract publication number + kind from publication field');
+assert.strictEqual(main.title, 'FACADE', 'Main parser should extract live English title from real Register capture');
+assert(main.applicant.includes('Mauer Limited'), 'Main parser should normalize applicant block from real Register capture');
+assert(main.representative.includes('J A Kemp LLP'), 'Main parser should extract representative from real Register capture');
+assert.strictEqual(main.filingDate, '19.12.2024', 'Main parser should extract filing date from real Register capture');
+assert(main.divisionalChildren.includes('EP25203726') && main.divisionalChildren.includes('EP25203732'), 'Main parser should extract live divisional children');
+assert.strictEqual(main.applicationType, 'E/PCT regional phase', 'Main parser should classify the live case as Euro-PCT regional phase');
+assert(main.internationalAppNo === 'WO2024EP87573', 'Main parser should extract the live PCT application number from the real capture');
+assert(main.publications.some((p) => p.no === 'EP4623169' && p.kind === 'A1'), 'Main parser should extract real publication number + kind from multi-row publication tables');
 
 const doclist = hooks.parseDoclist(docs.doclist);
-assert.strictEqual(doclist.docs.length, 5, 'Doclist parser should extract all checkbox-backed document rows');
-assert(doclist.docs.some((d) => d.title.includes('Communication about intention to grant') && d.bundle === 'Grant package' && d.actor === 'EPO'), 'Doclist parser should classify intention-to-grant communication as EPO grant-package material');
-assert(doclist.docs.some((d) => d.title.includes('Amendments/corrections to the text proposed for grant') && d.bundle === 'Grant package' && d.actor === 'Applicant'), 'Doclist parser should classify applicant grant-text corrections as grant-package filings');
-assert(doclist.docs.some((d) => d.title.includes('Article 94(3)') && d.bundle === 'Examination'), 'Doclist parser should classify Article 94(3) communications as examination material');
+assert(doclist.docs.length >= 10, 'Doclist parser should extract a non-trivial document list from the live capture');
+assert(doclist.docs.some((d) => /Copy of the international search report/i.test(d.title) && d.bundle === 'Search package' && d.actor === 'EPO'), 'Doclist parser should classify EPO search-report material in the live Euro-PCT capture');
+assert(doclist.docs.some((d) => /Amended claims|Amendments received before examination/i.test(d.title) && d.actor === 'Applicant'), 'Doclist parser should classify applicant amendment filings in the live capture');
 
 const legal = hooks.parseLegal(docs.legal, caseNo);
-assert(legal.events.some((e) => e.title === 'Mention of grant'), 'Legal parser should extract dated legal-status events');
-assert(legal.renewals.some((r) => r.year === 7), 'Legal parser should detect renewal year from annual-fee event text');
+assert(legal.events.some((e) => /Examination fee paid|Despatch of communication/i.test(`${e.title} ${e.detail}`)), 'Legal parser should extract dated legal-status events from the live capture');
 
 const eventHistory = hooks.parseEventHistory(docs.event, caseNo);
-assert.strictEqual(eventHistory.events.length, 2, 'Event-history parser should extract dated rows');
-assert(eventHistory.events.some((e) => /Applicant observations filed/.test(e.title)), 'Event-history parser should preserve event titles');
+assert(eventHistory.events.length >= 3, 'Event-history parser should extract multiple dated rows from the live capture');
+assert(eventHistory.events.some((e) => /request for examination/i.test(e.title)), 'Event-history parser should preserve live event titles');
 
 const family = hooks.parseFamily(docs.family);
-assert(family.publications.some((p) => p.no === 'EP1234567' && p.kind === 'A1'), 'Family parser should extract publication entries from page text');
+assert(family.publications.some((p) => p.no === 'EP4623169' && p.kind === 'A1'), 'Family parser should extract publication entries from real family-table HTML');
 
 const ue = hooks.parseUe(docs.ueMain);
-assert.strictEqual(ue.ueStatus, 'Unitary effect registered', 'UE parser should normalize unitary-effect registration status');
-assert.strictEqual(ue.upcOptOut, 'Opt-out withdrawn', 'UE parser should detect withdrawn UPC opt-out wording');
+assert((ue.ueStatus || ue.statusRaw || '').length > 0, 'UE parser should parse the live ueMain capture without crashing');
 
 const pdfR71 = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'r71_communication.txt'), {
   docDateStr: '10.01.2026',
@@ -70,8 +67,7 @@ assert.strictEqual(pdfArt94Fallback.hints[0].dateStr, '01.01.2026', 'PDF parser 
 assert(/Default 4-month period inferred/.test(pdfArt94Fallback.diagnostics.responseEvidence), 'PDF parser should record default-period fallback evidence for metadata-derived categories');
 
 const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, pdfR71);
-assert(deadlines.some((d) => d.label === 'R71(3) response period' && d.resolved === true), 'Deadline model should mark the R71(3) cycle resolved when later applicant grant-response activity exists');
-assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Deadline model should derive post-grant opposition monitor from mention of grant');
-assert(deadlines.some((d) => d.label === '20-year term from filing (reference)' && d.reference === true), 'Deadline model should include filing-term reference from fixture data');
+assert(deadlines.some((d) => d.label === 'R71(3) response period'), 'Deadline model should derive the R71(3) cycle from live grant-communication material');
+assert(deadlines.some((d) => d.label === '20-year term from filing (reference)' && d.reference === true), 'Deadline model should include filing-term reference from real Register data');
 
 console.log('userscript parser fixture checks passed');

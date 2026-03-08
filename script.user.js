@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.87
+// @version      7.0.88
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.87';
+  const VERSION = '7.0.88';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -756,6 +756,37 @@
     });
   }
 
+  function sectionRowsByHeader(doc, headerRegex) {
+    const groups = [];
+
+    for (const tr of doc.querySelectorAll('tr')) {
+      const headers = [...tr.querySelectorAll('th,td')].filter((cell) => {
+        const tag = String(cell.tagName || '').toUpperCase();
+        if (tag === 'TH') return true;
+        const cls = String(cell.className || '').toLowerCase();
+        return /\bth\b/.test(cls) || cls.includes('header');
+      });
+      const th = headers.find((h) => headerRegex.test(text(h)));
+      if (!th) continue;
+
+      const rows = [tr];
+      const rowspan = Math.max(1, parseInt(th.getAttribute('rowspan') || '1', 10) || 1);
+      let next = tr;
+      for (let i = 1; i < rowspan; i++) {
+        next = next?.nextElementSibling;
+        if (!next || next.tagName !== 'TR') break;
+        rows.push(next);
+      }
+      groups.push(rows);
+    }
+
+    return groups;
+  }
+
+  function sectionTextsByHeader(doc, headerRegex) {
+    return dedupe(sectionRowsByHeader(doc, headerRegex).map((rows) => rows.map((r) => text(r)).join('\n').trim()).filter(Boolean), (x) => x);
+  }
+
   function fieldByLabel(doc, regexes) {
     for (const row of doc.querySelectorAll('tr')) {
       const cells = [...row.querySelectorAll('th,td')].map(text);
@@ -783,38 +814,62 @@
   }
 
   function parseApplicationField(raw) {
-    const m = normalize(raw).match(/\b(\d{6,10}\.\d)\b[\s\S]{0,70}?\b(\d{2}\.\d{2}\.\d{4})\b/);
+    const m = normalize(raw).match(/(\d{6,10}\.\d)[\s\S]{0,70}?(\d{2}\.\d{2}\.\d{4})\b/);
     return { checksum: m?.[1] || '', filingDate: m?.[2] || '' };
+  }
+
+  function parseMainPublications(doc, role = 'EP (this file)') {
+    const out = [];
+
+    const push = (rawNo, rawKind, rawDate) => {
+      const parsed = splitPublicationNumber(rawNo, rawKind);
+      const dateStr = String(rawDate || '').match(DATE_RE)?.[1] || '';
+      if (!parsed.no || !dateStr) return;
+      out.push({ no: parsed.no, kind: parsed.kind, dateStr, role });
+    };
+
+    for (const rows of sectionRowsByHeader(doc, /^Publication\b/i)) {
+      let currentType = '';
+      let currentNo = '';
+      let currentDate = '';
+
+      const flush = () => {
+        if (!currentNo || !currentDate) return;
+        push(currentNo, currentType, currentDate);
+        currentType = '';
+        currentNo = '';
+        currentDate = '';
+      };
+
+      for (const row of rows) {
+        const cells = [...row.querySelectorAll('th,td')].map(text).filter(Boolean);
+        for (let i = 0; i < cells.length - 1; i++) {
+          const label = cells[i];
+          const value = cells.slice(i + 1).join(' ');
+          if (/^Type:?$/i.test(label)) {
+            currentType = value.match(/\b([A-Z]\d)\b/)?.[1] || currentType;
+          } else if (/^No\.:?$/i.test(label)) {
+            currentNo = value;
+          } else if (/^Date:?$/i.test(label)) {
+            currentDate = value;
+            flush();
+          }
+        }
+      }
+
+      flush();
+    }
+
+    return dedupe(out, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
   }
 
   function extractEpNumbersByHeader(doc, headerRegex) {
     const values = [];
-
-    for (const tr of doc.querySelectorAll('tr')) {
-      const headers = [...tr.querySelectorAll('th,td')].filter((cell) => {
-        const tag = String(cell.tagName || '').toUpperCase();
-        if (tag === 'TH') return true;
-        const cls = String(cell.className || '').toLowerCase();
-        return /\bth\b/.test(cls) || cls.includes('header');
-      });
-      const th = headers.find((h) => headerRegex.test(text(h)));
-      if (!th) continue;
-
-      const rows = [tr];
-      const rowspan = Math.max(1, parseInt(th.getAttribute('rowspan') || '1', 10) || 1);
-      let next = tr;
-      for (let i = 1; i < rowspan; i++) {
-        next = next?.nextElementSibling;
-        if (!next || next.tagName !== 'TR') break;
-        rows.push(next);
-      }
-
-      const chunk = rows.map((r) => text(r)).join('\n');
+    for (const chunk of sectionTextsByHeader(doc, headerRegex)) {
       for (const m of chunk.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)) {
         values.push(String(m[1] || '').toUpperCase());
       }
     }
-
     return dedupe(values, (x) => x);
   }
 
@@ -1131,10 +1186,12 @@
   }
 
   function parseMain(doc, caseNo) {
-    const appField = fieldByLabel(doc, [/^Application number/i]);
+    const appSections = sectionTextsByHeader(doc, /^Application number/i);
+    const publicationSections = sectionTextsByHeader(doc, /^Publication\b/i);
+    const appField = appSections[0] || fieldByLabel(doc, [/^Application number/i]);
     const statusField = dedupeMultiline(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
     const priorityField = fieldByLabel(doc, [/^Priority\b/i]);
-    const publicationField = fieldByLabel(doc, [/^Publication\b/i]);
+    const publicationField = publicationSections.join('\n') || fieldByLabel(doc, [/^Publication\b/i]);
     const recentEventField = fieldByLabel(doc, [/^Most recent event$/i]);
 
     const appInfo = parseApplicationField(appField);
@@ -1150,11 +1207,12 @@
     const divisionalSection = String(pageText).match(/Divisional\s+application(?:\(s\))?[\s\S]{0,400}/i)?.[0] || '';
     const divisionalChildrenFromText = [...divisionalSection.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
     const divisionalChildren = dedupe([...divisionalChildrenFromHeader, ...divisionalChildrenFromText], (x) => x);
+    const mainPublications = parseMainPublications(doc, 'EP (this file)');
 
     const internationalField = dedupeMultiline(fieldByLabel(doc, [/^International application\b/i, /^International publication\b/i, /^PCT application\b/i]));
     const internationalSectionFromPage = String(pageText).match(/International\s+application(?:\s+number)?[\s\S]{0,220}/i)?.[0] || '';
-    const pctScopeText = `${String(appField || '')}\n${internationalField}\n${internationalSectionFromPage}`;
-    const woMatch = pctScopeText.match(/\b(WO\d{4}[A-Z]{2}\d{3,})\b/i);
+    const pctScopeText = `${appSections.join('\n')}\n${String(appField || '')}\n${internationalField}\n${internationalSectionFromPage}\n${pageText}`;
+    const woMatch = pctScopeText.match(/\b(WO\d{4}(?:[A-Z]{2})?\d{3,})\b/i);
     const pctMatch = pctScopeText.match(/\b(PCT\/[A-Z]{2}\d{4}\/\d{5,})\b/i);
     const internationalAppNo = (woMatch?.[1] || pctMatch?.[1] || '').toUpperCase();
     const isEuroPct = !!internationalAppNo;
@@ -1182,7 +1240,7 @@
       statusStage: inferStatusStage(statusField),
       designatedStates: dedupeMultiline(fieldByLabel(doc, [/^Designated/i])),
       recentEvents: parseRecentEvents(recentEventField),
-      publications: parsePublications(publicationField, 'EP (this file)'),
+      publications: mainPublications.length ? mainPublications : parsePublications(publicationField, 'EP (this file)'),
       internationalAppNo,
       isEuroPct,
       isDivisional: !!parentCase || divisionalMarker,

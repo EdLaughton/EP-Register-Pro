@@ -2,6 +2,8 @@
 
 This matrix is used to validate sidebar correctness across different prosecution states and UPC outcomes.
 
+Per-tab live capture status is tracked separately in `tests/live-fixture-tracker.md`.
+
 ## Core Cases
 
 > **Matrix rule:** the primary case identifier must be the **EP application number** (not publication number).
@@ -12,6 +14,7 @@ This matrix is used to validate sidebar correctness across different prosecution
 | `EP25203732` | Active divisional child | English title selection, divisional type + parent link, search-publication path, family/publication crossover to parent case, reminder/search-opinion doc coverage | `EP4644110` |
 | `EP19205846` | Withdrawn/deemed-withdrawn + renewal-history + UPC opt-out negative control | Status simplification, repeated R71 cycles, deemed-withdrawn outcome, renewal-fee extraction, publication fallback behavior, UPC lookup resolves as no opt-out found | `EP3816364` |
 | `EP24189818` | Grant-intention / renewal-heavy / UPC opt-out positive control | Divisional parent link, repeated grant-intention cycles, renewal-fee extraction through later years, family/publication linkage, UPC registry lookup resolves as opted out | `EP4438108` |
+| `EP19871250` | Granted EP baseline + Euro-PCT + unitary effect | Granted/no-opposition happy path, unitary effect extraction, parent/divisional relationship, B1/C0 family/publication coverage, post-grant lapse signals | `EP3863511` |
 
 ---
 

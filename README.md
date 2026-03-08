@@ -98,6 +98,14 @@ npm test
 
 ## 📝 Changelog (recent)
 
+### 7.0.88
+- Removed the synthetic/fake Register HTML fixtures and consolidated real Register captures under `tests/fixtures/cases/<application>/`.
+- Added a persistent scrape tracker at `tests/live-fixture-tracker.md` so future runs can retry missing tabs/cases until the requested coverage set is complete.
+- Added the requested `EP3863511 B1` granted baseline via Register application `EP19871250`:
+  - captured real `main`, `event`, `family`, and `ueMain` HTML
+  - recorded `legal` and `doclist` as still missing after this run (challenge/blocked)
+- Expanded live case-matrix coverage to assert granted/no-opposition + unitary-effect behavior from the new real baseline case.
+
 ### 7.0.87
 - Cleaned up the sidebar presentation without dropping useful data:
   - filing summary still shows the 20-year term reference, but no longer shows the extra years-remaining countdown noise
