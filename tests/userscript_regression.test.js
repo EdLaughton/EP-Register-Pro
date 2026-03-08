@@ -188,7 +188,8 @@ notHas(/<div class="epoRP-l">Grace period until<\/div>/, 'Renewals overview shou
 has(/return 'Post-publication';/, 'Stage mapping should avoid using "Published" as a stage label');
 has(/return 'Closed';/, 'Stage mapping should classify withdrawn/refused/revoked outcomes as Closed');
 has(/const\s+detailedDeadlines\s*=\s*m\.deadlines\.filter\(/, 'Overview should compute detailed deadlines separately from the active next deadline summary');
-hasText('Deadlines & clocks (detailed)', 'Overview should render a detailed deadlines section title after dedupe pass');
+hasText('Detailed clocks', 'Overview should embed detailed/reference clocks inside actionable status');
+notHas(/Deadlines & clocks \(detailed\)/, 'Overview should no longer render a separate Deadlines & clocks section');
 hasText('Type / stage', 'Overview should combine type and stage in a single summary row');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.65
+// @version      7.0.66
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.65';
+  const VERSION = '7.0.66';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -3816,8 +3816,9 @@
       return !(sameLabel && sameDate && sameSource);
     });
 
+    let detailedDeadlinesHtml = '';
     if (detailedDeadlines.length) {
-      html += `<div class="epoRP-c"><h4>Deadlines & clocks (detailed)</h4><div class="epoRP-dl">`;
+      let rows = '';
       for (const d of detailedDeadlines) {
         const ds = formatDate(d.date);
         const dd = Math.ceil((d.date.getTime() - Date.now()) / 86400000);
@@ -3829,9 +3830,9 @@
           d.rolledOver ? `rolled over${d.rolloverNote ? ` (${d.rolloverNote})` : ''}` : '',
           d.resolved ? 'responded' : '',
         ].filter(Boolean);
-        html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span>${!d.reference ? `<div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div>` : ''}</div></div>`;
+        rows += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span>${!d.reference ? `<div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div>` : ''}</div></div>`;
       }
-      html += `</div><div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.${m.nextDeadline ? ' Next actionable due date is summarized in Actionable status.' : ''}</div></div>`;
+      detailedDeadlinesHtml = `<div class="epoRP-m">Detailed clocks</div><div class="epoRP-dl">${rows}</div><div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.</div>`;
     }
 
     const nextDeadlineBadge = m.daysToDeadline != null
@@ -3868,7 +3869,7 @@
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : '—'}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
       <div class="epoRP-l">Waiting on</div><div class="epoRP-v">${waitingSummary}</div>
-    </div></div>`;
+    </div>${detailedDeadlinesHtml}</div>`;
 
     if (opts.showRenewals) {
       const filingDateObj = parseDateString(m.filingDate);

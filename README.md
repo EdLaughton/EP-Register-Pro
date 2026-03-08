@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.66
+- Combined previously separate overview blocks into a single **Actionable status** card:
+  - actionable next-deadline summary + latest actions + waiting-party state
+  - detailed/reference clocks now shown inline below as **Detailed clocks**
+- Removed duplicate section split between `Deadlines & clocks (detailed)` and `Actionable status` for a more compact decision view.
+
 ### 7.0.65
 - UPC opt-out query input now strictly uses **EP publication numbers only**.
   - Removed any application-number fallback for UPC `patent_number` lookups.
