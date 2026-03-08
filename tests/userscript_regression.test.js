@@ -61,9 +61,12 @@ has(/withResponsePeriod:\s*scanned\.filter\(/, 'PDF summary logging should inclu
 has(/function\s+sourceDiagnostics\s*\(/, 'Source diagnostics helper should summarize parsed feature payloads');
 has(/addLog\(caseNo,\s*'ok',\s*`Parse success \$\{src\.key\}`,[\s\S]*sourceDiagnostics\(src\.key,\s*parsed\)/, 'Fetch parse success logs should include feature-level source diagnostics');
 has(/addLog\(caseNo,\s*'info',\s*'Live parse success',[\s\S]*sourceDiagnostics\(sourceKey,\s*data\)/, 'Live parse logs should include feature-level source diagnostics');
-hasText('const logs = (getCase(caseNo).logs || []).slice(-120).reverse();', 'Operation console should render latest logs first');
+hasText('const logs = (getCase(caseNo).logs || []).slice(-MAX_LOGS_PER_APP).reverse();', 'Operation console should render latest logs first');
 hasText('autoPrefetchDoneByCase', 'Init should track per-case auto-prefetch completion in current page session');
 hasText('lastRegisterTabByCase', 'Init should track previous register tab per case to detect same-case tab switches');
+hasText('SESSION_KEY', 'Init gate should persist page-session state in sessionStorage');
+hasText('getCaseSession(caseNo)', 'Init should load case session state before applying prefetch gate');
+hasText('patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });', 'Init should persist prefetch gate state to session storage for reload-safe same-tab switching');
 hasText('Initial case load: stale/missing sources detected; running auto prefetch', 'Init should log initial auto-prefetch decisions');
 hasText('Case tab/page changed; auto prefetch skipped for this page session', 'Init should skip repeated auto-prefetch on case/page switches in this session');
 hasText('Same-case tab switch detected: prefetch gate active', 'Init should log explicit same-case tab switch gate decisions');

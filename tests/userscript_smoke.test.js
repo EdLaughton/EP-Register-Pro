@@ -25,7 +25,7 @@ for (const pdfHook of ['extractRegisteredLetterProofLine', 'normalizePdfDocument
   assert(src.includes(pdfHook), `Missing PDF diagnostics hook ${pdfHook}`);
 }
 
-for (const diagnosticsHook of ['sourceDiagnostics', 'autoPrefetchDoneByCase', 'lastRegisterTabByCase', 'slice(-120).reverse()', 'Case tab/page changed; auto prefetch skipped for this page session', 'Same-case tab switch detected: prefetch gate active']) {
+for (const diagnosticsHook of ['sourceDiagnostics', 'autoPrefetchDoneByCase', 'lastRegisterTabByCase', 'SESSION_KEY', 'loadSessionJson', 'patchCaseSession', 'slice(-MAX_LOGS_PER_APP).reverse()', 'Case tab/page changed; auto prefetch skipped for this page session', 'Same-case tab switch detected: prefetch gate active']) {
   assert(src.includes(diagnosticsHook), `Missing diagnostics coverage hook ${diagnosticsHook}`);
 }
 

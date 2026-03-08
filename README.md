@@ -91,6 +91,11 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.54
+- Fixed same-case auto-prefetch gate persistence across full page reloads by storing gate state in `sessionStorage`.
+  - Prevents repeated background full-source reloads when switching Register tabs (`tab=main`, `tab=doclist`, etc.) for the same case in the same browser tab session.
+- Increased operation-console visibility to show the full retained per-case log window (latest-at-top) instead of clipping to 120 rows.
+
 ### 7.0.53
 - Added explicit gate diagnostics for same-case Register tab switches:
   - Logs `Same-case tab switch detected: prefetch gate active` with `fromTab`/`toTab` metadata.

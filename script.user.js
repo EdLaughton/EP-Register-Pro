@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.53
+// @version      7.0.54
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,10 +20,11 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.53';
+  const VERSION = '7.0.54';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
+  const SESSION_KEY = 'epoRP_700_session';
   const DATE_RE = /(\d{2}\.\d{2}\.\d{4})/;
 
   const CACHE_SCHEMA = 2;
@@ -81,6 +82,7 @@
 
   let memory = null;
   let optionsShadow = null;
+  let sessionShadow = null;
   let dirty = false;
   let flushTimer = null;
   let renderTimer = null;
@@ -116,6 +118,24 @@
           return false;
         }
       }
+      return false;
+    }
+  }
+
+  function loadSessionJson(key, fallback) {
+    try {
+      const raw = sessionStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function saveSessionJson(key, value) {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch {
       return false;
     }
   }
@@ -302,7 +322,7 @@
   }
 
   function renderLogConsole(caseNo) {
-    const logs = (getCase(caseNo).logs || []).slice(-120).reverse();
+    const logs = (getCase(caseNo).logs || []).slice(-MAX_LOGS_PER_APP).reverse();
     if (!logs.length) {
       return `<div class="epoRP-log-empty">No operation logs yet for this case.</div>`;
     }
@@ -432,6 +452,46 @@
     saveJson(UI_KEY, next);
     runtime.activeView = next.activeView;
     runtime.collapsed = !!next.collapsed;
+  }
+
+  function sessionState() {
+    if (!sessionShadow || typeof sessionShadow !== 'object') {
+      sessionShadow = loadSessionJson(SESSION_KEY, { cases: {} });
+    }
+    if (!sessionShadow.cases || typeof sessionShadow.cases !== 'object') sessionShadow.cases = {};
+    return sessionShadow;
+  }
+
+  function saveSessionState() {
+    return saveSessionJson(SESSION_KEY, sessionState());
+  }
+
+  function getCaseSession(caseNo) {
+    if (!caseNo) return {};
+    const state = sessionState();
+    const key = String(caseNo).toUpperCase();
+    if (!state.cases[key] || typeof state.cases[key] !== 'object') state.cases[key] = {};
+    return state.cases[key];
+  }
+
+  function patchCaseSession(caseNo, patch) {
+    if (!caseNo || !patch || typeof patch !== 'object') return {};
+    const state = sessionState();
+    const key = String(caseNo).toUpperCase();
+    const next = { ...(state.cases[key] || {}), ...patch, updatedAt: Date.now() };
+    state.cases[key] = next;
+
+    const keys = Object.keys(state.cases || {});
+    const maxEntries = 40;
+    if (keys.length > maxEntries) {
+      keys
+        .sort((a, b) => Number(state.cases[a]?.updatedAt || 0) - Number(state.cases[b]?.updatedAt || 0))
+        .slice(0, keys.length - maxEntries)
+        .forEach((k) => delete state.cases[k]);
+    }
+
+    saveSessionState();
+    return next;
   }
 
   function timelineGroupKey(caseNo, item) {
@@ -3270,7 +3330,7 @@
       </div>
       <div class="epoRP-console-wrap">
         <div class="epoRP-ol">Operation console</div>
-        <div class="epoRP-oh">Live sidebar activity for this application (latest 120 entries).</div>
+        <div class="epoRP-oh">Live sidebar activity for this application (latest entries at top).</div>
         <div class="epoRP-log" id="epoRP-log-console">${renderLogConsole(caseNo)}</div>
       </div>
     </div>`;
@@ -3509,13 +3569,20 @@
     }, 1800);
 
     const registerTab = tabSlug();
-    const previousRegisterTab = String(runtime.lastRegisterTabByCase[caseNo] || '');
+    const caseSession = getCaseSession(caseNo);
+    if (caseSession.prefetchDoneAt) runtime.autoPrefetchDoneByCase[caseNo] = Number(caseSession.prefetchDoneAt) || Date.now();
+    if (caseSession.lastRegisterTab) runtime.lastRegisterTabByCase[caseNo] = String(caseSession.lastRegisterTab);
+
+    const previousRegisterTab = String(runtime.lastRegisterTabByCase[caseNo] || caseSession.lastRegisterTab || '');
     const tabChangedWithinCase = !changed && !!previousRegisterTab && previousRegisterTab !== registerTab;
     runtime.lastRegisterTabByCase[caseNo] = registerTab;
+    patchCaseSession(caseNo, { lastRegisterTab: registerTab });
 
     if (force) {
       addLog(caseNo, 'info', 'Forced data reload for case', { source: 'prefetch', registerTab });
-      runtime.autoPrefetchDoneByCase[caseNo] = Date.now();
+      const gateTs = Date.now();
+      runtime.autoPrefetchDoneByCase[caseNo] = gateTs;
+      patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });
       prefetchCase(caseNo, true);
       return;
     }
@@ -3537,7 +3604,9 @@
       return;
     }
 
-    runtime.autoPrefetchDoneByCase[caseNo] = Date.now();
+    const gateTs = Date.now();
+    runtime.autoPrefetchDoneByCase[caseNo] = gateTs;
+    patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });
 
     const needsRefresh = SOURCES.some((s) => !isFresh(getCase(caseNo).sources[s.key], options().refreshHours));
     if (needsRefresh) {
