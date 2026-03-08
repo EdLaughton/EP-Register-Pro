@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.49
+// @version      7.0.50
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.49';
+  const VERSION = '7.0.50';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1743,13 +1743,63 @@
     return { months: best?.months || 0, evidence: best?.evidence || '' };
   }
 
+  function extractRegisteredLetterProofLine(textBlock) {
+    const raw = String(textBlock || '');
+    if (!raw) return { registeredLetterLine: '', proofLine: '' };
+
+    const lines = raw
+      .split(/\r?\n/)
+      .map((line) => normalize(line))
+      .filter(Boolean);
+
+    const idx = lines.findIndex((line) => /\bregistered\s+letter\b/i.test(line));
+    if (idx >= 0) {
+      for (let i = idx + 1; i < Math.min(lines.length, idx + 8); i++) {
+        const line = normalize(lines[i]);
+        if (!line) continue;
+        if (/\bregistered\s+letter\b/i.test(line)) continue;
+        return {
+          registeredLetterLine: lines[idx],
+          proofLine: line,
+        };
+      }
+      return {
+        registeredLetterLine: lines[idx],
+        proofLine: '',
+      };
+    }
+
+    const inline = raw.match(/registered\s+letter[^\n\r]{0,24}(?:\r?\n|\s+)([^\n\r]{3,140})/i);
+    if (inline?.[1]) {
+      return {
+        registeredLetterLine: 'Registered Letter',
+        proofLine: normalize(inline[1]),
+      };
+    }
+
+    return { registeredLetterLine: '', proofLine: '' };
+  }
+
   function parsePdfDeadlineHints(pdfText, context = {}) {
     const textRaw = String(pdfText || '');
     const textLower = textRaw.toLowerCase();
-    if (!textLower) return [];
+    const docDateStr = normalizeDateString(context.docDateStr || '');
+
+    const diagnostics = {
+      category: '',
+      communicationDate: '',
+      communicationEvidence: '',
+      responseMonths: 0,
+      responseEvidence: '',
+      explicitDeadlineDate: '',
+      explicitDeadlineEvidence: '',
+      registeredLetterLine: '',
+      registeredLetterProofLine: '',
+    };
+
+    if (!textLower) return { hints: [], diagnostics };
 
     const hints = [];
-    const docDateStr = normalizeDateString(context.docDateStr || '');
 
     const pushHint = (hint) => {
       const date = parseDateString(hint?.dateStr || '');
@@ -1766,23 +1816,40 @@
       });
     };
 
-    const category = /rule\s*71\(3\)|intention to grant/.test(textLower)
+    const category = /rule\s*71\s*\(\s*3\s*\)|intention to grant/.test(textLower)
       ? 'R71(3) response period'
-      : /rule\s*116|summons to oral proceedings/.test(textLower)
+      : /\brule\s*116\b|summons to oral proceedings/.test(textLower)
         ? 'Rule 116 final date'
-        : /article\s*94\(3\)|art\.\s*94\(3\)/.test(textLower)
+        : /\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)/.test(textLower)
           ? 'Art. 94(3) response period'
-          : /rule\s*161|rule\s*162/.test(textLower)
+          : /\brule\s*161\b|\brule\s*162\b/.test(textLower)
             ? 'Rule 161/162 response period'
             : '';
 
-    if (!category) return [];
+    diagnostics.category = category;
+
+    const registeredLetter = extractRegisteredLetterProofLine(textRaw);
+    diagnostics.registeredLetterLine = registeredLetter.registeredLetterLine || '';
+    diagnostics.registeredLetterProofLine = registeredLetter.proofLine || '';
 
     const communication = extractCommunicationDateFromPdf(textRaw, { docDateStr });
     const communicationDateStr = communication.dateStr || docDateStr;
     const communicationDate = parseDateString(communicationDateStr);
+    diagnostics.communicationDate = communicationDateStr || '';
+    diagnostics.communicationEvidence = communication.evidence || (docDateStr ? 'Doclist date fallback for communication date' : '');
+
+    const monthPeriod = extractResponseMonthsFromPdf(textRaw);
+    diagnostics.responseMonths = monthPeriod.months || 0;
+    diagnostics.responseEvidence = monthPeriod.evidence || '';
 
     const explicitDue = extractExplicitDeadlineDateFromPdf(textRaw);
+    diagnostics.explicitDeadlineDate = explicitDue.dateStr || '';
+    diagnostics.explicitDeadlineEvidence = explicitDue.evidence || '';
+
+    if (!category) {
+      return { hints: [], diagnostics };
+    }
+
     let explicitAdded = false;
     if (explicitDue.dateStr) {
       pushHint({
@@ -1796,7 +1863,6 @@
       explicitAdded = true;
     }
 
-    const monthPeriod = extractResponseMonthsFromPdf(textRaw);
     if (!explicitAdded && monthPeriod.months && communicationDate) {
       const calc = addCalendarMonthsDetailed(communicationDate, monthPeriod.months);
       pushHint({
@@ -1809,7 +1875,10 @@
       });
     }
 
-    return dedupe(hints, (h) => `${h.label}|${h.dateStr}`);
+    return {
+      hints: dedupe(hints, (h) => `${h.label}|${h.dateStr}`),
+      diagnostics,
+    };
   }
 
   async function resolvePdfUrl(url, signal) {
@@ -1924,34 +1993,98 @@
     for (const doc of candidates) {
       if (signal?.aborted) return;
       try {
-        const resolvedUrl = await resolvePdfUrl(doc.url, signal);
-        if (!resolvedUrl) continue;
-        const text = await extractPdfText(resolvedUrl, signal);
-        if (!text) continue;
+        addLog(caseNo, 'info', 'PDF candidate scan start', { source: 'pdfDeadlines', doc: doc.title || '', docDate: doc.dateStr || '' });
 
-        const parsedHints = parsePdfDeadlineHints(text, { docDateStr: doc.dateStr });
+        const resolvedUrl = await resolvePdfUrl(doc.url, signal);
+        if (!resolvedUrl) {
+          addLog(caseNo, 'warn', 'PDF URL could not be resolved from document page', { source: 'pdfDeadlines', doc: doc.title || '', docUrl: doc.url || '' });
+          continue;
+        }
+
+        const text = await extractPdfText(resolvedUrl, signal);
+        if (!text) {
+          addLog(caseNo, 'warn', 'PDF opened but extracted text was empty', { source: 'pdfDeadlines', doc: doc.title || '', url: resolvedUrl });
+          continue;
+        }
+
+        const parsed = parsePdfDeadlineHints(text, { docDateStr: doc.dateStr });
+        const parsedHints = Array.isArray(parsed?.hints) ? parsed.hints : [];
+        const diagnostics = parsed?.diagnostics || {};
+
+        const proofLine = normalize(diagnostics.registeredLetterProofLine || '');
+        addLog(caseNo, proofLine ? 'ok' : 'warn', `PDF proof line (below "Registered Letter"): ${proofLine || 'not found'}`, {
+          source: 'pdfDeadlines',
+          doc: doc.title || '',
+          docDate: doc.dateStr || '',
+        });
+
+        addLog(caseNo, 'info', 'PDF parse diagnostics', {
+          source: 'pdfDeadlines',
+          doc: doc.title || '',
+          category: diagnostics.category || '',
+          communicationDate: diagnostics.communicationDate || '',
+          communicationEvidence: diagnostics.communicationEvidence || '',
+          responseMonths: Number(diagnostics.responseMonths || 0),
+          responseEvidence: diagnostics.responseEvidence || '',
+          explicitDeadlineDate: diagnostics.explicitDeadlineDate || '',
+          explicitDeadlineEvidence: diagnostics.explicitDeadlineEvidence || '',
+          textChars: text.length,
+        });
+
         if (parsedHints.length) {
           hints.push(...parsedHints);
-          scanned.push({ title: doc.title, dateStr: doc.dateStr, url: resolvedUrl, hintCount: parsedHints.length });
+          addLog(caseNo, 'ok', `PDF deadline hints parsed: ${parsedHints.length}`, {
+            source: 'pdfDeadlines',
+            doc: doc.title || '',
+            hints: parsedHints.map((h) => `${h.label}=${h.dateStr}`),
+          });
+        } else {
+          addLog(caseNo, 'info', 'PDF opened but no deadline hint produced for this document', {
+            source: 'pdfDeadlines',
+            doc: doc.title || '',
+            category: diagnostics.category || '',
+          });
         }
+
+        scanned.push({
+          title: doc.title,
+          dateStr: doc.dateStr,
+          url: resolvedUrl,
+          hintCount: parsedHints.length,
+          category: String(diagnostics.category || ''),
+          communicationDate: String(diagnostics.communicationDate || ''),
+          responseMonths: Number(diagnostics.responseMonths || 0),
+          explicitDeadlineDate: String(diagnostics.explicitDeadlineDate || ''),
+          registeredLetterProofLine: proofLine,
+        });
       } catch (error) {
         addLog(caseNo, 'warn', `PDF deadline parse skipped: ${error?.message || error}`, { source: 'pdfDeadlines', doc: doc.title || '' });
       }
     }
 
+    const dedupedHints = dedupe(hints, (h) => `${h.label}|${h.dateStr}`);
+
     patchCase(caseNo, (entry) => {
       entry.sources.pdfDeadlines = {
         key: 'pdfDeadlines',
         title: 'PDF-derived deadlines',
-        status: hints.length ? 'ok' : 'empty',
+        status: dedupedHints.length ? 'ok' : 'empty',
         fetchedAt: Date.now(),
         parserVersion: VERSION,
         transport: 'fetch+pdfjs',
-        data: { hints: dedupe(hints, (h) => `${h.label}|${h.dateStr}`), scanned },
+        data: { hints: dedupedHints, scanned },
       };
     });
 
-    addLog(caseNo, hints.length ? 'ok' : 'info', `PDF deadline parse ${hints.length ? `found ${hints.length} hint(s)` : 'found no explicit hints'}`, { source: 'pdfDeadlines' });
+    const summary = {
+      scannedDocs: scanned.length,
+      withHints: scanned.filter((x) => (x.hintCount || 0) > 0).length,
+      withCommunicationDate: scanned.filter((x) => !!x.communicationDate).length,
+      withResponsePeriod: scanned.filter((x) => Number(x.responseMonths || 0) > 0).length,
+      withProofLine: scanned.filter((x) => !!x.registeredLetterProofLine).length,
+    };
+
+    addLog(caseNo, dedupedHints.length ? 'ok' : 'info', `PDF deadline parse ${dedupedHints.length ? `found ${dedupedHints.length} hint(s)` : 'found no explicit hints'}`, { source: 'pdfDeadlines', ...summary });
   }
 
   async function fetchWithRetry(url, signal) {

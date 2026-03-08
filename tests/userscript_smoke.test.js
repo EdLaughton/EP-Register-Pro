@@ -21,6 +21,10 @@ for (const diagnosticsHook of ['epoRP-log-console', 'epoRP-clear-logs', 'epoRP-o
   assert(src.includes(diagnosticsHook), `Missing diagnostics hook ${diagnosticsHook}`);
 }
 
+for (const pdfHook of ['extractRegisteredLetterProofLine', 'PDF parse diagnostics', 'PDF proof line (below "Registered Letter")']) {
+  assert(src.includes(pdfHook), `Missing PDF diagnostics hook ${pdfHook}`);
+}
+
 assert(!src.includes('IPC/CPC'), 'IPC/CPC block should be removed from sidebar UI');
 
 console.log('userscript smoke checks passed');

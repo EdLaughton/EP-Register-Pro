@@ -91,6 +91,14 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.50
+- Expanded PDF parse diagnostics in the sidebar operation console:
+  - Logs whether communication date was detected and what evidence pattern matched.
+  - Logs whether a response-period month value was detected.
+  - Always logs the line immediately below **"Registered Letter"** (or reports not found) as proof the PDF text was opened/extracted.
+  - Adds aggregate PDF parse summary counters (scanned docs, communication-date hits, response-period hits, registered-letter proof hits).
+- Hardened PDF category matching for spacing/format variants (e.g. `Art. 94 (3)`).
+
 ### 7.0.49
 - Improved PDF deadline parsing for prosecution communications:
   - Better extraction of the **communication date** from PDF header/table fields (e.g. `Date 14.11.2025`).
