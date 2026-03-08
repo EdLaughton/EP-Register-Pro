@@ -98,6 +98,12 @@ npm test
 
 ## 📝 Changelog (recent)
 
+### 7.0.85
+- Added **browser-captured real Register fixtures** under `tests/fixtures/register-real/` and wired them into test coverage.
+- Real-capture pass surfaced and fixed a parser gap:
+  - `parseFamily()` now understands live family-table publication rows (`Publication No. / Date / Type`) instead of relying only on loose text extraction.
+- `npm test` now covers both representative synthetic fixtures and real captured Register fixtures.
+
 ### 7.0.84
 - Added real fixture-based parser tests using a lightweight `jsdom` harness:
   - exercises `parseMain`, `parseDoclist`, `parseLegal`, `parseEventHistory`, `parseFamily`, `parseUe`, `parsePdfDeadlineHints`, and `inferProceduralDeadlines`

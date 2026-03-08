@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.84
+// @version      7.0.85
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.84';
+  const VERSION = '7.0.85';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1563,7 +1563,34 @@
   }
 
   function parseFamily(doc) {
-    return { publications: parsePublications(bodyText(doc), 'Family') };
+    const publications = [];
+    const rows = [...doc.querySelectorAll('tr')];
+    let inPublicationBlock = false;
+
+    for (const row of rows) {
+      const cells = [...row.querySelectorAll('td,th')].map((cell) => normalize(text(cell)));
+      if (!cells.length) continue;
+      const rowText = cells.join(' | ');
+
+      if (/^publication no\.?$/i.test(cells[0] || '')) {
+        inPublicationBlock = true;
+        continue;
+      }
+      if (/^priority number$/i.test(cells[0] || '')) {
+        inPublicationBlock = false;
+        continue;
+      }
+      if (!inPublicationBlock) continue;
+      if (!/^(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)/i.test(cells[0] || '')) continue;
+
+      const dateStr = cells.find((value) => DATE_RE.test(value || '')) || '';
+      const kind = cells.find((value) => /^[A-Z]\d?$/.test(value || '')) || '';
+      const parsed = splitPublicationNumber(cells[0], kind);
+      if (!parsed.no || !dateStr) continue;
+      publications.push({ no: parsed.no, kind: parsed.kind, dateStr: dateStr.match(DATE_RE)?.[1] || '', role: 'Family' });
+    }
+
+    return { publications: publications.length ? dedupe(publications, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`) : parsePublications(bodyText(doc), 'Family') };
   }
 
   function parseLegal(doc, caseNo) {
