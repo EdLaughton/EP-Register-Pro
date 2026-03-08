@@ -7,7 +7,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node tests/userscript_smoke.test.js && node tests/userscript_regression.test.js && node tests/userscript_lifecycle.test.js && node tests/userscript_parser_fixtures.test.js && node tests/userscript_real_fixtures.test.js"
+    "test": "node tests/userscript_smoke.test.js && node tests/userscript_regression.test.js && node tests/userscript_lifecycle.test.js && node tests/userscript_parser_fixtures.test.js && node tests/userscript_real_fixtures.test.js && node tests/userscript_live_case_matrix.test.js"
   },
   "repository": {
     "type": "git",

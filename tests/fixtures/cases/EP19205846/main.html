@@ -1,0 +1,174 @@
+<div id="body" class="clearfix">
+					<div class="epoToolBar firstChildToolbar">
+						<ul class="clearfix">
+							<li class="separator separatorFirst"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="rfnLst" title="Refine search" href="simpleSearch?lng=en">Refine search</a></li>
+							
+							<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+									<li style="padding-right: 0.4em;"><a class="download" title="Download ST36 data" href="javascript:downloadXML(&quot;/download?number=EP19205846&amp;tab=main&amp;xml=st36&quot;, &quot;&quot;)">ST36</a></li>
+								<li id="histSeparator" style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+								<li style="padding-right: 0.4em;"><a class="showHist" title="Show/Hide history" id="historyButton" href="#" onclick="showDetails(); return false;">Show history</a></li>
+							<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="ext" title="Open in Espacenet" href="https://worldwide.espacenet.com/patent/search?q=pn%3DEP3816364&amp;called_by=EuropeanRegister" target="_blank">Espacenet</a></li>
+								<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="thirdParty" title="Third Party Observation" href="https://tpo.apps.epo.org/tpo/ui/prod/?subject.publicationNumber=EP3816364" target="_blank">Submit observations</a></li>
+								<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="reportErr" title="Send us your questions or feedback" href="http://www.epo.org/service-support/contact-us/contact2-form.html?number=EP19205846&amp;subject=EPRegister" target="_blank">Report error</a></li>
+							
+							<li style="padding-right: 0.4em;" class="floatRight prt line"><a href="javascript:window.print();" class="prt" title="Print">Print</a></li>
+							<li style="padding-right: 0.4em;" class="floatRight separator"><span class="firstFollow">|</span></li>
+						</ul>
+					</div>
+					<script>
+	$(document).ready(function() {
+		// CPC
+	    $(".cpc_data_toggle_minus a.cpc_data_toggle").click();
+	    $(".cset_data_toggle_minus a.cset_data_toggle").click();
+	    
+	    
+	 	/** Here's the W3C standards on calculating the width of table columns. Basically it is left up to the implementing browser/agent.
+		/*  That's why we opted for 1500px as a conventional value for C-Set after. Therefore, any C-set width having width greater than it
+		/*  is considered as a "Too long C-Set"
+		/*  For more information, please refer to W3C official documentation: https://www.w3.org/TR/html401/struct/tables.html#h-11.2.4.4
+		 */
+	    const getElementWidth = elem => elem.getBoundingClientRect().width;
+	 	
+		const checkOverflow = (elem) => {
+			const elemWidth = getElementWidth(elem);
+			const defaultWidth = 1500;
+			return elemWidth > defaultWidth;
+		}
+		
+		const breakElement = (element) => {
+			let middleIndex = Math.ceil(element.innerHTML.length/2);
+			let indexOfComma = element.innerHTML.indexOf(", ", middleIndex);
+			if (indexOfComma !== -1) {
+				element.innerHTML = element.innerHTML.substring(0, indexOfComma + 2) + "<br/>" + element.innerHTML.substring(indexOfComma + 2);
+			}else{
+				element.innerHTML = element.innerHTML.substring(0, middleIndex) + "<br/>" + element.innerHTML.substring(middleIndex);
+			}
+		}
+		
+		const breakCsetIfTooLong = (csetDivs) => {
+			for(let i = 0; i < csetDivs.length; i++) {
+		        isCsetDataItemTooLong = checkOverflow(csetDivs[i]);
+		        if(isCsetDataItemTooLong) {
+		            breakElement(csetDivs[i]);
+		        }
+		    }
+		}
+
+		var csetDataItemNoHideDivs = document.getElementsByClassName("cset_data_item_no_hide");
+		var csetDataItemDivs = document.getElementsByClassName("cset_data_item");
+		var isCsetDataItemTooLong = false;
+		
+		breakCsetIfTooLong(csetDataItemNoHideDivs);
+		breakCsetIfTooLong(csetDataItemDivs);
+	});
+</script>
+
+<table class="tableType3 printTable"><tbody><tr><td class="t2" colspan="4"><b><font size="3"><a href="https://register.epo.org/espacenet/regviewer?AP=19205846&amp;CY=EP&amp;LG=en&amp;DB=REG">EP3816364 - FIRE RESISTANT MODULAR PREFABRICATED CLADDING PANEL</a></font></b>
+			
+				[Right-click to bookmark this link]
+			</td></tr><tr><td class="th">Status</td><td class="t2" colspan="3">The application is deemed to be withdrawn<br>
+	<font size="1"><i><i>Status updated on &nbsp;14.06.2024</i></i></font><i>
+<br>
+				<font size="1"><i>Database last updated on&nbsp;07.03.2026</i></font>
+			</i></td></tr><tr class="former "><td class="t1">Former</td><td class="null" colspan="3">Grant of patent is intended<br>
+	<font size="1"><i><i>Status updated on &nbsp;09.10.2023</i></i></font><i>
+</i></td></tr><tr class="former "><td class="t1">Former</td><td class="null" colspan="3">Request for examination was made<br>
+	<font size="1"><i><i>Status updated on &nbsp;13.09.2023</i></i></font><i>
+</i></td></tr><tr class="former "><td class="t1">Former</td><td class="null" colspan="3">Grant of patent is intended<br>
+	<font size="1"><i><i>Status updated on &nbsp;09.05.2023</i></i></font><i>
+</i></td></tr><tr class="former "><td class="t1">Former</td><td class="null" colspan="3">Request for examination was made<br>
+	<font size="1"><i><i>Status updated on &nbsp;21.04.2023</i></i></font><i>
+</i></td></tr><tr class="former "><td class="t1">Former</td><td class="null" colspan="3">Grant of patent is intended<br>
+	<font size="1"><i><i>Status updated on &nbsp;21.12.2022</i></i></font><i>
+</i></td></tr><tr class="former "><td class="t1">Former</td><td class="null" colspan="3">Request for examination was made<br>
+	<font size="1"><i><i>Status updated on &nbsp;12.11.2021</i></i></font><i>
+</i></td></tr><tr class="former "><td class="t1">Former</td><td class="null" colspan="3">The application has been published<br>
+	<font size="1"><i><i>Status updated on &nbsp;03.04.2021</i></i></font><i>
+</i></td></tr><tr><td class="th">Most recent event&nbsp;&nbsp;&nbsp;<b><span title="Please note that the ’’Most recent event’’ date shown first is the date on which the event was processed and so may differ from the effective legal date of the event concerned or the date of the related decision. Please refer to the information under ’’All documents’’ for the event’s effective legal date. " class="tooltipActuator noPrint">Tooltip</span></b></td><td class="t2">14.06.2024</td><td class="t3">Application deemed to be withdrawn</td><td class="t4">published on&nbsp;17.07.2024&nbsp;&nbsp;<a href="https://www.epo.org/bulletin/downloads/2024/bulletin2429.pdf" target="_blank" class="ext">[2024/29]</a></td></tr><tr><td class="th" rowspan="2">Applicant(s)</td><td class="t2" colspan="3">For all designated states<br>
+	Wall &amp; Facade Solutions SRL<br>
+	Malmedyer Weg 62<br>
+	4770 Amel (Schoppen)
+	  / BE<br>
+</td></tr><tr><td class="t2" colspan="3">[2023/02]</td></tr><tr class="former "><td class="t1">Former [2021/18]</td><td class="t2" colspan="3">For all designated states<br>
+	Isosystems AG<br>
+	Malmedyer Weg 62<br>
+	4770 Amel (Schoppen)
+	  / BE<br>
+</td></tr><tr><td class="th" rowspan="3">Inventor(s)</td><td class="t2" colspan="3">01&nbsp;/
+	COOL, Rainer<br>
+	Hebscheider Heide 32B<br>
+	4731 Eynatten
+	  / BE<br>
+</td></tr><tr><td class="t2" colspan="3">02&nbsp;/
+	FRECHES, Gregor<br>
+	Bahnallée, Recht n° 47<br>
+	4780 St.-Vith
+	  / BE<br>
+</td></tr><tr><td class="t2" colspan="3">[N/P]</td></tr><tr class="former "><td class="t1" rowspan="2">Former [2021/18]</td><td class="t2" colspan="3">01&nbsp;/
+	COOL, Rainer<br>
+	Hebscheider Heide 32B<br>
+	4731 EYNATTEN
+	  / BE<br>
+</td></tr><tr class="former"><td class="t2" colspan="3">02&nbsp;/
+	FRECHES, Gregor<br>
+	Bahnallée, Recht n° 47<br>
+	4780 St.-Vith
+	  / BE<br>
+</td></tr><tr><td class="th" rowspan="2">Representative(s)</td><td class="t2" colspan="3">AWA Benelux<br>
+	Parc d'affaires Zénobe Gramme - Bât. K<br>
+	Square des Conduites d'Eau 1-2<br>
+	4020 Liège
+	  / BE<br>
+</td></tr><tr><td class="t2" colspan="3">[N/P]</td></tr><tr class="former "><td class="t1">Former [2021/18]</td><td class="t2" colspan="3">Pronovem<br>
+	Office Van Malderen<br>
+	Parc d'affaires Zénobe Gramme- bâtiment K<br>
+	Square des Conduites d'Eau 1-2<br>
+	4020 Liège
+	  / BE<br>
+</td></tr><tr><td class="th" rowspan="2">Application number, filing date</td><td class="t2">19205846.9</td><td class="t3" colspan="2">29.10.2019</td></tr><tr><td class="t2" colspan="3">[2021/18]</td></tr><tr><td class="th">Filing language</td><td class="t2" colspan="3">EN</td></tr><tr><td class="th">Procedural language</td><td class="t2" colspan="3">EN</td></tr><tr><td class="th" rowspan="5">Publication</td><td class="th">Type:
+   </td><td class="t2" colspan="2"><a href="https://data.epo.org/publication-server/pdf-document?pn=3816364&amp;ki=A1&amp;cc=EP&amp;pd=20210505" target="_blank" class="ext" style="">A1&nbsp;Application with search report&nbsp;</a></td></tr><tr><td class="th">No.:</td><td class="t2" colspan="2">EP3816364</td></tr><tr><td class="th">Date:</td><td class="t2" colspan="2">05.05.2021</td></tr><tr><td class="th">Language:</td><td class="t2" colspan="2">EN</td></tr><tr><td class="t2" colspan="3"> [2021/18] </td></tr><tr><td class="th">Search report(s)</td><td class="th">(Supplementary) European search report - dispatched on:</td><td class="t2">EP</td><td class="t3">04.05.2020</td></tr><tr><td class="th" rowspan="2">Classification</td><td class="th">IPC:</td><td class="t2">E04F13/08, E04F13/12, E04F13/14<br>
+								</td><td class="t3">[2021/18]</td></tr><tr><td class="th">CPC:</td><td class="t2" colspan="2"><div class="cpc_data_no_hide" style="white-space: nowrap; ">
+										<span class="cpc_data_item_no_hide" style="white-space: nowrap;">
+											<b>E04F13/0862 (EP);</b>
+												</span>
+										
+										<span class="cpc_data_item_no_hide" style="white-space: nowrap;">
+											<b>E04F13/0894 (EP);</b>
+												</span>
+										
+										<span class="cpc_data_item_no_hide" style="white-space: nowrap;">
+											<b>E04F13/123 (EP);</b>
+												</span>
+										
+										</div>
+										<div class="cpc_data_no_hide" style="white-space: nowrap; ">
+										<span class="cpc_data_item_no_hide" style="white-space: nowrap;">
+											<b>E04F13/14 (EP);</b>
+												</span>
+										
+										<span class="cpc_data_item_no_hide" style="white-space: nowrap;">
+											<b>E04F13/147 (EP);</b>
+												</span>
+										
+										<span class="cpc_data_item_no_hide" style="white-space: nowrap;">
+											E04F2290/045 (EP)</span>
+										
+										</div>
+										</td></tr><tr><td class="th">Designated contracting states</td><td class="t2" colspan="3">AL, &nbsp; AT, &nbsp; BE, &nbsp; BG, &nbsp; CH, &nbsp; CY, &nbsp; CZ, &nbsp; DE, &nbsp; DK, &nbsp; EE, &nbsp; ES, &nbsp; FI, &nbsp; FR, &nbsp; GB, &nbsp; GR, &nbsp; HR, &nbsp; HU, &nbsp; IE, &nbsp; IS, &nbsp; IT, &nbsp; LI, &nbsp; LT, &nbsp; LU, &nbsp; LV, &nbsp; MC, &nbsp; MK, &nbsp; MT, &nbsp; NL, &nbsp; NO, &nbsp; PL, &nbsp; PT, &nbsp; RO, &nbsp; RS, &nbsp; SE, &nbsp; SI, &nbsp; SK, &nbsp; SM, &nbsp; TR&nbsp;[2021/50]</td></tr><tr class="former "><td class="t1">Former [2021/18]</td><td class="t2" colspan="3">AL,&nbsp; AT,&nbsp; BE,&nbsp; BG,&nbsp; CH,&nbsp; CY,&nbsp; CZ,&nbsp; DE,&nbsp; DK,&nbsp; EE,&nbsp; ES,&nbsp; FI,&nbsp; FR,&nbsp; GB,&nbsp; GR,&nbsp; HR,&nbsp; HU,&nbsp; IE,&nbsp; IS,&nbsp; IT,&nbsp; LI,&nbsp; LT,&nbsp; LU,&nbsp; LV,&nbsp; MC,&nbsp; MK,&nbsp; MT,&nbsp; NL,&nbsp; NO,&nbsp; PL,&nbsp; PT,&nbsp; RO,&nbsp; RS,&nbsp; SE,&nbsp; SI,&nbsp; SK,&nbsp; SM,&nbsp; TR&nbsp;</td></tr><tr><td class="th" rowspan="2">Extension states</td><td class="t2">BA</td><td class="t3" colspan="2">Not yet paid</td></tr><tr><td class="t2">ME</td><td class="t3" colspan="2">Not yet paid</td></tr><tr><td class="th" rowspan="4">Validation states</td><td class="t2">KH</td><td class="t3" colspan="2">Not yet paid</td></tr><tr><td class="t2">MA</td><td class="t3" colspan="2">Not yet paid</td></tr><tr><td class="t2">MD</td><td class="t3" colspan="2">Not yet paid</td></tr><tr><td class="t2">TN</td><td class="t3" colspan="2">Not yet paid</td></tr><tr><td class="th" rowspan="3">Title</td><td class="th">German:</td><td class="t2">FEUERFESTE MODULARE FERTIGVERKLEIDUNGSPLATTE</td><td class="t3">[2023/02]</td></tr><tr><td class="th">English:</td><td class="t2">FIRE RESISTANT MODULAR PREFABRICATED CLADDING PANEL</td><td class="t3">[2021/18]</td></tr><tr><td class="th">French:</td><td class="t2">PANNEAU DE REVÊTEMENT PRÉFABRIQUÉ MODULAIRE RÉSISTANT AU FEU</td><td class="t3">[2021/18]</td></tr><tr class="former "><td class="t1"> </td><td class="t2">Former [2021/18]</td><td class="t2" colspan="2">FEUERFESTE MODULARE VORGEFERTIGTE VERKLEIDUNGSPLATTE</td></tr><tr><td class="th" rowspan="10">Examination procedure</td><td class="t2">04.11.2021</td><td class="t3" colspan="2">Amendment by applicant (claims and/or description)</td></tr><tr><td class="t2">04.11.2021</td><td class="t3" colspan="2">Examination requested&nbsp;
+			[2021/50]</td></tr><tr><td class="t2">04.11.2021</td><td class="t3" colspan="2">Date on which the examining division has become responsible</td></tr><tr><td class="t2">22.12.2022</td><td class="t3" colspan="2">Communication of intention to grant the patent</td></tr><tr><td class="t2">21.04.2023</td><td class="t3" colspan="2">Disapproval of the communication of intention to grant the patent by the applicant or resumption of examination proceedings by the EPO</td></tr><tr><td class="t2">10.05.2023</td><td class="t3" colspan="2">Communication of intention to grant the patent</td></tr><tr><td class="t2">08.09.2023</td><td class="t3" colspan="2">Disapproval of the communication of intention to grant the patent by the applicant or resumption of examination proceedings by the EPO</td></tr><tr><td class="t2">10.10.2023</td><td class="t3" colspan="2">Communication of intention to grant the patent</td></tr><tr><td class="t2">21.02.2024</td><td class="t3" colspan="2">Application deemed to be withdrawn, date of legal effect&nbsp;
+			[2024/29]</td></tr><tr><td class="t2">13.03.2024</td><td class="t3" colspan="2">Despatch of communication that the application is deemed to be withdrawn, reason: fee for grant / fee for printing not paid in time&nbsp;
+			[2024/29]</td></tr><tr><td class="th" rowspan="4">Fees paid</td><td class="th" colspan="3">Renewal fee</td></tr><tr><td class="t2">20.10.2021</td><td class="t3" colspan="2">Renewal fee&nbsp;patent year&nbsp;03</td></tr><tr><td class="t2">21.10.2022</td><td class="t3" colspan="2">Renewal fee&nbsp;patent year&nbsp;04</td></tr><tr><td class="t2">19.10.2023</td><td class="t3" colspan="2">Renewal fee&nbsp;patent year&nbsp;05</td></tr><tr class="optoutCls "><td class="th optout-label" rowspan="2">Opt-out from the exclusive &nbsp;<b><span title="Follow the hyperlink to access the opt-out information recorded in the Register of the Unified Patent Court" class="tooltipActuator noPrint">Tooltip</span></b><br>competence of the Unified <br>Patent Court</td><td class="t2" colspan="3"><span id="optoutTextTop">
+						<a href="https://www.unifiedpatentcourt.org/en/registry/opt-out/results?case_type&amp;patent_number=EP3816364">See the Register of the Unified Patent Court for opt-out data</a>	
+					</span>
+				</td></tr><tr class="optoutCls"><td class="t2" colspan="3"><span id="optoutDisclaimer">
+						Responsibility for the accuracy, completeness or quality of the data displayed under the link provided lies entirely with the Unified Patent Court.</span>
+				</td></tr><tr><td class="th" rowspan="5">Documents cited:</td><td class="th">Search</td><td class="t2" colspan="2">[Y] <a href="https://worldwide.espacenet.com/patent/search?q=pn%3DFR2706174&amp;called_by=EuropeanRegister" target="_blank" class="ext" style="">FR2706174</a>
+					&nbsp;(PIC CONSEIL et al.)  </td></tr><tr><td class="t2">&nbsp;</td><td class="t2" colspan="2">[Y] <a href="https://worldwide.espacenet.com/patent/search?q=pn%3DUS2014083033&amp;called_by=EuropeanRegister" target="_blank" class="ext" style="">US2014083033</a>
+					&nbsp;(MCINTOSH ROBERT GORDON et al.)  </td></tr><tr><td class="t2">&nbsp;</td><td class="t2" colspan="2">[Y] <a href="https://worldwide.espacenet.com/patent/search?q=pn%3DUS2014057075&amp;called_by=EuropeanRegister" target="_blank" class="ext" style="">US2014057075</a>
+					&nbsp;(WANG CHAO-LANG et al.)  [Y]  1-17 * figures 1-2 * * page  1, line  25  - line  28 * * page  2, line  4  - page  3, line  1 * * page  3, line  15  - line  20 * * page  4, line  2  - line  4 *</td></tr><tr><td class="t2">&nbsp;</td><td class="t2" colspan="2">[Y] <a href="https://worldwide.espacenet.com/patent/search?q=pn%3DUS2010107531&amp;called_by=EuropeanRegister" target="_blank" class="ext" style="">US2010107531</a>
+					&nbsp;(HUNSAKER GARRICK et al.)  [Y]  1-17 * figures 1-2 * * paragraph  [0094]  - paragraph  [0100] *</td></tr><tr><td class="t2">&nbsp;</td><td class="t2" colspan="2">[Y] <a href="https://worldwide.espacenet.com/patent/search?q=pn%3DCA3010868&amp;called_by=EuropeanRegister" target="_blank" class="ext" style="">CA3010868</a>
+					&nbsp;(MAX LIFE LLC et al.)  [Y]  3,5 * figures 2-3 * * paragraph  [0015] *</td></tr><tr><td class="th" rowspan="2"> </td><td class="th">by applicant</td><td class="t2" colspan="2"><a href="https://worldwide.espacenet.com/patent/search?q=pn%3DBE891963&amp;called_by=EuropeanRegister" target="_blank" class="int" style="">BE891963</a></td></tr><tr><td class="t2">&nbsp;</td><td class="t2" colspan="2"><a href="https://worldwide.espacenet.com/patent/search?q=pn%3DEP2392741&amp;called_by=EuropeanRegister" target="_blank" class="int" style="">EP2392741</a></td></tr></tbody></table>The EPO accepts no responsibility for the accuracy of data originating from other authorities; in particular, it does not guarantee that it is complete, up to date or fit for specific purposes.</div>

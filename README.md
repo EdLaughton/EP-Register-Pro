@@ -98,6 +98,16 @@ npm test
 
 ## 📝 Changelog (recent)
 
+### 7.0.86
+- Expanded the live case matrix with additional browser-captured fixtures under `tests/fixtures/cases/`:
+  - `EP19205846` for deemed-withdrawn + renewal-history + repeated R71 cycles
+  - `EP24189818` for renewal-heavy grant-intention flow
+  - `EP25203732` for active divisional-child / parent-link / search-publication behavior
+- Added live UPC registry fixtures under `tests/fixtures/upc/` and a new matrix test covering positive/negative controls.
+- Real live-control expansion surfaced and fixed a parser gap:
+  - `parseUpcOptOutResult()` now recognizes live UPC positive-control pages that present `Case Type: Opt-out application` instead of only `opted out registered/effective` wording.
+- `npm test` now includes `userscript_live_case_matrix.test.js` for broader feature-type coverage.
+
 ### 7.0.85
 - Added **browser-captured real Register fixtures** under `tests/fixtures/register-real/` and wired them into test coverage.
 - Real-capture pass surfaced and fixed a parser gap:

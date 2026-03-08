@@ -34,6 +34,7 @@ function loadUserscriptHooks() {
     'parseEventHistory',
     'parseUe',
     'parsePdfDeadlineHints',
+    'parseUpcOptOutResult',
     'inferProceduralDeadlines',
     'classifyDocument',
   ];

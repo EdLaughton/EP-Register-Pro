@@ -8,9 +8,10 @@ This matrix is used to validate sidebar correctness across different prosecution
 
 | Application # | Purpose | Key Checks | Publication Ref (optional) |
 |---|---|---|---|
-| `EP25203732` | Active polishing target (title/status/deadline/divisional behavior) | English title selection, non-duplicated status, divisional type+parent link, applicant-vs-EPO waiting logic, renewal countdown | — |
-| `EP19205846` | Withdrawn/deemed-withdrawn + UPC opt-out negative control | Status simplification, stage vs status separation, event/timeline cleanup, publication fallback behavior, UPC lookup resolves as no opt-out found | `EP3816364` |
-| `EP24189818` | UPC opt-out positive control | UPC registry lookup should resolve as opted out | `EP4438108` |
+| `EP24837586` | Parent / family / active Euro-PCT baseline | Main-page title/applicant/rep extraction, divisional children, event/legal/doclist/family hydration, parent-side family publication coverage | `EP4623169` |
+| `EP25203732` | Active divisional child | English title selection, divisional type + parent link, search-publication path, family/publication crossover to parent case, reminder/search-opinion doc coverage | `EP4644110` |
+| `EP19205846` | Withdrawn/deemed-withdrawn + renewal-history + UPC opt-out negative control | Status simplification, repeated R71 cycles, deemed-withdrawn outcome, renewal-fee extraction, publication fallback behavior, UPC lookup resolves as no opt-out found | `EP3816364` |
+| `EP24189818` | Grant-intention / renewal-heavy / UPC opt-out positive control | Divisional parent link, repeated grant-intention cycles, renewal-fee extraction through later years, family/publication linkage, UPC registry lookup resolves as opted out | `EP4438108` |
 
 ---
 
@@ -78,8 +79,8 @@ For each case, verify these fields:
 ## Regression Commands
 
 ```bash
-node tests/userscript_smoke.test.js
-node tests/userscript_regression.test.js
+node --check script.user.js
+npm test
 ```
 
 ---
