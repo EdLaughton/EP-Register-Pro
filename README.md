@@ -91,6 +91,13 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.47
+- Broader **Overview** deduplication pass:
+  - Combined **Type** + **Stage** into a single `Type / stage` row.
+  - Consolidated actionable activity into a single **Latest actions** row (EPO + Applicant).
+  - Replaced standalone `Days since applicant response` row with a compact **Waiting on** summary.
+  - Reduced deadline repetition by excluding the active `Next deadline` from detailed deadline rows.
+
 ### 7.0.46
 - Tidied the **Overview → Renewals** panel to reduce duplicate rows.
 - Folded latest paid renewal event into **Patent year status** and removed the separate **Latest renewal** line.

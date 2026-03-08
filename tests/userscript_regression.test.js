@@ -102,6 +102,15 @@ notHas(/<div class="epoRP-l">Latest renewal<\/div>/, 'Renewals overview should n
 notHas(/<div class="epoRP-l">Grace period until<\/div>/, 'Renewals overview should not render a separate Grace period row');
 has(/return 'Post-publication';/, 'Stage mapping should avoid using "Published" as a stage label');
 has(/return 'Closed';/, 'Stage mapping should classify withdrawn/refused/revoked outcomes as Closed');
+has(/const\s+detailedDeadlines\s*=\s*m\.deadlines\.filter\(/, 'Overview should compute detailed deadlines separately from the active next deadline summary');
+hasText('Deadlines & clocks (detailed)', 'Overview should render a detailed deadlines section title after dedupe pass');
+hasText('Type / stage', 'Overview should combine type and stage in a single summary row');
+has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
+has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
+hasText('since applicant response', 'Waiting-on summary should include elapsed applicant-response time when applicable');
+notHas(/<div class="epoRP-l">EPO last action<\/div>/, 'Actionable status should not render a separate EPO last action row after consolidation');
+notHas(/<div class="epoRP-l">Applicant last filing<\/div>/, 'Actionable status should not render a separate applicant last filing row after consolidation');
+notHas(/<div class="epoRP-l">Days since applicant response<\/div>/, 'Actionable status should not render a separate day-counter row after consolidation');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
 has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute a structural signature for change detection');
 has(/runtime\.doclistGroupSigByCase\[caseNo\]\s*===\s*signature/, 'Doclist grouping should skip full regroup when table signature is unchanged');

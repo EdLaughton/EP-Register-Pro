@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.46
+// @version      7.0.47
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.46';
+  const VERSION = '7.0.47';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -2541,15 +2541,22 @@
       <div class="epoRP-l">Application #</div><div class="epoRP-v">${esc(m.appNo)}</div>
       <div class="epoRP-l">Filing date</div><div class="epoRP-v">${esc(m.filingDate)}</div>
       <div class="epoRP-l">Priority</div><div class="epoRP-v">${esc(m.priority)}</div>
-      <div class="epoRP-l">Type</div><div class="epoRP-v">${esc(m.applicationType)}${m.parentCase ? ` (<a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>)` : ''}</div>
+      <div class="epoRP-l">Type / stage</div><div class="epoRP-v">${esc(m.applicationType)}${m.parentCase ? ` (<a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>)` : ''} · ${esc(m.stage)}</div>
       ${m.divisionalChildren?.length ? `<div class="epoRP-l">Divisionals</div><div class="epoRP-v">${m.divisionalChildren.map((ep) => `<a class="epoRP-a" href="${esc(sourceUrl(ep, 'main'))}">${esc(ep)}</a>`).join(', ')}</div>` : ''}
-      <div class="epoRP-l">Stage</div><div class="epoRP-v">${esc(m.stage)}</div>
       <div class="epoRP-l">Representative</div><div class="epoRP-v">${esc(m.representative)}</div>
     </div></div>`;
 
-    if (m.deadlines.length) {
-      html += `<div class="epoRP-c"><h4>Deadlines & clocks</h4><div class="epoRP-dl">`;
-      for (const d of m.deadlines) {
+    const detailedDeadlines = m.deadlines.filter((d) => {
+      if (!m.nextDeadline) return true;
+      const sameLabel = d.label === m.nextDeadline.label;
+      const sameDate = formatDate(d.date) === formatDate(m.nextDeadline.date);
+      const sameSource = String(d.sourceDate || '') === String(m.nextDeadline.sourceDate || '');
+      return !(sameLabel && sameDate && sameSource);
+    });
+
+    if (detailedDeadlines.length) {
+      html += `<div class="epoRP-c"><h4>Deadlines & clocks (detailed)</h4><div class="epoRP-dl">`;
+      for (const d of detailedDeadlines) {
         const ds = formatDate(d.date);
         const dd = Math.ceil((d.date.getTime() - Date.now()) / 86400000);
         const proximity = dd < 0 ? 'bad' : dd <= 14 ? 'bad' : dd <= 45 ? 'warn' : 'ok';
@@ -2562,7 +2569,7 @@
         ].filter(Boolean);
         html += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span>${!d.reference ? `<div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div>` : ''}</div></div>`;
       }
-      html += `</div><div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.</div></div>`;
+      html += `</div><div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.${m.nextDeadline ? ' Next actionable due date is summarized in Actionable status.' : ''}</div></div>`;
     }
 
     const nextDeadlineMeta = m.nextDeadline
@@ -2579,11 +2586,17 @@
       ? `<span class="epoRP-bdg ${m.daysToDeadline < 0 ? 'bad' : m.daysToDeadline <= 14 ? 'bad' : m.daysToDeadline <= 45 ? 'warn' : 'ok'}">${m.daysToDeadline >= 0 ? formatDaysHuman(m.daysToDeadline) : `${formatDaysHuman(m.daysToDeadline).slice(1)} overdue`}</span>`
       : '';
 
+    const latestEpoText = m.latestEpo ? `${m.latestEpo.dateStr} · ${m.latestEpo.title}` : '—';
+    const latestApplicantText = m.latestApplicant ? `${m.latestApplicant.dateStr} · ${m.latestApplicant.title}` : '—';
+    const waitingLevel = m.waitingDays == null ? 'info' : (m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok');
+    const waitingSummary = m.waitingOn === 'EPO'
+      ? `EPO${m.waitingDays != null ? ` · <span class="epoRP-bdg ${waitingLevel}">${formatDaysHuman(m.waitingDays)} since applicant response</span>` : ''}`
+      : 'Applicant';
+
     html += `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}${nextDeadlineMeta ? `<div class="epoRP-m">${esc(`(${nextDeadlineMeta})`)}</div>` : ''}` : '—'}</div>
-      <div class="epoRP-l">EPO last action</div><div class="epoRP-v">${m.latestEpo ? `${esc(m.latestEpo.dateStr)} · ${esc(m.latestEpo.title)}` : '—'}</div>
-      <div class="epoRP-l">Applicant last filing</div><div class="epoRP-v">${m.latestApplicant ? `${esc(m.latestApplicant.dateStr)} · ${esc(m.latestApplicant.title)}` : '—'}</div>
-      ${m.waitingOn === 'EPO' ? `<div class="epoRP-l">Days since applicant response</div><div class="epoRP-v">${m.waitingDays != null ? `<span class="epoRP-bdg ${m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok'}">${formatDaysHuman(m.waitingDays)}</span>` : '—'}</div>` : ''}
+      <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
+      <div class="epoRP-l">Waiting on</div><div class="epoRP-v">${waitingSummary}</div>
     </div></div>`;
 
     if (opts.showRenewals) {
