@@ -29,11 +29,16 @@ hasText("addEventListener('pageshow', () => {", 'Pageshow should reschedule init
 hasText('scheduleInit(false);', 'Route/pageshow handling should use debounced init scheduling');
 
 // Derived-source dedupe
+has(/function\s+storeCaseSource\s*\(/, 'Centralized source-write helper missing');
 hasText("const dependencyStamp = derivedDependencyStamp(caseNo, 'upcRegistry');", 'UPC refresh should compute dependency stamp from upstream state');
 hasText("isFresh(cached, options().refreshHours, { allowEmpty: true, dependencyStamp })", 'UPC/PDF derived refresh should reuse fresh empty/ok cache only when dependency stamp matches');
 hasText("status: 'empty'", 'Derived-source refreshers should cache explicit empty states when appropriate');
 hasText('dependencyStamp,', 'Derived-source cache entries should persist dependency stamps');
 hasText("await refreshUpcRegistry(caseNo, controller.signal, force);", 'Prefetch pipeline should pass force flag through to UPC refresh');
+hasText('let hadResponse = false;', 'UPC refresh should distinguish real empty results from complete request failure');
+hasText("status: 'error'", 'Derived-source refreshers should persist error states when all candidate requests fail');
+hasText('let failedCandidates = 0;', 'PDF refresh should track per-candidate failures instead of collapsing all-zero-hint outcomes into empty');
+hasText("const pdfStatus = dedupedHints.length", 'PDF refresh should derive status from successful-vs-failed candidate scans');
 
 // Overview-model memoization
 has(/function\s+overviewCacheKey\s*\(/, 'Overview cache key helper missing');

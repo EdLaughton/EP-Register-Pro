@@ -94,6 +94,16 @@ node tests/userscript_lifecycle.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.80
+- Second-pass cache/state hardening:
+  - centralized source-cache writes behind a single helper to keep status/parserVersion/dependencyStamp handling consistent
+  - `sourceStamp()` now includes dependency stamps so derived-model memoization reflects upstream dependency changes cleanly
+- Fixed derived-source status semantics:
+  - UPC registry refresh now distinguishes **true empty/no-match** from **all candidate requests failed**
+  - PDF deadline refresh now distinguishes **no hints after successful scans** from **all candidate scans failed**
+  - avoids false-negative empty states during transport/parser failures
+- Added lifecycle/derived-status coverage in `tests/userscript_lifecycle.test.js`.
+
 ### 7.0.79
 - Refactored page lifecycle + navigation handling:
   - added debounced route observers around `pushState` / `replaceState` / `popstate` / `hashchange`

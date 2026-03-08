@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.79
+// @version      7.0.80
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.79';
+  const VERSION = '7.0.80';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -331,6 +331,36 @@
     store.apps[caseNo].updatedAt = Date.now();
     markDirty();
     return store.apps[caseNo];
+  }
+
+  function syncMainSourceMeta(caseEntry, data) {
+    if (!caseEntry || !data || typeof data !== 'object') return;
+    caseEntry.meta = caseEntry.meta || {};
+    caseEntry.meta.lastMainStatusRaw = String(data?.statusRaw || '');
+    caseEntry.meta.lastMainStage = String(data?.statusStage || inferStatusStage(data?.statusRaw || '') || '');
+  }
+
+  function storeCaseSource(caseNo, key, payload = {}) {
+    if (!caseNo || !key) return null;
+    const title = payload.title || sourceTitle(key);
+    return patchCase(caseNo, (c) => {
+      const next = {
+        key,
+        title,
+        status: payload.status || 'ok',
+        fetchedAt: payload.fetchedAt || Date.now(),
+        parserVersion: payload.parserVersion || VERSION,
+      };
+
+      if (payload.url) next.url = payload.url;
+      if (payload.transport) next.transport = payload.transport;
+      if (payload.dependencyStamp != null) next.dependencyStamp = String(payload.dependencyStamp || '');
+      if (payload.error) next.error = String(payload.error || '');
+      if (payload.data !== undefined) next.data = payload.data;
+
+      c.sources[key] = next;
+      if (key === 'main' && payload.data && payload.status === 'ok') syncMainSourceMeta(c, payload.data);
+    });
   }
 
   function addLog(caseNo, level, message, meta = {}) {
@@ -1572,36 +1602,19 @@
     try {
       const data = parseSource(sourceKey, document, caseNo);
       addLog(caseNo, 'info', 'Live parse success', { transport: 'dom', ...sourceDiagnostics(sourceKey, data) });
-      patchCase(caseNo, (c) => {
-        c.sources[sourceKey] = {
-          key: sourceKey,
-          title: sourceTitle(sourceKey),
-          status: 'ok',
-          fetchedAt: Date.now(),
-          parserVersion: VERSION,
-          url: location.href,
-          transport: 'dom',
-          data,
-        };
-        if (sourceKey === 'main') {
-          c.meta = c.meta || {};
-          c.meta.lastMainStatusRaw = String(data?.statusRaw || '');
-          c.meta.lastMainStage = String(data?.statusStage || inferStatusStage(data?.statusRaw || '') || '');
-        }
+      storeCaseSource(caseNo, sourceKey, {
+        status: 'ok',
+        url: location.href,
+        transport: 'dom',
+        data,
       });
     } catch (error) {
       addLog(caseNo, 'error', `Live parse failure: ${error?.message || error}`, { source: sourceKey, transport: 'dom' });
-      patchCase(caseNo, (c) => {
-        c.sources[sourceKey] = {
-          key: sourceKey,
-          title: sourceTitle(sourceKey),
-          status: 'error',
-          fetchedAt: Date.now(),
-          parserVersion: VERSION,
-          url: location.href,
-          transport: 'dom',
-          error: String(error?.message || error),
-        };
+      storeCaseSource(caseNo, sourceKey, {
+        status: 'error',
+        url: location.href,
+        transport: 'dom',
+        error: String(error?.message || error),
       });
     }
   }
@@ -2049,61 +2062,67 @@
 
     const candidates = upcCandidateNumbers(caseNo);
     if (!candidates.length) {
-      patchCase(caseNo, (c) => {
-        c.sources.upcRegistry = {
-          key: 'upcRegistry',
-          title: 'UPC Opt-out registry',
-          status: 'empty',
-          fetchedAt: Date.now(),
-          parserVersion: VERSION,
-          transport: 'cross-origin',
-          dependencyStamp,
-          data: { patentNumbers: [], status: 'No EP publication numbers available' },
-        };
+      storeCaseSource(caseNo, 'upcRegistry', {
+        title: 'UPC Opt-out registry',
+        status: 'empty',
+        transport: 'cross-origin',
+        dependencyStamp,
+        data: { patentNumbers: [], status: 'No EP publication numbers available' },
       });
       addLog(caseNo, 'info', 'UPC registry check skipped: no EP publication numbers available', { source: 'upcRegistry' });
       return;
     }
 
+    let hadResponse = false;
+    let lastError = null;
+
     for (const patentNumber of candidates) {
       const url = `https://www.unifiedpatentcourt.org/en/registry/opt-out/results?patent_number=${encodeURIComponent(patentNumber)}`;
       try {
         const html = await fetchCrossOrigin(url, signal);
+        hadResponse = true;
         const parsed = parseUpcOptOutResult(html, patentNumber);
         if (!parsed) continue;
-        patchCase(caseNo, (c) => {
-          c.sources.upcRegistry = {
-            key: 'upcRegistry',
-            title: 'UPC Opt-out registry',
-            status: 'ok',
-            fetchedAt: Date.now(),
-            parserVersion: VERSION,
-            url,
-            transport: 'cross-origin',
-            dependencyStamp,
-            data: parsed,
-          };
+        storeCaseSource(caseNo, 'upcRegistry', {
+          title: 'UPC Opt-out registry',
+          status: 'ok',
+          url,
+          transport: 'cross-origin',
+          dependencyStamp,
+          data: parsed,
         });
         addLog(caseNo, 'ok', `UPC registry check: ${parsed.status}`, { source: 'upcRegistry', patentNumber });
         return;
       } catch (error) {
+        lastError = error;
         addLog(caseNo, 'warn', `UPC registry check failed for ${patentNumber}: ${error?.message || error}`, { source: 'upcRegistry' });
       }
     }
 
-    patchCase(caseNo, (c) => {
-      c.sources.upcRegistry = {
-        key: 'upcRegistry',
+    if (hadResponse) {
+      storeCaseSource(caseNo, 'upcRegistry', {
         title: 'UPC Opt-out registry',
         status: 'empty',
-        fetchedAt: Date.now(),
-        parserVersion: VERSION,
         transport: 'cross-origin',
         dependencyStamp,
         data: { patentNumbers: candidates, status: 'No registry match found' },
-      };
+      });
+      addLog(caseNo, 'info', 'UPC registry check completed without a matching opt-out result', {
+        source: 'upcRegistry',
+        candidates,
+      });
+      return;
+    }
+
+    storeCaseSource(caseNo, 'upcRegistry', {
+      title: 'UPC Opt-out registry',
+      status: 'error',
+      transport: 'cross-origin',
+      dependencyStamp,
+      error: String(lastError?.message || lastError || 'UPC registry lookup failed'),
+      data: { patentNumbers: candidates },
     });
-    addLog(caseNo, 'info', 'UPC registry check completed without a matching opt-out result', {
+    addLog(caseNo, 'error', 'UPC registry check failed for all publication candidates', {
       source: 'upcRegistry',
       candidates,
     });
@@ -2949,17 +2968,12 @@
 
     const docs = [...(c.sources.doclist?.data?.docs || [])].sort(compareDateDesc);
     if (!docs.length) {
-      patchCase(caseNo, (entry) => {
-        entry.sources.pdfDeadlines = {
-          key: 'pdfDeadlines',
-          title: 'PDF-derived deadlines',
-          status: 'empty',
-          fetchedAt: Date.now(),
-          parserVersion: VERSION,
-          transport: 'fetch+pdfjs',
-          dependencyStamp,
-          data: { hints: [], scanned: [] },
-        };
+      storeCaseSource(caseNo, 'pdfDeadlines', {
+        title: 'PDF-derived deadlines',
+        status: 'empty',
+        transport: 'fetch+pdfjs',
+        dependencyStamp,
+        data: { hints: [], scanned: [] },
       });
       addLog(caseNo, 'info', 'PDF deadline scan skipped: doclist cache is empty', { source: 'pdfDeadlines' });
       return;
@@ -2978,17 +2992,12 @@
       return false;
     }).slice(0, 8);
     if (!candidates.length) {
-      patchCase(caseNo, (entry) => {
-        entry.sources.pdfDeadlines = {
-          key: 'pdfDeadlines',
-          title: 'PDF-derived deadlines',
-          status: 'empty',
-          fetchedAt: Date.now(),
-          parserVersion: VERSION,
-          transport: 'fetch+pdfjs',
-          dependencyStamp,
-          data: { hints: [], scanned: [] },
-        };
+      storeCaseSource(caseNo, 'pdfDeadlines', {
+        title: 'PDF-derived deadlines',
+        status: 'empty',
+        transport: 'fetch+pdfjs',
+        dependencyStamp,
+        data: { hints: [], scanned: [] },
       });
       addLog(caseNo, 'info', 'PDF deadline scan skipped: no communication-type documents found', { source: 'pdfDeadlines' });
       return;
@@ -3001,18 +3010,13 @@
     } catch (error) {
       const errText = String(error?.message || error || 'unknown error');
       addLog(caseNo, 'error', `PDF parser unavailable: ${errText}`, { source: 'pdfDeadlines' });
-      patchCase(caseNo, (entry) => {
-        entry.sources.pdfDeadlines = {
-          key: 'pdfDeadlines',
-          title: 'PDF-derived deadlines',
-          status: 'error',
-          fetchedAt: Date.now(),
-          parserVersion: VERSION,
-          transport: 'fetch+pdfjs',
-          dependencyStamp,
-          error: errText,
-          data: { hints: [], scanned: [] },
-        };
+      storeCaseSource(caseNo, 'pdfDeadlines', {
+        title: 'PDF-derived deadlines',
+        status: 'error',
+        transport: 'fetch+pdfjs',
+        dependencyStamp,
+        error: errText,
+        data: { hints: [], scanned: [] },
       });
       addLog(caseNo, 'warn', 'PDF deadline parse aborted (parser engine unavailable)', { source: 'pdfDeadlines' });
       return;
@@ -3020,6 +3024,9 @@
 
     const hints = [];
     const scanned = [];
+    let failedCandidates = 0;
+    let successfulCandidates = 0;
+    let lastCandidateError = null;
 
     for (const doc of candidates) {
       if (signal?.aborted) return;
@@ -3041,6 +3048,7 @@
         const text = normalize(String(extracted?.text || ''));
         const parseTransport = String(extracted?.transport || 'unknown');
         const parseUrl = String(extracted?.resolvedUrl || resolvedUrl);
+        successfulCandidates += 1;
 
         if (extracted?.usedOcr) {
           addLog(caseNo, 'ok', 'PDF OCR fallback used', {
@@ -3148,27 +3156,32 @@
           registeredLetterProofLine: proofLine,
         });
       } catch (error) {
+        failedCandidates += 1;
+        lastCandidateError = error;
         addLog(caseNo, 'warn', `PDF deadline parse skipped: ${error?.message || error}`, { source: 'pdfDeadlines', doc: doc.title || '' });
       }
     }
 
     const dedupedHints = dedupe(hints, (h) => `${h.label}|${h.dateStr}`);
+    const pdfStatus = dedupedHints.length
+      ? 'ok'
+      : (successfulCandidates > 0 || scanned.length > 0)
+        ? 'empty'
+        : 'error';
 
-    patchCase(caseNo, (entry) => {
-      entry.sources.pdfDeadlines = {
-        key: 'pdfDeadlines',
-        title: 'PDF-derived deadlines',
-        status: dedupedHints.length ? 'ok' : 'empty',
-        fetchedAt: Date.now(),
-        parserVersion: VERSION,
-        transport: 'fetch+pdfjs',
-        dependencyStamp,
-        data: { hints: dedupedHints, scanned },
-      };
+    storeCaseSource(caseNo, 'pdfDeadlines', {
+      title: 'PDF-derived deadlines',
+      status: pdfStatus,
+      transport: 'fetch+pdfjs',
+      dependencyStamp,
+      error: pdfStatus === 'error' ? String(lastCandidateError?.message || lastCandidateError || 'PDF deadline scan failed') : '',
+      data: { hints: dedupedHints, scanned },
     });
 
     const summary = {
       scannedDocs: scanned.length,
+      successfulCandidates,
+      failedCandidates,
       withHints: scanned.filter((x) => (x.hintCount || 0) > 0).length,
       withCommunicationDate: scanned.filter((x) => !!x.communicationDate).length,
       withResponsePeriod: scanned.filter((x) => Number(x.responseMonths || 0) > 0).length,
@@ -3176,7 +3189,11 @@
       withOcr: scanned.filter((x) => !!x.usedOcr).length,
     };
 
-    addLog(caseNo, dedupedHints.length ? 'ok' : 'info', `PDF deadline parse ${dedupedHints.length ? `found ${dedupedHints.length} hint(s)` : 'found no explicit hints'}`, { source: 'pdfDeadlines', ...summary });
+    const summaryLevel = pdfStatus === 'error' ? 'error' : (dedupedHints.length ? 'ok' : 'info');
+    const summaryMessage = pdfStatus === 'error'
+      ? 'PDF deadline parse failed for all candidate documents'
+      : `PDF deadline parse ${dedupedHints.length ? `found ${dedupedHints.length} hint(s)` : 'found no explicit hints'}`;
+    addLog(caseNo, summaryLevel, summaryMessage, { source: 'pdfDeadlines', ...summary });
   }
 
   async function fetchWithRetry(url, signal) {
@@ -3301,38 +3318,23 @@
           const parsed = parseSource(src.key, parseHtml(html), caseNo);
           addLog(caseNo, 'ok', `Parse success ${src.key}`, { transport: 'fetch', ...sourceDiagnostics(src.key, parsed) });
 
-          patchCase(caseNo, (c) => {
-            c.sources[src.key] = {
-              key: src.key,
-              title: src.title,
-              status: 'ok',
-              fetchedAt: Date.now(),
-              parserVersion: VERSION,
-              url,
-              transport: 'fetch',
-              data: parsed,
-            };
-            if (src.key === 'main') {
-              c.meta = c.meta || {};
-              c.meta.lastMainStatusRaw = String(parsed?.statusRaw || '');
-              c.meta.lastMainStage = String(parsed?.statusStage || inferStatusStage(parsed?.statusRaw || '') || '');
-            }
+          storeCaseSource(caseNo, src.key, {
+            title: src.title,
+            status: 'ok',
+            url,
+            transport: 'fetch',
+            data: parsed,
           });
           addLog(caseNo, 'info', `Cache write ${src.key}`, { source: src.key });
         } catch (error) {
           if (controller.signal.aborted) return;
           addLog(caseNo, 'error', `Fetch/parse failure ${src.key}: ${error?.message || error}`, { source: src.key, transport: 'fetch' });
-          patchCase(caseNo, (c) => {
-            c.sources[src.key] = {
-              key: src.key,
-              title: src.title,
-              status: 'error',
-              fetchedAt: Date.now(),
-              parserVersion: VERSION,
-              url,
-              transport: 'fetch',
-              error: String(error?.message || error),
-            };
+          storeCaseSource(caseNo, src.key, {
+            title: src.title,
+            status: 'error',
+            url,
+            transport: 'fetch',
+            error: String(error?.message || error),
           });
         }
 
@@ -3960,7 +3962,7 @@
 
   function sourceStamp(c, key) {
     const src = c?.sources?.[key] || {};
-    return `${key}:${src.status || 'na'}:${src.fetchedAt || 0}:${src.parserVersion || ''}`;
+    return `${key}:${src.status || 'na'}:${src.fetchedAt || 0}:${src.parserVersion || ''}:${src.dependencyStamp || ''}`;
   }
 
   function timelineCacheKey(caseNo, opts, c) {
