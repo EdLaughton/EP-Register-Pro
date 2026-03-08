@@ -91,6 +91,15 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.70
+- Improved actionability heuristics for deemed-withdrawn / loss-of-rights postures:
+  - classifies loss-of-rights style communications as EPO actions (avoids false applicant attribution)
+  - adds a **Recovery options** advisory line in Actionable status with Rule 136(1) context when applicable
+  - adjusts waiting-party logic in loss-of-rights situations to avoid incorrectly showing "waiting on EPO"
+- Improved doclist grouping around grant communications:
+  - group header label now shows **Intention to grant (R71(3) EPC)** (instead of generic Grant package)
+  - bibliographic rows on the same date as intention-to-grant communications are folded into that group
+
 ### 7.0.69
 - Sidebar mounting is now blocked on EPO document-viewer URLs (`/application?documentId=...`).
 - Case-page detection now requires an EP application number in the `number` query param and excludes `documentId` routes.

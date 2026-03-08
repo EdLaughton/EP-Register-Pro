@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.69
+// @version      7.0.70
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.69';
+  const VERSION = '7.0.70';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1134,6 +1134,11 @@
       /search\s*\/\s*examination|search\s*and\s*examination|search report|search opinion/.test(p)
       || /after receipt of \(?(?:european\)? )?search report|before examination/.test(t);
 
+    const isLossOfRights = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|noting of loss of rights|application refused|application rejected/.test(`${t} ${p}`);
+    if (isLossOfRights) {
+      return { bundle: 'Examination', level: 'bad', actor: 'EPO' };
+    }
+
     if (/by applicant|amendment by applicant|filed by applicant|from applicant/.test(p)) {
       if (isSearchResponseContext && /amend|claims|description|letter|annotations|subsequently filed items/.test(t)) {
         return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
@@ -1158,7 +1163,11 @@
 
     if (/search report|search opinion|written opinion|search strategy|esr/.test(t)) return { bundle: 'Search package', level: 'info', actor: 'EPO' };
     if (/rule\s*71\(3\)|intention to grant|text intended for grant|mention of grant/.test(t)) return { bundle: 'Grant package', level: 'warn', actor: 'EPO' };
-    if (/annex to (?:the )?communication|communication annex|annex.*examining division/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
+    if (/annex to (?:the )?communication|communication annex|annex.*examining division/.test(t)) {
+      return /intention to grant|rule\s*71\(3\)/.test(t)
+        ? { bundle: 'Grant package', level: 'warn', actor: 'EPO' }
+        : { bundle: 'Examination', level: 'info', actor: 'EPO' };
+    }
     if (/article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining|examining division has become responsible/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
     if (/renewal|annual fee/.test(t)) return { bundle: 'Renewal', level: 'ok', actor: 'Applicant' };
     if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
@@ -1167,6 +1176,11 @@
 
     if (/examining division|epo|office/.test(p)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
     return { bundle: 'Other', level: 'info', actor: 'Other' };
+  }
+
+  function doclistBundleLabel(bundle) {
+    if (bundle === 'Grant package') return 'Intention to grant (R71(3) EPC)';
+    return bundle;
   }
 
   function parseDoclist(doc, caseNo) {
@@ -1283,20 +1297,36 @@
     const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
     const groupable = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
 
-    const runs = [];
-    let run = null;
-
+    const rowModels = [];
     for (const row of rows) {
       const cells = [...row.querySelectorAll('td')];
       if (!cells.length) continue;
       const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[1] || cells[0] || row);
-      const bundle = classifyDocument(title, text(row)).bundle || 'Other';
+      const rowText = text(row);
+      const dateStr = rowText.match(DATE_RE)?.[1] || '';
+      const bundle = classifyDocument(title, rowText).bundle || 'Other';
+      rowModels.push({ row, title, dateStr, rowText, bundle });
+    }
 
-      if (!run || run.bundle !== bundle) {
-        run = { bundle, rows: [row] };
+    for (const model of rowModels) {
+      if (!/bibliographic data of the european patent application/i.test(model.title || '')) continue;
+      const sameDateGrantSignals = rowModels.some((other) => {
+        if (other === model) return false;
+        if (other.dateStr !== model.dateStr) return false;
+        return /intention to grant|rule\s*71\(3\)|text intended for grant|communication about intention to grant|annex to the communication about intention to grant/i.test(other.title || '');
+      });
+      if (sameDateGrantSignals) model.bundle = 'Grant package';
+    }
+
+    const runs = [];
+    let run = null;
+
+    for (const model of rowModels) {
+      if (!run || run.bundle !== model.bundle) {
+        run = { bundle: model.bundle, rows: [model.row] };
         runs.push(run);
       } else {
-        run.rows.push(row);
+        run.rows.push(model.row);
       }
     }
 
@@ -1316,7 +1346,8 @@
 
       const td = document.createElement('td');
       td.colSpan = Math.max(1, cells.length);
-      td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-label" data-bundle="${esc(r.bundle)}">${esc(r.bundle)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
+      const bundleLabel = doclistBundleLabel(r.bundle);
+      td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)} (${r.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
       headerRow.appendChild(td);
       firstRow.parentElement?.insertBefore(headerRow, firstRow);
 
@@ -3673,8 +3704,24 @@
 
     const latestEpoDate = parseDateString(latestEpo?.dateStr);
     const latestApplicantDate = parseDateString(latestApplicant?.dateStr);
-    const waitingOn = latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant';
-    const waitingDays = waitingOn === 'EPO' && latestApplicantDate ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000) : null;
+
+    const latestEpoIsLossOfRights = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|application refused|application rejected/.test(`${String(latestEpo?.title || '')} ${String(latestEpo?.procedure || '')}`.toLowerCase());
+    const applicantAfterLatestEpo = !!(latestEpoDate && latestApplicantDate && latestApplicantDate > latestEpoDate);
+
+    const waitingOn = latestEpoIsLossOfRights
+      ? (applicantAfterLatestEpo ? 'EPO' : 'Applicant')
+      : (latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant');
+
+    const waitingDays = waitingOn === 'EPO' && latestApplicantDate
+      ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000)
+      : null;
+
+    let recoveryOptions = '';
+    if (latestEpoIsLossOfRights) {
+      recoveryOptions = applicantAfterLatestEpo
+        ? 'Loss-of-rights posture detected. Applicant appears to have filed after the adverse communication; monitor EPO decision on recovery.'
+        : 'Loss-of-rights posture detected (deemed withdrawn / Rule 112 context). Further processing may still be available in some situations; otherwise re-establishment under Rule 136(1) EPC applies (earliest of 2 months from removal of cause of non-compliance and 1 year from expiry of the unobserved time limit).';
+    }
 
     const actionableDeadlines = deadlines.filter((d) => !d.reference && !d.resolved);
     const nextDeadline = actionableDeadlines.find((d) => d.date > new Date())
@@ -3703,6 +3750,7 @@
       latestApplicant,
       waitingOn,
       waitingDays,
+      recoveryOptions,
       nextDeadline,
       daysToDeadline,
       publications,
@@ -3932,6 +3980,7 @@
     html += `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : '—'}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
+      ${m.recoveryOptions ? `<div class="epoRP-l">Recovery options</div><div class="epoRP-v"><div class="epoRP-m">${esc(m.recoveryOptions)}</div></div>` : ''}
       <div class="epoRP-l">Waiting on</div><div class="epoRP-v">${waitingSummary}</div>
     </div>${detailedDeadlinesHtml}</div>`;
 

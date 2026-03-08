@@ -202,6 +202,9 @@ has(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Overv
 has(/if \(d\.reference && \/20-year term from filing\/i\.test\(String\(d\.label \|\| ''\)\)\) return false;/, 'Detailed clocks should avoid duplicating 20-year term reference row already shown in top summary');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
+hasText('Recovery options', 'Actionable status should expose recovery guidance for loss-of-rights postures');
+has(/const\s+latestEpoIsLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed to be withdrawn\|loss of rights/, 'Overview model should detect loss-of-rights posture from latest EPO action');
+has(/const\s+waitingOn\s*=\s*latestEpoIsLossOfRights/, 'Waiting-on allocation should use dedicated loss-of-rights logic');
 has(/const\s+nextDeadlineMetaLines\s*=\s*\[\];/, 'Actionable status should build tidy next-deadline metadata lines');
 hasText('Basis: ${nextDeadlineMethod}', 'Actionable status should render method evidence as a dedicated Basis line');
 notHas(/nextDeadlineMeta\s*=\s*m\.nextDeadline/, 'Legacy one-line next-deadline metadata blob should be removed');
@@ -210,6 +213,9 @@ notHas(/<div class="epoRP-l">EPO last action<\/div>/, 'Actionable status should 
 notHas(/<div class="epoRP-l">Applicant last filing<\/div>/, 'Actionable status should not render a separate applicant last filing row after consolidation');
 notHas(/<div class="epoRP-l">Days since applicant response<\/div>/, 'Actionable status should not render a separate day-counter row after consolidation');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
+hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use explicit R71(3) wording for grant package groups');
+has(/if \(sameDateGrantSignals\) model\.bundle = 'Grant package';/, 'Doclist grouping should fold same-date bibliographic rows into intention-to-grant group when grant signals are present');
+has(/const\s+isLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed to be withdrawn\|loss of rights/, 'Document classification should mark loss-of-rights communications as EPO actions');
 has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute a structural signature for change detection');
 has(/runtime\.doclistGroupSigByCase\[caseNo\]\s*===\s*signature/, 'Doclist grouping should skip full regroup when table signature is unchanged');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
