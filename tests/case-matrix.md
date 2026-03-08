@@ -9,9 +9,8 @@ This matrix is used to validate sidebar correctness across different prosecution
 | Application # | Purpose | Key Checks | Publication Ref (optional) |
 |---|---|---|---|
 | `EP25203732` | Active polishing target (title/status/deadline/divisional behavior) | English title selection, non-duplicated status, divisional type+parent link, applicant-vs-EPO waiting logic, renewal countdown | — |
-| `EP19205846` | Withdrawn/deemed-withdrawn behavior | Status simplification, stage vs status separation, event/timeline cleanup, publication fallback behavior | — |
-| `TODO_APP_NO_FOR_UPC_POSITIVE` | UPC opt-out positive control | UPC registry lookup should resolve as opted out | `EP4438108` |
-| `TODO_APP_NO_FOR_UPC_NEGATIVE` | UPC opt-out negative control | UPC registry lookup should resolve as no opt-out found | `EP3816364` |
+| `EP19205846` | Withdrawn/deemed-withdrawn + UPC opt-out negative control | Status simplification, stage vs status separation, event/timeline cleanup, publication fallback behavior, UPC lookup resolves as no opt-out found | `EP3816364` |
+| `EP24189818` | UPC opt-out positive control | UPC registry lookup should resolve as opted out | `EP4438108` |
 
 ---
 
@@ -68,8 +67,8 @@ For each case, verify these fields:
 
 ### UPC / UE
 - [ ] Opt-out status is registry-backed when lookup succeeds.
-- [ ] Positive control (`TODO_APP_NO_FOR_UPC_POSITIVE`; publication ref `EP4438108`) resolves as opted out.
-- [ ] Negative control (`TODO_APP_NO_FOR_UPC_NEGATIVE`; publication ref `EP3816364`) resolves as no opt-out found.
+- [ ] Positive control (`EP24189818`; publication ref `EP4438108`) resolves as opted out.
+- [ ] Negative control (`EP19205846`; publication ref `EP3816364`) resolves as no opt-out found.
 
 ### All Documents page (`tab=doclist`)
 - [ ] Bundle grouping headers are present and stable after focus/visibility changes.
