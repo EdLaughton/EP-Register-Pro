@@ -91,6 +91,11 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.65
+- UPC opt-out query input now strictly uses **EP publication numbers only**.
+  - Removed any application-number fallback for UPC `patent_number` lookups.
+  - Added explicit skip diagnostic when no EP publication number is available for UPC lookup.
+
 ### 7.0.64
 - Tidied **Overview → Actionable status** formatting for readability:
   - reformatted Next deadline supporting context into cleaner sub-lines (context + basis + status), instead of one long parenthesized sentence

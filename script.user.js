@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.64
+// @version      7.0.65
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.64';
+  const VERSION = '7.0.65';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1965,15 +1965,10 @@
     const picks = [];
 
     // Use case-specific publication numbers only (avoid family-wide false positives).
+    // IMPORTANT: UPC patent_number must be a publication number, never an EP application number.
     for (const p of (main.publications || [])) {
       const m = String(p.no || '').toUpperCase().match(/^(EP\d{6,})/);
       if (m?.[1]) picks.push(m[1]);
-    }
-
-    // Conservative fallback only for published/granted status and EP-like number.
-    const statusText = String(main.statusRaw || '').toLowerCase();
-    if (!picks.length && /^EP\d{6,}$/i.test(caseNo || '') && /(published|granted)/.test(statusText)) {
-      picks.push(String(caseNo).toUpperCase());
     }
 
     return [...new Set(picks)].slice(0, 4);
@@ -1981,7 +1976,10 @@
 
   async function refreshUpcRegistry(caseNo, signal) {
     const candidates = upcCandidateNumbers(caseNo);
-    if (!candidates.length) return;
+    if (!candidates.length) {
+      addLog(caseNo, 'info', 'UPC registry check skipped: no EP publication numbers available', { source: 'upcRegistry' });
+      return;
+    }
 
     for (const patentNumber of candidates) {
       const url = `https://www.unifiedpatentcourt.org/en/registry/opt-out/results?patent_number=${encodeURIComponent(patentNumber)}`;

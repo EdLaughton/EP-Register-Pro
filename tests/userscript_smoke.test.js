@@ -25,7 +25,7 @@ for (const pdfHook of ['@grant        unsafeWindow', 'PDF_JS_CANDIDATES', 'OCR_T
   assert(src.includes(pdfHook), `Missing PDF diagnostics hook ${pdfHook}`);
 }
 
-for (const diagnosticsHook of ['sourceDiagnostics', 'autoPrefetchDoneByCase', 'lastRegisterTabByCase', 'SESSION_KEY', 'loadSessionJson', 'patchCaseSession', 'slice(-MAX_LOGS_PER_APP).reverse()', 'Case tab/page changed; auto prefetch skipped for this page session', 'Same-case tab switch detected: prefetch gate active', 'Same-case page reload detected: prefetch gate active']) {
+for (const diagnosticsHook of ['sourceDiagnostics', 'autoPrefetchDoneByCase', 'lastRegisterTabByCase', 'SESSION_KEY', 'loadSessionJson', 'patchCaseSession', 'slice(-MAX_LOGS_PER_APP).reverse()', 'Case tab/page changed; auto prefetch skipped for this page session', 'Same-case tab switch detected: prefetch gate active', 'Same-case page reload detected: prefetch gate active', 'UPC registry check skipped: no EP publication numbers available']) {
   assert(src.includes(diagnosticsHook), `Missing diagnostics coverage hook ${diagnosticsHook}`);
 }
 

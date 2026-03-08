@@ -19,7 +19,11 @@ function notHas(re, message) {
 has(/@grant\s+GM_xmlhttpRequest/, 'Missing GM_xmlhttpRequest grant for UPC registry checks');
 has(/@connect\s+unifiedpatentcourt\.org/, 'Missing @connect unifiedpatentcourt.org');
 has(/function\s+refreshUpcRegistry\s*\(/, 'Missing UPC registry refresh function');
+has(/function\s+upcCandidateNumbers\s*\(/, 'Missing UPC candidate-number selection helper');
 has(/parseUpcOptOutResult/, 'Missing UPC opt-out parser');
+hasText('IMPORTANT: UPC patent_number must be a publication number, never an EP application number.', 'UPC lookup should explicitly enforce publication-number-only input');
+hasText('UPC registry check skipped: no EP publication numbers available', 'UPC lookup should skip cleanly when no EP publication numbers are available');
+notHas(/if \(!picks\.length && \/^EP\\d\{6,\}\$\/i\.test\(caseNo \|\| ''\)/, 'UPC candidate selection should not fallback to application-number caseNo');
 hasText("upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')", 'Overview should preserve explicit UPC registry status (e.g., Opt-out withdrawn)');
 hasText('opt(?:ed)?[\\s-]*out(?:\\s+\\w+){0,8}\\s+(?:register', 'UPC positive matcher should allow words between opt-out and registered/entered/effective');
 
