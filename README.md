@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.51
+- Fixed PDF URL resolution for EPO doclist links that use `javascript:NewPDFWindow(...)` handlers.
+  - Extracts and normalizes `application?documentId=...` links from javascript pseudo-URLs.
+  - Allows direct `documentId` endpoints as resolvable PDF candidates (without requiring `.pdf` suffix in URL).
+  - Adds `normalizedDocUrl` to failure logs for easier debugging when URL resolution still fails.
+
 ### 7.0.50
 - Expanded PDF parse diagnostics in the sidebar operation console:
   - Logs whether communication date was detected and what evidence pattern matched.

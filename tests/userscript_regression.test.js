@@ -46,11 +46,16 @@ has(/function\s+extractCommunicationDateFromPdf\s*\(/, 'PDF parser should extrac
 has(/function\s+extractResponseMonthsFromPdf\s*\(/, 'PDF parser should extract response-period month count from communication text');
 has(/function\s+extractExplicitDeadlineDateFromPdf\s*\(/, 'PDF parser should support explicit deadline dates when present in the communication');
 has(/function\s+extractRegisteredLetterProofLine\s*\(/, 'PDF parser should extract proof line below Registered Letter for logging');
+has(/function\s+normalizePdfDocumentUrl\s*\(/, 'PDF resolver should normalize javascript-based document links');
+hasText('/^javascript:/i.test(raw)', 'PDF URL normalizer should detect javascript pseudo-links from doclist');
+hasText('source.match(/\\/?application\\?documentId=', 'PDF URL normalizer should extract application?documentId links from javascript handlers');
+hasText('/[?&]documentId=/i.test(normalized)', 'PDF resolver should allow direct EPO documentId endpoints without requiring .pdf suffix');
 hasText('within\\s+(?:a\\s+)?(?:period|time\\s+limit)\\s+of\\s+([a-z]+|\\d{1,2})\\s+months?', 'PDF month parser should match "within a period of X months" wording');
 has(/communicationDateStr\s*=\s*communication\.dateStr\s*\|\|\s*docDateStr/, 'PDF hint derivation should anchor to communication date with doclist fallback');
 has(/addCalendarMonthsDetailed\(communicationDate,\s*monthPeriod\.months\)/, 'PDF month-based deadline should be computed from communication date + response period');
 hasText('PDF proof line (below "Registered Letter")', 'PDF parser logging should report line below Registered Letter to prove document was opened');
 hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-date/response-period diagnostics');
+hasText('normalizedDocUrl', 'PDF URL failure logging should include normalized URL attempt for debugging');
 has(/withProofLine:\s*scanned\.filter\(/, 'PDF summary logging should include proof-line hit count');
 has(/withResponsePeriod:\s*scanned\.filter\(/, 'PDF summary logging should include response-period hit count');
 has(/inferProceduralDeadlines\(main,\s*docs,\s*eventHistory,\s*legal,\s*pdfDeadlines\)/, 'Overview deadline model should include PDF-derived hints');

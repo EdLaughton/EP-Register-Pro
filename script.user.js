@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.50
+// @version      7.0.51
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.50';
+  const VERSION = '7.0.51';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1881,17 +1881,98 @@
     };
   }
 
+  function normalizePdfDocumentUrl(rawUrl) {
+    const absolutize = (candidate) => {
+      const value = String(candidate || '').trim();
+      if (!value) return '';
+      try {
+        return new URL(value.replace(/&amp;/gi, '&'), location.origin).toString();
+      } catch {
+        return '';
+      }
+    };
+
+    let raw = String(rawUrl || '').trim();
+    if (!raw) return '';
+
+    if (/^javascript:/i.test(raw)) {
+      const js = raw
+        .replace(/^javascript:\s*/i, '')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"');
+
+      let decodedJs = js;
+      try {
+        decodedJs = decodeURIComponent(js);
+      } catch {
+        // keep raw form
+      }
+
+      const source = `${js}\n${decodedJs}`;
+
+      const absMatch = source.match(/https?:\/\/[^'"\s)]+/i)?.[0] || '';
+      if (absMatch) {
+        const cleanedAbs = absMatch
+          .replace(/%27.*$/i, '')
+          .replace(/&#39;.*$/i, '')
+          .split("'")[0]
+          .split('"')[0]
+          .split(')')[0]
+          .split(',')[0];
+        const absUrl = absolutize(cleanedAbs);
+        if (absUrl) return absUrl;
+      }
+
+      const relMatch = source.match(/\/?application\?documentId=[^'"\s)]+/i)?.[0] || '';
+      if (relMatch) {
+        let cleanedRel = relMatch
+          .replace(/%27.*$/i, '')
+          .replace(/&#39;.*$/i, '')
+          .split("'")[0]
+          .split('"')[0]
+          .split(')')[0]
+          .split(',')[0];
+        if (!cleanedRel.startsWith('/')) cleanedRel = `/${cleanedRel}`;
+        return absolutize(cleanedRel);
+      }
+
+      return '';
+    }
+
+    raw = raw.replace(/%27.*$/i, '');
+    return absolutize(raw);
+  }
+
   async function resolvePdfUrl(url, signal) {
-    if (!url) return '';
-    if (/\.pdf(?:\?|$)/i.test(url)) return url;
+    const normalized = normalizePdfDocumentUrl(url);
+    if (!normalized) return '';
+    if (/\.pdf(?:\?|$)/i.test(normalized)) return normalized;
 
     try {
-      const html = await fetchWithRetry(url, signal);
+      if (/[?&]documentId=/i.test(normalized) && /\/application\b/i.test(new URL(normalized).pathname)) {
+        return normalized;
+      }
+    } catch {
+      // continue to HTML fallback
+    }
+
+    try {
+      const html = await fetchWithRetry(normalized, signal);
       const doc = parseHtml(html);
+
       const links = [...doc.querySelectorAll('a[href]')].map((a) => a.getAttribute('href') || '');
       const pdfHref = links.find((href) => /\.pdf(?:\?|$)/i.test(href));
-      if (!pdfHref) return '';
-      return new URL(pdfHref, url).toString();
+      if (pdfHref) return new URL(pdfHref, normalized).toString();
+
+      const embeds = [
+        ...[...doc.querySelectorAll('iframe[src], embed[src]')].map((el) => el.getAttribute('src') || ''),
+        ...[...doc.querySelectorAll('object[data]')].map((el) => el.getAttribute('data') || ''),
+      ].filter(Boolean);
+
+      const embedHref = embeds.find((href) => /\.pdf(?:\?|$)/i.test(href) || /[?&]documentId=/i.test(href));
+      if (embedHref) return new URL(embedHref, normalized).toString();
+
+      return '';
     } catch {
       return '';
     }
@@ -1997,7 +2078,12 @@
 
         const resolvedUrl = await resolvePdfUrl(doc.url, signal);
         if (!resolvedUrl) {
-          addLog(caseNo, 'warn', 'PDF URL could not be resolved from document page', { source: 'pdfDeadlines', doc: doc.title || '', docUrl: doc.url || '' });
+          addLog(caseNo, 'warn', 'PDF URL could not be resolved from document page', {
+            source: 'pdfDeadlines',
+            doc: doc.title || '',
+            docUrl: doc.url || '',
+            normalizedDocUrl: normalizePdfDocumentUrl(doc.url || ''),
+          });
           continue;
         }
 
