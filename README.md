@@ -91,6 +91,12 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.74
+- Full-script audit cleanup pass:
+  - removed an unused `caseNo` parameter from `parseDoclist` call flow
+  - retained existing behavior while simplifying parser call signatures
+- Includes previous timeline-collapse cleanup and redundancy removal.
+
 ### 7.0.73
 - Removed redundant timeline open-state persistence code paths (toggle listeners + save hooks) now that timeline groups intentionally default collapsed on each render.
 - Simplified timeline rendering flow while preserving keyed group markup and collapse/expand behavior per-view.
