@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.86
+// @version      7.0.87
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.86';
+  const VERSION = '7.0.87';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -4240,16 +4240,42 @@
     return built;
   }
 
+  function compactOverviewTitle(title = '') {
+    const normalized = normalize(title);
+    if (!normalized) return '—';
+
+    const exactMap = new Map([
+      ['Text intended for grant (version for approval)', 'Grant text for approval'],
+      ['Text intended for grant (clean copy)', 'Grant text (clean copy)'],
+      ['Communication about intention to grant a European patent', 'Intention to grant'],
+      ['Annex to the communication about intention to grant a European patent', 'Grant communication annex'],
+      ['Bibliographic data of the European patent application', 'Bibliographic data'],
+      ['Request for correction/amendment of the text proposed for grant sent from 01.04.2012', 'Grant text correction request'],
+      ['Reminder period for payment of examination fee/designation fee and correction of deficiencies in Written Opinion/amendment', 'Exam / designation fee reminder'],
+      ['Communication regarding the transmission of the European search report', 'Search report transmission'],
+      ['Amendments received before examination', 'Amendments before examination'],
+    ]);
+    if (exactMap.has(normalized)) return exactMap.get(normalized);
+
+    return normalized
+      .replace(/\s+a European patent$/i, '')
+      .replace(/^New entry:\s*/i, '')
+      .replace(/^Deletion\s+-\s*/i, '')
+      .replace(/\s+sent from 01\.04\.2012$/i, '')
+      .trim();
+  }
+
+  function overviewLatestActionText(doc) {
+    if (!doc) return '—';
+    return `${doc.dateStr} · ${compactOverviewTitle(doc.title || '')}`;
+  }
+
   function renderOverviewHeaderCard(m) {
     const termReference = m.deadlines.find((d) => d.reference && /20-year term from filing/i.test(String(d.label || '')));
     const termReferenceDate = termReference?.date ? formatDate(termReference.date) : '';
-    const termReferenceDays = termReference?.date ? Math.ceil((termReference.date.getTime() - Date.now()) / 86400000) : null;
-    const termReferenceText = termReferenceDate
-      ? `${termReferenceDate}${Number.isFinite(termReferenceDays) ? ` · ${termReferenceDays >= 0 ? formatDaysHuman(termReferenceDays) : `${formatDaysHuman(termReferenceDays).slice(1)} overdue`}` : ''}`
-      : '';
     const filingSummary = normalize([
       m.filingDate ? `Filed ${m.filingDate}` : 'Filed —',
-      termReferenceText ? `20-year term ${termReferenceText}` : '',
+      termReferenceDate ? `20-year term ${termReferenceDate}` : '',
     ].filter(Boolean).join(' · ')) || 'Filed —';
 
     return `<div class="epoRP-c"><div class="epoRP-g">
@@ -4325,8 +4351,8 @@
   function renderOverviewActionableCard(m) {
     const detailedDeadlinesHtml = renderOverviewDetailedDeadlines(m);
     const { nextDeadlineBadge, nextDeadlineMetaHtml } = overviewNextDeadlineState(m);
-    const latestEpoText = m.latestEpo ? `${m.latestEpo.dateStr} · ${m.latestEpo.title}` : '—';
-    const latestApplicantText = m.latestApplicant ? `${m.latestApplicant.dateStr} · ${m.latestApplicant.title}` : '—';
+    const latestEpoText = overviewLatestActionText(m.latestEpo);
+    const latestApplicantText = overviewLatestActionText(m.latestApplicant);
     const waitingLevel = m.waitingDays == null ? 'info' : (m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok');
     const waitingSummary = m.waitingOn === 'EPO'
       ? `EPO${m.waitingDays != null ? ` · <span class="epoRP-bdg ${waitingLevel}">${formatDaysHuman(m.waitingDays)} since applicant response</span>` : ''}`
@@ -4356,7 +4382,7 @@
       ? `Current year ${patentYearFromFiling}${m.renewal.highestYear ? ` · paid through Year ${m.renewal.highestYear}` : ''}`
       : (m.renewal.highestYear ? `Paid through Year ${m.renewal.highestYear}` : 'No renewal payment captured yet');
     const latestRenewalNote = m.renewal.latest
-      ? `Latest paid event: ${m.renewal.latest.dateStr} · ${m.renewal.latest.title}`
+      ? `Latest paid event: ${m.renewal.latest.dateStr} · ${compactOverviewTitle(m.renewal.latest.title)}`
       : 'No renewal payment event cached.';
 
     return `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">

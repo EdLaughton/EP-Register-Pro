@@ -48,8 +48,10 @@ has(/function\s+caseSnapshot\s*\(/, 'Case-source reads should be centralized beh
 has(/function\s+overviewCacheKey\s*\(/, 'Overview cache key helper missing');
 hasText("runtime.overviewCache = { key: cacheKey, model };", 'Overview model should be memoized');
 hasText("if (runtime.overviewCache.key === cacheKey && runtime.overviewCache.model)", 'Overview model should reuse cached derived state when inputs are unchanged');
+has(/function\s+compactOverviewTitle\s*\(/, 'Overview renderer should centralize noisy document-title cleanup behind a compaction helper');
 has(/function\s+renderOverviewHeaderCard\s*\(/, 'Overview renderer should be split into maintainable sub-renderers');
 has(/function\s+renderOverviewActionableCard\s*\(/, 'Actionable-status overview card should be isolated from the top-level renderer');
+hasText("termReferenceDate ? `20-year term ${termReferenceDate}` : ''", 'Overview header should show 20-year term date without extra years-remaining noise');
 
 // Publication hydration should merge fallback evidence instead of only replacing on total miss
 hasText('const publicationFallback = includeDocFallback ? inferPublicationsFromDocs(docs) : [];', 'Publication fallback should always be available as centralized supplemental evidence');

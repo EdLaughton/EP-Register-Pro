@@ -98,6 +98,12 @@ npm test
 
 ## 📝 Changelog (recent)
 
+### 7.0.87
+- Cleaned up the sidebar presentation without dropping useful data:
+  - filing summary still shows the 20-year term reference, but no longer shows the extra years-remaining countdown noise
+  - latest-action and renewal labels now compact verbose Register document titles into shorter human-readable summaries (for example, `Text intended for grant (version for approval)` → `Grant text for approval`)
+  - retained the underlying data model and validation coverage while improving readability
+
 ### 7.0.86
 - Expanded the live case matrix with additional browser-captured fixtures under `tests/fixtures/cases/`:
   - `EP19205846` for deemed-withdrawn + renewal-history + repeated R71 cycles
