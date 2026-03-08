@@ -64,6 +64,14 @@ has(/renderLogConsole\(caseNo\)/, 'Options view should render operation console 
 has(/b\.querySelector\('#epoRP-clear-logs'\)\?\.addEventListener\('click',\s*\(\)\s*=>\s*\{[\s\S]*?c\.logs\s*=\s*\[\];[\s\S]*?renderPanel\(\);[\s\S]*?\}\);/, 'Clear operation console control should empty case logs and rerender options');
 hasText('Current option values', 'Options view should show a section listing effective option values');
 
+// Publications parsing + tab readability improvements
+has(/function\s+normalizePublicationNumber\s*\(/, 'Publication-number normalization helper missing');
+has(/function\s+splitPublicationNumber\s*\(/, 'Publication number/kind splitter helper missing');
+has(/const\s+publicationField\s*=\s*fieldByLabel\(doc,\s*\[\/\^Publication\\b\/i\]\);/, 'Main parser should match Publication* label variants');
+has(/const\s+reDateBeforeNumber\s*=\s*new RegExp/, 'Publication parser should support date-before-number layouts');
+hasText('(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)', 'Publication parser should include broad publication-country prefixes');
+has(/\.epoRP-tab\.on\{background:#bfdbfe;color:#0f172a;border-color:#93c5fd/, 'Selected tab styling should use dark text for readability');
+
 // UI removals requested
 notHas(/Document index/, 'Document index UI should be removed');
 notHas(/data-view="logs"/, 'Logs tab should be removed');

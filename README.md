@@ -91,6 +91,11 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.48
+- Improved publication extraction robustness (handles spaced/formatted publication numbers and date/number order variations).
+- Broadened publication label matching on the main page (`Publication*` variants).
+- Updated selected sidebar tab styling for better readability (dark text on selected tab).
+
 ### 7.0.47
 - Broader **Overview** deduplication pass:
   - Combined **Type** + **Stage** into a single `Type / stage` row.

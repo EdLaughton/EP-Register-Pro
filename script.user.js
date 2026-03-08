@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.47
+// @version      7.0.48
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.47';
+  const VERSION = '7.0.48';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -698,27 +698,75 @@
     return dedupe(out, (i) => `${i.no}|${i.dateStr}`);
   }
 
-  function parsePublications(textBlock, role = '') {
-    const re = /\b((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)[A-Z0-9]{5,})([A-Z]\d)?\b[\s\S]{0,60}?\b(\d{2}\.\d{2}\.\d{4})\b/gi;
-    const out = [];
-    let m;
-    while ((m = re.exec(textBlock || '')) !== null) {
-      out.push({ no: m[1].toUpperCase(), kind: (m[2] || '').toUpperCase(), dateStr: m[3], role });
+  function normalizePublicationNumber(raw) {
+    return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  function splitPublicationNumber(rawNo, rawKind = '') {
+    let no = normalizePublicationNumber(rawNo);
+    let kind = String(rawKind || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+    if (kind && no.endsWith(kind) && no.length > kind.length + 5) {
+      no = no.slice(0, -kind.length);
     }
+
+    if (!kind) {
+      const m = no.match(/^(.*?)([A-Z]\d)$/);
+      if (m && m[1].length >= 7) {
+        no = m[1];
+        kind = m[2];
+      }
+    }
+
+    return { no, kind };
+  }
+
+  function parsePublications(textBlock, role = '') {
+    const out = [];
+    const pubPrefixes = /^(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)/;
+
+    const push = (rawNo, rawKind, rawDate) => {
+      const parsed = splitPublicationNumber(rawNo, rawKind);
+      const dateStr = String(rawDate || '').match(DATE_RE)?.[1] || '';
+      if (!parsed.no || !dateStr) return;
+      if (!pubPrefixes.test(parsed.no)) return;
+      if (!/\d/.test(parsed.no.slice(2))) return;
+
+      out.push({ no: parsed.no, kind: parsed.kind, dateStr, role });
+    };
+
+    const text = String(textBlock || '');
+    const numberPattern = '((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)(?:[\\s.\\-\\/]*[A-Z0-9]){5,24})';
+
+    const reNumberBeforeDate = new RegExp(`\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?[\\s\\S]{0,50}?\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b`, 'gi');
+    let m;
+    while ((m = reNumberBeforeDate.exec(text)) !== null) {
+      push(m[1], m[2], m[3]);
+    }
+
+    const reDateBeforeNumber = new RegExp(`\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b[\\s\\S]{0,50}?\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?`, 'gi');
+    while ((m = reDateBeforeNumber.exec(text)) !== null) {
+      push(m[2], m[3], m[1]);
+    }
+
     return dedupe(out, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
   }
 
   function inferPublicationsFromDocs(docs = []) {
     const out = [];
-    const re = /\b((?:EP|WO)[A-Z0-9]{6,})([A-Z]\d)?\b/i;
+    const re = /\b((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)(?:[\s.\-\/]*[A-Z0-9]){6,24})\b(?:\s+([A-Z]\d))?\b/i;
     for (const d of docs) {
       const title = String(d?.title || '');
-      if (!/publication|published|a1|a2|a3|b1|b2/i.test(title)) continue;
-      const m = title.match(re);
+      const procedure = String(d?.procedure || '');
+      if (!/publication|published|a1|a2|a3|b1|b2|bulletin|gazette/i.test(`${title} ${procedure}`)) continue;
+      const m = `${title}\n${procedure}`.match(re);
       if (!m) continue;
+      const parsed = splitPublicationNumber(m[1], m[2]);
+      if (!parsed.no || !/^(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)/.test(parsed.no)) continue;
+      if (!/\d/.test(parsed.no.slice(2))) continue;
       out.push({
-        no: String(m[1] || '').toUpperCase(),
-        kind: String(m[2] || '').toUpperCase(),
+        no: parsed.no,
+        kind: parsed.kind,
         dateStr: d.dateStr || '',
         role: 'Inferred from documents',
       });
@@ -864,7 +912,7 @@
     const appField = fieldByLabel(doc, [/^Application number/i]);
     const statusField = dedupeMultiline(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
     const priorityField = fieldByLabel(doc, [/^Priority\b/i]);
-    const publicationField = fieldByLabel(doc, [/^Publication$/i]);
+    const publicationField = fieldByLabel(doc, [/^Publication\b/i]);
     const recentEventField = fieldByLabel(doc, [/^Most recent event$/i]);
 
     const appInfo = parseApplicationField(appField);
@@ -3011,7 +3059,7 @@
     .epoRP-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px;padding:4px;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:10px}
     .epoRP-tab{display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid transparent;background:transparent;color:#334155;border-radius:8px;padding:5px 6px;font-size:11px;font-weight:700;cursor:pointer;line-height:1}
     .epoRP-tab:hover{background:#f8fafc;border-color:#cbd5e1}
-    .epoRP-tab.on{background:#1d4ed8;color:#fff;border-color:#1d4ed8;box-shadow:0 1px 0 rgba(15,23,42,.15)}
+    .epoRP-tab.on{background:#bfdbfe;color:#0f172a;border-color:#93c5fd;box-shadow:0 1px 0 rgba(15,23,42,.10)}
     .epoRP-tab-ico{font-size:11px;opacity:.9}
     .epoRP-tab.on .epoRP-tab-ico{opacity:1}
     .epoRP-btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer}
