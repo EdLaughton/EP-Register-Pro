@@ -91,6 +91,11 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.53
+- Added explicit gate diagnostics for same-case Register tab switches:
+  - Logs `Same-case tab switch detected: prefetch gate active` with `fromTab`/`toTab` metadata.
+  - Helps verify that switching e.g. `tab=doclist` ↔ `tab=main` on the same application does **not** trigger a full background reload.
+
 ### 7.0.52
 - Added broader feature diagnostics in operation logs:
   - source-level parse summaries for main/doclist/event/family/legal/ueMain

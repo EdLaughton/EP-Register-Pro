@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.52
+// @version      7.0.53
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -20,7 +20,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.52';
+  const VERSION = '7.0.53';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -75,6 +75,7 @@
     doclistGroupSigByCase: {},
     pdfjsPromise: null,
     autoPrefetchDoneByCase: {},
+    lastRegisterTabByCase: {},
     lastViewLogKey: '',
   };
 
@@ -3508,6 +3509,9 @@
     }, 1800);
 
     const registerTab = tabSlug();
+    const previousRegisterTab = String(runtime.lastRegisterTabByCase[caseNo] || '');
+    const tabChangedWithinCase = !changed && !!previousRegisterTab && previousRegisterTab !== registerTab;
+    runtime.lastRegisterTabByCase[caseNo] = registerTab;
 
     if (force) {
       addLog(caseNo, 'info', 'Forced data reload for case', { source: 'prefetch', registerTab });
@@ -3521,6 +3525,13 @@
         addLog(caseNo, 'info', 'Case tab/page changed; auto prefetch skipped for this page session', {
           source: 'prefetch',
           registerTab,
+        });
+      }
+      if (tabChangedWithinCase) {
+        addLog(caseNo, 'info', 'Same-case tab switch detected: prefetch gate active', {
+          source: 'prefetch',
+          fromTab: previousRegisterTab,
+          toTab: registerTab,
         });
       }
       return;
