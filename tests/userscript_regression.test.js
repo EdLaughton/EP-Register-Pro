@@ -214,6 +214,8 @@ has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute
 has(/runtime\.doclistGroupSigByCase\[caseNo\]\s*===\s*signature/, 'Doclist grouping should skip full regroup when table signature is unchanged');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
+hasText("if (url.searchParams.has('documentId')) return false;", 'Case-page detection should skip document-viewer URLs');
+hasText('return /^EP\\d+/i.test(appNoFromUrl(url));', 'Case-page detection should require EP application number in URL query (number=...)');
 has(/function\s+persistCurrentPanelScroll\s*\(/, 'Panel scroll persistence helper missing');
 has(/restorePanelScroll\(caseNo,\s*activeView\)/, 'Panel scroll should be restored after rerender');
 has(/nextDeadlineBadge/, 'Actionable status should show next-deadline day delta inline');

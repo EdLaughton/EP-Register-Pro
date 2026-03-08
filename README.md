@@ -91,6 +91,10 @@ node tests/userscript_smoke.test.js
 
 ## 📝 Changelog (recent)
 
+### 7.0.69
+- Sidebar mounting is now blocked on EPO document-viewer URLs (`/application?documentId=...`).
+- Case-page detection now requires an EP application number in the `number` query param and excludes `documentId` routes.
+
 ### 7.0.68
 - Expanded PDF/OCR candidate selection to cover broader communication-type documents (not only a narrow rule list).
 - Communication date extraction now prioritizes PDF-derived date evidence from **Registered Letter** / EPO form stamp lines before doclist fallback.

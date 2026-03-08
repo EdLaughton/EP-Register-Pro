@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.68
+// @version      7.0.69
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.68';
+  const VERSION = '7.0.69';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -437,7 +437,9 @@
   }
 
   function isCasePage(url = currentUrl()) {
-    return /\/application$/i.test(url.pathname) && /^EP\d+/i.test(detectAppNo(url));
+    if (!/\/application$/i.test(url.pathname)) return false;
+    if (url.searchParams.has('documentId')) return false;
+    return /^EP\d+/i.test(appNoFromUrl(url));
   }
 
   function sourceUrl(caseNo, slug) {
