@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.97
+// @version      7.0.98
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.97';
+  const VERSION = '7.0.98';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1435,7 +1435,10 @@
       || /after receipt of \(?(?:european\)? )?search report|before examination/.test(t);
 
     const isGrantContext = /rule\s*71\(3\)|intention to grant|text intended for grant|text proposed for grant|proposed for grant/.test(`${t} ${p}`);
-    const isGrantResponse = isGrantContext && /amend|correction|request|claims|description|translation|approval|text proposed for grant/.test(t);
+    const isGrantCommunicationTitle = /text intended for grant|communication about intention to grant|annex to the communication about intention to grant|intention to grant/.test(t);
+    const isGrantResponse = isGrantContext
+      && !isGrantCommunicationTitle
+      && /amend|correction|request|claims|description|translation|approval|text proposed for grant/.test(t);
 
     const isLossOfRights = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|noting of loss of rights|application refused|application rejected/.test(`${t} ${p}`);
     if (isLossOfRights) {

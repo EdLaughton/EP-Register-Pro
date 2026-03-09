@@ -120,6 +120,10 @@ assert.strictEqual(hooks.timelineSubtitleText({ detail: 'published on 17.07.2024
 assert.strictEqual(hooks.timelineSubtitleText({ detail: 'Formalities / other', source: 'Documents', actor: 'Other' }), 'Formalities / other · Documents', 'Timeline subtitle rendering should omit the useless actor=Other tail for generic document items');
 assert.strictEqual(hooks.genericDocLabel({ title: 'Application deemed to be withdrawn ( translations of claims/payment missing)', bundle: 'Examination' }), 'Loss-of-rights communication', 'Generic document labels should upgrade terminal examination-row wording beyond the raw Examination bucket');
 assert.strictEqual(hooks.genericDocLabel({ title: 'Communication to designated inventor', bundle: 'Other' }), 'Inventor notification', 'Generic document labels should upgrade common filing-formality rows beyond the raw Other bucket');
+const grantTextClassification = hooks.classifyDocument('Text intended for grant (version for approval)', 'Search / examination');
+assert.strictEqual(grantTextClassification.bundle, 'Grant package', 'Grant-text communication rows should remain in the grant-package bucket');
+assert.strictEqual(grantTextClassification.level, 'warn', 'Grant-text communication rows should retain the expected grant-package severity');
+assert.strictEqual(grantTextClassification.actor, 'EPO', 'Grant-text communication rows should remain EPO grant-package items instead of being misclassified as applicant responses');
 assert.strictEqual(hooks.shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), false, 'Single-item timeline rows should not append broad run labels when a stronger upgraded label already exists');
 
 const supersededDeadline = hooks.selectNextDeadline([
