@@ -50,6 +50,7 @@ function loadUserscriptHooks() {
     'pdfCategoryBundleLabel',
     'genericDocLabel',
     'shouldAppendSingleRunLabel',
+    'overviewPartialState',
   ];
 
   const instrumented = source.replace(/\}\)\(\);\s*$/, `window.__EPRP_TEST_HOOKS = { ${hookNames.join(', ')} };})();`);

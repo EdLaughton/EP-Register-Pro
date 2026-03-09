@@ -559,6 +559,53 @@
     return 'info';
   }
 
+  function sourceLabel(key = '') {
+    return ({
+      main: 'main Register',
+      doclist: 'doclist',
+      event: 'event history',
+      family: 'family',
+      legal: 'legal status',
+      federated: 'federated',
+      citations: 'citations',
+      ueMain: 'UE/UPC',
+      upcRegistry: 'UPC registry',
+      pdfDeadlines: 'PDF deadlines',
+    })[key] || key;
+  }
+
+  function overviewPartialState(caseEntry) {
+    const counts = sourceStatusCounts(caseEntry || {});
+    const sources = caseEntry?.sources || {};
+    const okSources = SOURCES.map((s) => s.key).filter((key) => String(sources[key]?.status || '').toLowerCase() === 'ok');
+    const emptySources = SOURCES.map((s) => s.key).filter((key) => String(sources[key]?.status || '').toLowerCase() === 'empty');
+    const mainStatus = String(sources.main?.status || '').toLowerCase();
+    const mainUnavailable = mainStatus === 'empty' || mainStatus === 'notfound';
+    const partial = mainUnavailable && (okSources.length > 0 || emptySources.length > 0);
+
+    const availableText = okSources.length ? okSources.map(sourceLabel).join(', ') : '';
+    const emptyText = emptySources.filter((key) => key !== 'main').map(sourceLabel).join(', ');
+    let note = '';
+    if (partial) {
+      note = mainStatus === 'notfound'
+        ? 'Main Register data is unavailable for this application number.'
+        : 'Main Register data is temporarily unavailable.';
+      if (availableText) note += ` Showing partial data from ${availableText}.`;
+      if (emptyText) note += ` Still empty: ${emptyText}.`;
+    }
+
+    return {
+      counts,
+      mainStatus,
+      mainUnavailable,
+      partial,
+      okSources,
+      emptySources,
+      note: normalize(note),
+      summary: sourceStatusSummaryText(counts),
+    };
+  }
+
   function isFresh(src, refreshHours, config = {}) {
     const sameParser = src?.parserVersion === VERSION;
     const ageMs = Number(refreshHours || 0) * 3600000;
@@ -4624,6 +4671,7 @@
     const latestEpo = docs.find((d) => d.actor === 'EPO' && d.bundle !== 'Other') || docs.find((d) => d.actor === 'EPO') || null;
     const applicantDocs = docs.filter((d) => d.actor === 'Applicant');
     const latestApplicant = applicantDocs.find((d) => d.bundle !== 'Other') || applicantDocs[0] || null;
+    const partialState = overviewPartialState(c);
 
     const storedStatusRaw = c.meta?.lastMainStatusRaw || '';
     const stageText = normalize(main.statusRaw || storedStatusRaw).toLowerCase();
@@ -4700,6 +4748,7 @@
       recentMainEvent: main.recentEvents?.[0] || (legal.events || [])[0] || null,
       latestEpo,
       latestApplicant,
+      partialState,
       waitingOn,
       waitingDays,
       recoveryOptions,
@@ -5037,8 +5086,11 @@
       m.filingDate ? `Filed ${m.filingDate}` : 'Filed —',
       termReferenceDate ? `20-year term ${termReferenceDate}` : '',
     ].filter(Boolean).join(' · ')) || 'Filed —';
+    const partialNotice = m.partialState?.partial
+      ? `<div class="epoRP-m"><span class="epoRP-bdg warn">${esc(m.partialState.summary || 'partial data')}</span> ${esc(m.partialState.note || 'Showing partial case data only.')}</div>`
+      : '';
 
-    return `<div class="epoRP-c"><div class="epoRP-g">
+    return `<div class="epoRP-c">${partialNotice}<div class="epoRP-g">
       <div class="epoRP-l">Title</div><div class="epoRP-v">${esc(m.title)}</div>
       <div class="epoRP-l">Applicant</div><div class="epoRP-v">${esc(m.applicant)}</div>
       <div class="epoRP-l">Application #</div><div class="epoRP-v">${esc(m.appNo)}</div>
