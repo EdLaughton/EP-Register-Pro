@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.1.00
+// @version      7.1.01
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.1.00';
+  const VERSION = '7.1.01';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -5898,15 +5898,15 @@
     .epoRP-docgrp-head{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
     .epoRP-docgrp-sel{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#1e3a8a;white-space:nowrap;cursor:pointer;padding:2px 7px;border:1px solid #bfdbfe;border-radius:999px;background:#ffffff}
     .epoRP-docgrp-sel input{margin:0}
-    .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent !important;background-image:none !important;border:0 !important;border-radius:0;box-shadow:none !important;padding:0;appearance:none !important;-webkit-appearance:none !important}
+    .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent !important;background-image:none !important;border:0 !important;border-radius:0;box-shadow:none !important;padding:0 2px 0 0;appearance:none !important;-webkit-appearance:none !important}
     .epoRP-docgrp-btn::-moz-focus-inner{border:0;padding:0}
     .epoRP-docgrp-btn:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;border-radius:6px}
     .epoRP-docgrp-main{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;min-width:0;flex:1}
     .epoRP-docgrp-label{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .epoRP-docgrp-meta{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#1d4ed8;white-space:nowrap;justify-self:end}
+    .epoRP-docgrp-meta{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#1d4ed8;white-space:nowrap;justify-self:end;padding-right:2px}
     .epoRP-docgrp-sep{opacity:.65}
     .epoRP-docgrp-pages{color:#334155}
-    .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}
+    .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease;flex:0 0 auto}
     .epoRP-docgrp-btn[aria-expanded="true"] .epoRP-docgrp-arrow{transform:rotate(90deg)}
     tr.epoRP-docgrp-item.epoRP-docgrp-open td{background:#f8fbff}
     tr.epoRP-docgrp-item.epoRP-docgrp-open td:first-child{box-shadow:inset 3px 0 0 #93c5fd}
