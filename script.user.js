@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.1.03
+// @version      7.1.04
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.1.03';
+  const VERSION = '7.1.04';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1589,7 +1589,7 @@
       const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || sourceUrl(fallbackCaseNo, 'doclist');
       const procedure = getCell(map.procedure);
       const pages = getCell(map.pages);
-      const cls = classifyDocument(title, procedure);
+      const cls = refineDocumentClassification(title, procedure, classifyDocument(title, procedure));
       docs.push({
         dateStr,
         title,
@@ -1708,12 +1708,26 @@
     return blocks;
   }
 
+  function refineDocumentClassification(title = '', procedure = '', cls = {}) {
+    const t = normalize(title).toLowerCase();
+    const p = normalize(procedure).toLowerCase();
+    const merged = `${t} ${p}`;
+    if (/reminder to observe due time limit|communication concerning the reminder|invitation pursuant to rule\s*45|communication under rule\s*112\(1\)|loss of rights|notification of forthcoming publication|transmission of the certificate|mention of grant|decision to grant|communication to designated inventor|search started|examining division becomes responsible|examination started|publication of the mention of the grant|grant of a european patent/.test(merged)) {
+      return {
+        bundle: /loss of rights|rule\s*112\(1\)|deemed to be withdrawn/.test(merged) ? 'Examination' : (cls.bundle || 'Other'),
+        level: /loss of rights|rule\s*112\(1\)|deemed to be withdrawn/.test(merged) ? 'bad' : (cls.level || 'info'),
+        actor: 'EPO',
+      };
+    }
+    return cls;
+  }
+
   function doclistEntryModel(entry = {}) {
     const title = String(entry.title || '');
     const procedure = String(entry.procedure || '');
     const dateStr = String(entry.dateStr || '');
     const rowText = String(entry.rowText || `${dateStr} ${title} ${procedure}`);
-    const cls = classifyDocument(title, procedure);
+    const cls = refineDocumentClassification(title, procedure, classifyDocument(title, procedure));
     return {
       row: entry.row || null,
       title,
