@@ -44,6 +44,8 @@ hasText("const defaultOpen = !!options().doclistGroupsExpandedByDefault;", 'Docl
 hasText("const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : defaultOpen;", 'Doclist grouping should respect the configured default expand/collapse state when there is no saved per-group state');
 hasText("if (!hasSavedOpenState && defaultOpen) openGroups.add(groupKey);", 'Doclist auto-expanded state should only seed open groups when default-open behaviour is enabled');
 hasText("if (key === 'doclistGroupsExpandedByDefault') clearDoclistOpenGroups(runtime.appNo || '');", 'Changing the doclist default-open toggle should clear saved per-case group state so refresh uses the new preference');
+hasText("const sessionPersisted = loadSessionJson(`${OPTIONS_KEY}:session`, null);", 'Options loading should fall back to a session-storage copy when site-local persistence is flaky across refreshes');
+hasText("saveSessionJson(`${OPTIONS_KEY}:session`, next);", 'Option writes should store a session backup so refresh keeps recent settings even if localStorage persistence is unreliable');
 notHas(/persistLiveTimelineGroups\(/, 'Timeline open-state persistence should be removed so timeline groups start collapsed on each render');
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
 has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');

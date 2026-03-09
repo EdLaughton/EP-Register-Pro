@@ -736,7 +736,11 @@
   }
 
   function options() {
-    if (!optionsShadow) optionsShadow = normalizeOptions(loadJson(OPTIONS_KEY, {}));
+    if (!optionsShadow) {
+      const persisted = loadJson(OPTIONS_KEY, null);
+      const sessionPersisted = loadSessionJson(`${OPTIONS_KEY}:session`, null);
+      optionsShadow = normalizeOptions((persisted && typeof persisted === 'object') ? persisted : (sessionPersisted || {}));
+    }
     return normalizeOptions(optionsShadow);
   }
 
@@ -744,6 +748,7 @@
     const next = normalizeOptions({ ...options(), ...patch });
     optionsShadow = next;
     saveJson(OPTIONS_KEY, next);
+    saveSessionJson(`${OPTIONS_KEY}:session`, next);
     return next;
   }
 
