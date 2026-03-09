@@ -57,10 +57,15 @@ assert.strictEqual(hooks.classifyParsedSourceState('main', placeholderMainDoc, {
 assert.strictEqual(hooks.classifyParsedSourceState('doclist', placeholderDoclistDoc, { docs: [] }).status, 'empty', 'Auxiliary placeholder pages should classify as empty instead of healthy ok loads');
 assert.strictEqual(hooks.classifyParsedSourceState('main', docs.main, main).status, 'ok', 'Real main Register captures should remain classified as ok');
 
-const repeatedGrantPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP19205846', 'doclist.html'], 'https://register.epo.org/application?number=EP19205846&tab=doclist&lng=en'));
+const repeatedGrantDoclistDoc = loadFixtureDocument(['cases', 'EP19205846', 'doclist.html'], 'https://register.epo.org/application?number=EP19205846&tab=doclist&lng=en');
+const repeatedGrantDoclist = hooks.parseDoclist(repeatedGrantDoclistDoc);
+const repeatedGrantPreview = hooks.doclistGroupingPreview(repeatedGrantDoclistDoc);
 assert(repeatedGrantPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '08.09.2023' && g.size === 5), 'Doclist grouping should keep the full 08.09.2023 grant-response packet together, including the electronic receipt');
 assert(repeatedGrantPreview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '10.05.2023' && g.size === 6), 'Doclist grouping should keep each R71 communication packet anchored to its own date');
 assert(repeatedGrantPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '21.04.2023' && g.size === 5), 'Doclist grouping should keep the full 21.04.2023 disapproval/resumption packet together, including the electronic receipt');
+
+const repeatedGrantTimelinePreview = hooks.timelineDocGroupingPreview(repeatedGrantDoclist.docs);
+assert(repeatedGrantTimelinePreview.some((g) => g.title === 'Response to intention to grant' && g.dateStr === '08.09.2023' && g.size === 5), 'Timeline doc grouping should mirror the receipt-inclusive grant-response packet labels from the shared doc model');
 
 const repeatedGrantControlPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP24189818', 'doclist.html'], 'https://register.epo.org/application?number=EP24189818&tab=doclist&lng=en'));
 assert(repeatedGrantControlPreview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '18.11.2025' && g.size === 6), 'Repeated-grant control should expose the latest 18.11.2025 grant packet as its own grouped cycle');
@@ -71,6 +76,17 @@ const euroPctPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases'
 assert(euroPctPreview.some((g) => g.label === 'Response to search' && g.dateStr === '09.09.2025' && g.size === 5), 'Doclist grouping should keep same-day search-response packets together, including the receipt');
 assert(euroPctPreview.some((g) => g.label === 'Filing package' && g.dateStr === '26.06.2025' && g.size === 4), 'Doclist grouping should treat the Euro-PCT entry-day bundle as one filing package instead of splitting the ISR copy away');
 assert(euroPctPreview.some((g) => g.label === 'Filing package' && g.dateStr === '19.12.2024' && g.size === 8), 'Doclist grouping should consolidate the Euro-PCT filing-day packet into one filing package');
+
+const syntheticTransferDoc = new JSDOM(`<!doctype html><html><body><table><thead><tr><th><input type="checkbox"></th><th>Date</th><th>Document type</th><th>Procedure</th><th>Number of pages</th></tr></thead><tbody>
+<tr><td><input type="checkbox"></td><td>06.12.2022</td><td><a>(Electronic) Receipt</a></td><td>Search / examination</td><td>1</td></tr>
+<tr><td><input type="checkbox"></td><td>06.12.2022</td><td><a>Annexes in respect of a client data request</a></td><td>Search / examination</td><td>3</td></tr>
+<tr><td><input type="checkbox"></td><td>06.12.2022</td><td><a>Letter accompanying subsequently filed items</a></td><td>Search / examination</td><td>1</td></tr>
+<tr><td><input type="checkbox"></td><td>06.12.2022</td><td><a>Submission concerning a transfer of rights (applicant)</a></td><td>Search / examination</td><td>1</td></tr>
+</tbody></table></body></html>`, {
+  url: 'https://register.epo.org/application?number=EP00000000&tab=doclist&lng=en',
+}).window.document;
+const syntheticTransferPreview = hooks.doclistGroupingPreview(syntheticTransferDoc);
+assert(syntheticTransferPreview.some((g) => g.label === 'Transfer / recordal filings' && g.dateStr === '06.12.2022' && g.size === 4), 'Doclist grouping should use a specific transfer/recordal packet label for same-day register-admin bundles');
 
 const syntheticArt94Doc = new JSDOM(`<!doctype html><html><body><table><thead><tr><th><input type="checkbox"></th><th>Date</th><th>Document type</th><th>Procedure</th><th>Number of pages</th></tr></thead><tbody>
 <tr><td><input type="checkbox"></td><td>07.08.2023</td><td><a>Communication from the Examining Division pursuant to Article 94(3) EPC</a></td><td>Search / examination</td><td>5</td></tr>
@@ -84,6 +100,19 @@ const syntheticArt94Doc = new JSDOM(`<!doctype html><html><body><table><thead><t
 const syntheticArt94Preview = hooks.doclistGroupingPreview(syntheticArt94Doc);
 assert(syntheticArt94Preview.some((g) => g.label === 'Examination communication' && g.dateStr === '07.08.2023' && g.size === 2), 'Doclist grouping should keep same-date Art. 94(3) communication rows together');
 assert(syntheticArt94Preview.some((g) => g.label === 'Response to examination communication' && g.dateStr === '11.12.2023' && g.size === 3), 'Doclist grouping should promote same-date applicant claims/amendments into the Art. 94(3) response packet');
+
+const syntheticArt94Doclist = hooks.parseDoclist(syntheticArt94Doc);
+const syntheticArt94TimelinePreview = hooks.timelineDocGroupingPreview(syntheticArt94Doclist.docs, {
+  scanned: [{
+    title: 'Communication from the Examining Division pursuant to Article 94(3) EPC',
+    dateStr: '07.08.2023',
+    category: 'Art. 94(3) response period',
+  }],
+});
+assert(syntheticArt94TimelinePreview.some((g) => g.title === 'Art. 94(3) communication' && g.dateStr === '07.08.2023' && g.size === 2), 'Timeline doc grouping should use PDF/OCR-derived Art. 94(3) labels when a scanned communication category is available');
+
+assert.strictEqual(hooks.upcRegistryNoteText({ status: 'No registry match found', patentNumbers: ['EP3816364'] }), 'Registry checked for EP3816364.', 'UPC overview note should mention checked EP publication candidates instead of rendering undefined');
+assert.strictEqual(hooks.upcRegistryNoteText(null, { ueStatus: 'The application is deemed to be withdrawn' }), 'Taken from UP/legal data where available.', 'UPC overview note should retain the UP/legal fallback when no UPC registry result is cached');
 
 const pdfR71 = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'r71_communication.txt'), {
   docDateStr: '10.01.2026',

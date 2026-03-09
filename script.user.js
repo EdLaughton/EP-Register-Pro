@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.92
+// @version      7.0.93
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.92';
+  const VERSION = '7.0.93';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1421,6 +1421,7 @@
       if (/^date$/.test(low)) map.date = idx;
       if (low.includes('document type') || low === 'document') map.document = idx;
       if (low.includes('procedure')) map.procedure = idx;
+      if (low.includes('number') && low.includes('page')) map.pages = idx;
     });
     return map;
   }
@@ -1504,6 +1505,7 @@
     const docs = [];
     const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();
 
+    let rowOrder = 0;
     for (const row of table.querySelectorAll('tr')) {
       const cells = [...row.querySelectorAll('td')];
       if (!cells.length || !row.querySelector("input[type='checkbox']")) continue;
@@ -1519,18 +1521,21 @@
 
       const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || sourceUrl(fallbackCaseNo, 'doclist');
       const procedure = getCell(map.procedure);
+      const pages = getCell(map.pages);
       const cls = classifyDocument(title, procedure);
       docs.push({
         dateStr,
         title,
         procedure,
+        pages,
+        rowOrder: rowOrder++,
         url,
         ...cls,
         source: 'All documents',
       });
     }
 
-    return { docs: dedupe(docs, (d) => `${d.dateStr}|${d.title}|${d.url}`).sort(compareDateDesc) };
+    return { docs: docs.sort(compareDateDesc) };
   }
 
   function applyDoclistFilter(table, query) {
@@ -1631,6 +1636,28 @@
     return blocks;
   }
 
+  function doclistEntryModel(entry = {}) {
+    const title = String(entry.title || '');
+    const procedure = String(entry.procedure || '');
+    const dateStr = String(entry.dateStr || '');
+    const rowText = String(entry.rowText || `${dateStr} ${title} ${procedure}`);
+    const cls = classifyDocument(title, procedure);
+    return {
+      row: entry.row || null,
+      title,
+      procedure,
+      dateStr,
+      rowText,
+      bundle: entry.bundle || cls.bundle || 'Other',
+      actor: entry.actor || cls.actor || 'Other',
+      url: entry.url || '',
+      level: entry.level || cls.level || 'info',
+      source: entry.source || 'All documents',
+      signals: doclistGroupingSignals(title, procedure),
+      groupKind: '',
+    };
+  }
+
   function doclistRowModels(rows) {
     const rowModels = [];
     for (const row of rows) {
@@ -1640,20 +1667,13 @@
       const procedure = text(cells[3] || '');
       const rowText = text(row);
       const dateStr = rowText.match(DATE_RE)?.[1] || '';
-      const cls = classifyDocument(title, procedure);
-      rowModels.push({
-        row,
-        title,
-        procedure,
-        dateStr,
-        rowText,
-        bundle: cls.bundle || 'Other',
-        actor: cls.actor || 'Other',
-        signals: doclistGroupingSignals(title, procedure),
-        groupKind: '',
-      });
+      rowModels.push(doclistEntryModel({ row, title, procedure, dateStr, rowText }));
     }
     return rowModels;
+  }
+
+  function doclistDocModels(docs = []) {
+    return (docs || []).map((doc) => doclistEntryModel(doc));
   }
 
   function normalizeGrantPackageRowModels(rowModels) {
@@ -1750,20 +1770,81 @@
     return runs;
   }
 
-  function doclistGroupingPreview(doc) {
+  function doclistRunPdfCategory(run, pdfDeadlines = {}) {
+    const scanned = Array.isArray(pdfDeadlines?.scanned) ? pdfDeadlines.scanned : [];
+    if (!scanned.length || !run?.models?.length) return '';
+
+    const runDates = new Set(run.models.map((model) => normalizeDateString(model.dateStr || '')).filter(Boolean));
+    const runTitles = new Set(run.models.map((model) => normalize(model.title || '').toLowerCase()).filter(Boolean));
+
+    const exact = scanned.find((entry) => {
+      const category = normalize(entry?.category || '');
+      if (!category) return false;
+      const entryDate = normalizeDateString(entry?.dateStr || '');
+      const entryTitle = normalize(entry?.title || '').toLowerCase();
+      return runDates.has(entryDate) && runTitles.has(entryTitle);
+    });
+    if (exact?.category) return String(exact.category);
+
+    const sameDate = scanned.find((entry) => {
+      const category = normalize(entry?.category || '');
+      if (!category) return false;
+      const entryDate = normalizeDateString(entry?.dateStr || '');
+      return runDates.has(entryDate);
+    });
+    return String(sameDate?.category || '');
+  }
+
+  function doclistRunLabel(run, pdfDeadlines = {}) {
+    const bundle = String(run?.bundle || run?.groupKind || 'Other');
+    const base = doclistBundleLabel(bundle);
+    const titles = (run?.models || []).map((model) => normalize(model.title || '').toLowerCase()).filter(Boolean).join('\n');
+    const pdfCategory = normalize(doclistRunPdfCategory(run, pdfDeadlines));
+
+    if (bundle === 'Applicant filings') {
+      if (/transfer of rights|registering a transfer/.test(titles)) return 'Transfer / recordal filings';
+      if (/representative/.test(titles)) return 'Representative change filings';
+      if (/client data request|consultation by telephone\/in person/.test(titles)) return 'Register admin filings';
+      return base;
+    }
+
+    if (/(?:article|art\.?)\s*94\s*\(\s*3\s*\)/i.test(pdfCategory)) {
+      if (bundle === 'Examination communication') return 'Art. 94(3) communication';
+      if (bundle === 'Examination response') return 'Response to Art. 94(3) communication';
+    }
+
+    if (/rule\s*116/i.test(pdfCategory)) {
+      if (bundle === 'Examination communication') return 'Rule 116 summons / communication';
+      if (bundle === 'Examination response') return 'Response to Rule 116 summons';
+    }
+
+    if (/rule\s*161\s*\/\s*162/i.test(pdfCategory)) {
+      if (bundle === 'Search package' || bundle === 'Examination communication') return 'Rule 161/162 communication';
+      if (bundle === 'Response to search' || bundle === 'Examination response') return 'Response to Rule 161/162 communication';
+    }
+
+    if (/rule\s*70\s*\(\s*2\s*\)/i.test(pdfCategory)) {
+      if (bundle === 'Search package') return 'Rule 70(2) / search communication';
+      if (bundle === 'Response to search') return 'Response to Rule 70(2) communication';
+    }
+
+    return base;
+  }
+
+  function doclistGroupingPreview(doc, pdfDeadlines = {}) {
     const table = bestTable(doc, ['date', 'document']) || bestTable(doc, ['document type']);
     if (!table) return [];
     const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
     return doclistRuns(normalizeDoclistGroupKinds(normalizeGrantPackageRowModels(doclistRowModels(rows)))).map((run) => ({
       bundle: run.bundle,
-      label: doclistBundleLabel(run.bundle),
+      label: doclistRunLabel(run, pdfDeadlines),
       dateStr: run.dateStr,
       size: run.rows.length,
       titles: run.models.map((model) => model.title),
     }));
   }
 
-  function attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState) {
+  function attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState, pdfDeadlines = {}) {
     const groupId = `g${gid}`;
     const groupKey = doclistGroupKey(caseNo, run.bundle, gid);
     const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;
@@ -1777,7 +1858,7 @@
 
     const td = document.createElement('td');
     td.colSpan = Math.max(1, cells.length);
-    const bundleLabel = doclistBundleLabel(run.bundle);
+    const bundleLabel = doclistRunLabel(run, pdfDeadlines);
     td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)} (${run.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
     headerRow.appendChild(td);
     firstRow.parentElement?.insertBefore(headerRow, firstRow);
@@ -1861,13 +1942,14 @@
 
     const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
     const groupable = new Set(['Search package', 'Grant communication', 'Grant response', 'Examination communication', 'Examination response', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
+    const pdfDeadlines = caseSourceData(getCase(caseNo), 'pdfDeadlines', {});
     const runs = doclistRuns(normalizeDoclistGroupKinds(normalizeGrantPackageRowModels(doclistRowModels(rows))));
 
     let gid = 0;
     for (const run of runs) {
       if (!groupable.has(run.bundle) || run.rows.length < 2) continue;
       gid += 1;
-      attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState);
+      attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState, pdfDeadlines);
     }
 
     runtime.doclistGroupSigByCase[caseNo] = signature;
@@ -3753,6 +3835,11 @@
       ? 'PDF deadline parse failed for all candidate documents'
       : `PDF deadline parse ${dedupedHints.length ? `found ${dedupedHints.length} hint(s)` : 'found no explicit hints'}`;
     addLog(caseNo, summaryLevel, summaryMessage, { source: 'pdfDeadlines', ...summary });
+
+    if (!signal?.aborted && tabSlug() === 'doclist' && (detectAppNo() || runtime.appNo || '') === caseNo) {
+      enhanceDoclistGrouping();
+      renderPanel();
+    }
   }
 
 
@@ -4546,11 +4633,7 @@
       upcUe: {
         ueStatus: ue.ueStatus || 'Unknown',
         upcOptOut: upcRegistry ? (upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')) : (ue.upcOptOut || 'Unknown'),
-        note: upcRegistry
-          ? `Registry checked for ${upcRegistry.patentNumber}.`
-          : (ue.ueStatus
-            ? 'Taken from UP/legal data where available.'
-            : 'No cached UP/UPC data yet.'),
+        note: upcRegistryNoteText(upcRegistry, ue),
       },
       docs,
     };
@@ -4600,13 +4683,88 @@
       opts.timelineMaxEntries,
     ].join('|');
 
-    const srcPart = ['main', 'doclist', 'event', 'family', 'legal'].map((k) => sourceStamp(c, k)).join('|');
+    const srcPart = ['main', 'doclist', 'event', 'family', 'legal', 'pdfDeadlines'].map((k) => sourceStamp(c, k)).join('|');
     return `${caseNo}|${optPart}|${srcPart}`;
+  }
+
+  function timelineDocItemsFromDocs(caseNo, docs = [], pdfDeadlines = {}) {
+    const groupableBundles = new Set(['Search package', 'Grant communication', 'Grant response', 'Examination communication', 'Examination response', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
+    const runs = doclistRuns(normalizeDoclistGroupKinds(normalizeGrantPackageRowModels(doclistDocModels(docs))));
+    const out = [];
+
+    const timelineItemFromDocModel = (model, groupLabel = '') => {
+      const actor = model.actor || 'Other';
+      const detail = [model.procedure || 'All documents', groupLabel].filter(Boolean).join(' · ');
+      return {
+        type: 'item',
+        dateStr: model.dateStr,
+        title: model.title,
+        detail,
+        source: 'Documents',
+        level: timelineAttorneyImportance(model.title, detail, 'Documents', actor, model.level || 'info'),
+        actor,
+        url: model.url,
+      };
+    };
+
+    for (const run of runs) {
+      const groupLabel = doclistRunLabel(run, pdfDeadlines);
+      const runItems = (run.models || []).map((model) => timelineItemFromDocModel(model));
+      const actorSet = [...new Set(runItems.map((item) => item.actor).filter(Boolean))].filter((actor) => actor !== 'Other');
+      const actor = actorSet.length === 1 ? actorSet[0] : (actorSet.length > 1 ? 'Mixed' : (runItems[0]?.actor || 'Other'));
+      const runLevel = topLevel(runItems.map((item) => item.level));
+      const shouldGroup = groupableBundles.has(run.bundle) && runItems.length >= 2;
+
+      if (!shouldGroup) {
+        runItems.forEach((item) => {
+          item.detail = [item.detail, shouldGroup ? '' : (groupableBundles.has(run.bundle) ? groupLabel : '')].filter(Boolean).join(' · ');
+          out.push(item);
+        });
+        continue;
+      }
+
+      out.push({
+        type: 'group',
+        _key: `${run.dateStr || 'nodate'}|${run.bundle}|${actor}`,
+        dateStr: run.dateStr,
+        title: groupLabel,
+        source: 'Documents',
+        level: runLevel,
+        actor,
+        items: runItems,
+      });
+    }
+
+    return out;
+  }
+
+  function timelineDocGroupingPreview(docs = [], pdfDeadlines = {}) {
+    return timelineDocItemsFromDocs('', docs, pdfDeadlines).filter((item) => item.type === 'group').map((item) => ({
+      dateStr: item.dateStr,
+      title: item.title,
+      size: (item.items || []).length,
+      actor: item.actor,
+    }));
+  }
+
+  function upcRegistryNoteText(upcRegistry, ue = {}) {
+    if (upcRegistry) {
+      const checked = [upcRegistry.patentNumber, ...(Array.isArray(upcRegistry.patentNumbers) ? upcRegistry.patentNumbers : [])]
+        .map((value) => normalize(String(value || '')))
+        .filter(Boolean);
+      const unique = [...new Set(checked)];
+      if (unique.length === 1) return `Registry checked for ${unique[0]}.`;
+      if (unique.length > 1) return `Registry checked for ${unique.join(', ')}.`;
+      return 'Registry queried against EP publication candidates.';
+    }
+    return ue.ueStatus
+      ? 'Taken from UP/legal data where available.'
+      : 'No cached UP/UPC data yet.';
   }
 
   function timelineModel(caseNo) {
     const opts = options();
-    const { c, main, eventHistory, legal, docs, publications } = caseSnapshot(caseNo);
+    const { c, main, eventHistory, legal, docs, publications, pdfDeadlines } = caseSnapshot(caseNo);
     const cacheKey = timelineCacheKey(caseNo, opts, c);
     if (runtime.timelineCache.key === cacheKey && Array.isArray(runtime.timelineCache.items)) {
       return runtime.timelineCache.items;
@@ -4628,53 +4786,7 @@
       });
     }
 
-    const docsSorted = docs;
-    const groupableBundles = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
-
-    const docItems = [];
-    const groupedByKey = new Map();
-
-    for (const d of docsSorted) {
-      const actor = d.actor || 'Other';
-      const shouldGroup = groupableBundles.has(d.bundle);
-      const detail = [d.procedure, 'All documents'].filter(Boolean).join(' · ');
-      const itemLevel = timelineAttorneyImportance(d.title, detail, 'Documents', actor, d.level || 'info');
-
-      if (!shouldGroup) {
-        docItems.push({
-          type: 'item',
-          dateStr: d.dateStr,
-          title: d.title,
-          detail,
-          source: 'Documents',
-          level: itemLevel,
-          actor,
-          url: d.url,
-        });
-        continue;
-      }
-
-      // Group by exact document date + bundle + actor to avoid fragmented filing-package rows.
-      const groupKey = `${d.dateStr || 'nodate'}|${d.bundle}|${actor}`;
-      if (!groupedByKey.has(groupKey)) {
-        const group = { type: 'group', _key: groupKey, dateStr: d.dateStr, title: d.bundle, source: 'Documents', level: itemLevel, actor, items: [] };
-        groupedByKey.set(groupKey, group);
-        docItems.push(group);
-      }
-
-      const group = groupedByKey.get(groupKey);
-      group.items.push({ dateStr: d.dateStr, title: d.title, detail: d.procedure || 'All documents', source: 'Documents', level: itemLevel, actor, url: d.url });
-      group.level = topLevel([group.level, itemLevel]);
-    }
-
-    const normalizedDocItems = docItems.map((item) => {
-      if (item.type !== 'group') return item;
-      if ((item.items || []).length !== 1) return item;
-      const first = item.items[0];
-      return { type: 'item', dateStr: first.dateStr, title: first.title, detail: `${first.detail} · ${item.title}`, source: 'Documents', level: first.level, actor: first.actor || item.actor || 'Other', url: first.url };
-    });
-
-    items.push(...normalizedDocItems);
+    items.push(...timelineDocItemsFromDocs(caseNo, docs, pdfDeadlines));
 
     if (opts.showEventHistory) {
       for (const e of eventHistory.events || []) {

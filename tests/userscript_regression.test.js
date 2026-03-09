@@ -234,6 +234,8 @@ hasText('const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAp
 hasText("sourceUrl(fallbackCaseNo, 'doclist')", 'Doclist parser should avoid undefined caseNo when generating fallback doclist URLs');
 hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use explicit R71(3) wording for grant package groups');
 hasText('Response to intention to grant', 'Doclist grouping should expose a dedicated label for applicant responses to R71(3) packets');
+hasText('Transfer / recordal filings', 'Doclist/timeline grouping should expose a more specific register-admin label for transfer/recordal packets');
+hasText('Art. 94(3) communication', 'Timeline/doc labels should be able to upgrade examination packet names from OCR/PDF-derived Art. 94(3) evidence');
 hasText('Examination communication', 'Doclist grouping should expose a dedicated label for Art. 94(3)/examining-division communication packets');
 hasText('Response to examination communication', 'Doclist grouping should expose a dedicated label for applicant responses to examining-division communications');
 hasText('tr.epoRP-docgrp td:first-child{box-shadow:inset 3px 0 0 #3b82f6}', 'Doclist group header should show a strong blue left guide line');
@@ -245,6 +247,8 @@ has(/if \(hasExamResponse && \(model\.signals\.isExamResponseExplicit \|\| model
 has(/const\s+isLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed to be withdrawn\|loss of rights/, 'Document classification should mark loss-of-rights communications as EPO actions');
 has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute a structural signature for change detection');
 has(/runtime\.doclistGroupSigByCase\[caseNo\]\s*===\s*signature/, 'Doclist grouping should skip full regroup when table signature is unchanged');
+hasText('items.push(...timelineDocItemsFromDocs(caseNo, docs, pdfDeadlines));', 'Timeline should reuse the shared doclist packet-grouping model instead of keeping a stale parallel bundling path');
+hasText('note: upcRegistryNoteText(upcRegistry, ue),', 'Overview UPC note should be derived through the centralized candidate-aware formatter');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
 hasText("if (url.searchParams.has('documentId')) return false;", 'Case-page detection should skip document-viewer URLs');

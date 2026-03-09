@@ -77,6 +77,10 @@ has(/function\s+scanPdfDeadlineCandidate\s*\(/, 'Per-document PDF scanning shoul
 has(/function\s+ensureDoclistFilterWrap\s*\(/, 'Doclist filter UI setup should be isolated from group rebuild logic');
 has(/function\s+doclistGroupingSignals\s*\(/, 'Doclist grouping should derive explicit grant/examination/search signals from row titles');
 has(/function\s+doclistDateBlocks\s*\(/, 'Doclist grouping should normalize same-date procedural packets before building runs');
+has(/function\s+doclistDocModels\s*\(/, 'Timeline/doclist grouping should share parsed document-entry normalization instead of keeping separate bundle heuristics');
+has(/function\s+doclistRunLabel\s*\(/, 'Doclist/timeline grouping should centralize packet label naming, including OCR-derived label upgrades');
+has(/function\s+timelineDocItemsFromDocs\s*\(/, 'Timeline should be built from the shared doclist packet-grouping model rather than a separate bundle combiner');
+has(/function\s+upcRegistryNoteText\s*\(/, 'UPC overview note text should be centralized so empty registry results do not render undefined patent numbers');
 has(/function\s+normalizeDoclistGroupKinds\s*\(/, 'Doclist grouping should assign cycle-aware group kinds before rendering DOM headers');
 has(/function\s+attachDoclistGroupRun\s*\(/, 'Doclist group DOM wiring should be isolated from group discovery');
 
