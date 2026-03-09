@@ -98,6 +98,17 @@ npm test
 
 ## 📝 Changelog (recent)
 
+### 7.0.90
+- Merged the most useful Federated-register context into the **UPC / UE** card to reduce duplication.
+- The UPC / UE card now also surfaces:
+  - UP coverage from federated data
+  - national/federated status
+  - renewal horizon from federated data
+  - invalidation date
+  - tracked-record summary / notable-state context where available
+- Kept the **UPC registry** as the authoritative source for opt-out status; federated data is now supporting context rather than a competing status source.
+- Removed the separate Federated card from the default overview flow so post-grant territory data reads as one coherent panel instead of two overlapping ones.
+
 ### 7.0.89
 - Added **Federated register** and **Citations** as first-class cached Register sources.
 - New sidebar/data integration:

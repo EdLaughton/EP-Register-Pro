@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.89
+// @version      7.0.90
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.89';
+  const VERSION = '7.0.90';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -4655,10 +4655,24 @@
   }
 
   function renderOverviewUpcUeCard(m) {
+    const upStates = normalize(m.federated?.upMemberStates || '');
+    const upCount = upStates ? upStates.split(/,\s*/).filter(Boolean).length : 0;
+    const trackedStates = Number(m.federated?.trackedStates || 0) || 0;
+    const notableStates = Array.isArray(m.federated?.notableStates) ? m.federated.notableStates : [];
+    const noteParts = [];
+    if (m.upcUe.note) noteParts.push(m.upcUe.note);
+    if (/Unitary effect registered/i.test(m.upcUe.ueStatus)) noteParts.push('Opt-out is generally not relevant once unitary effect is registered.');
+    if (trackedStates) noteParts.push(`Federated register tracks ${trackedStates} national/UP record${trackedStates === 1 ? '' : 's'}${m.federated?.recordUpdated ? ` (updated ${m.federated.recordUpdated})` : ''}.`);
+    if (notableStates.length) noteParts.push(`Notable states: ${notableStates.map((s) => `${s.state}${s.notInForceSince ? ` (not in force since ${s.notInForceSince})` : ''}`).join(', ')}`);
+
     return `<div class="epoRP-c"><h4>UPC / UE</h4><div class="epoRP-g">
       <div class="epoRP-l">Unitary effect</div><div class="epoRP-v">${esc(m.upcUe.ueStatus)}</div>
-      <div class="epoRP-l">Opt-out</div><div class="epoRP-v">${esc(m.upcUe.upcOptOut)}${/Unitary effect registered/i.test(m.upcUe.ueStatus) ? ' (typically not applicable to UP)' : ''}</div>
-    </div><div class="epoRP-m">${esc(m.upcUe.note)}</div></div>`;
+      <div class="epoRP-l">Opt-out</div><div class="epoRP-v">${esc(m.upcUe.upcOptOut)}</div>
+      <div class="epoRP-l">UP coverage</div><div class="epoRP-v">${upStates ? `${esc(upStates)} <span class="epoRP-bdg ok">${upCount} states</span>` : '—'}</div>
+      <div class="epoRP-l">National status</div><div class="epoRP-v">${esc(m.federated?.status || '—')}</div>
+      <div class="epoRP-l">Renewals paid to</div><div class="epoRP-v">${esc(m.federated?.renewalFeesPaidUntil || '—')}</div>
+      <div class="epoRP-l">Invalidation</div><div class="epoRP-v">${esc(m.federated?.invalidationDate || '—')}</div>
+    </div><div class="epoRP-m">${esc(noteParts.filter(Boolean).join(' '))}</div></div>`;
   }
 
   function renderOverviewPublicationsCard(caseNo, m) {
@@ -4684,7 +4698,6 @@
     let html = renderOverviewHeaderCard(m);
     html += renderOverviewActionableCard(m);
     if (opts.showRenewals) html += renderOverviewRenewalsCard(m);
-    html += renderOverviewFederatedCard(m);
     if (opts.showUpcUe) html += renderOverviewUpcUeCard(m);
     html += renderOverviewPublicationsCard(caseNo, m);
     if (opts.showCitations) html += renderOverviewCitationsCard(m);
