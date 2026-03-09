@@ -201,7 +201,8 @@ has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-do
 has(/function\s+epRenewalDueDate\s*\(/, 'Renewal model should compute EP due dates from filing-anniversary month');
 has(/feeForum\s*=\s*'EPO central \(Unitary Patent\)'/, 'Renewal model should distinguish UP central-fee forum');
 has(/graceUntil\s*=\s*nextDue\s*\?\s*addMonths\(nextDue,\s*6\)\s*:\s*null;/, 'Renewal model should include 6-month grace-period calculation');
-has(/const\s+graceText\s*=\s*m\.renewal\.graceUntil[\s\S]*?`Grace until \$\{esc\(formatDate\(m\.renewal\.graceUntil\)\)\}/, 'Renewals overview should fold grace-period text into the next-due row');
+hasText("const graceText = m.renewal.graceUntil", 'Renewals overview should still derive grace-period text inline inside the next-due row');
+hasText("terminalPosture ? 'Historical grace until' : 'Grace until'", 'Renewals overview should soften grace-period wording on terminal cases while keeping it in the next-due row');
 hasText('Last payment', 'Renewals overview should surface latest renewal inside the compact status row');
 notHas(/<div class="epoRP-l">Latest renewal<\/div>/, 'Renewals overview should not render a separate Latest renewal row');
 notHas(/<div class="epoRP-l">Grace period until<\/div>/, 'Renewals overview should not render a separate Grace period row');
@@ -237,6 +238,9 @@ hasText('Response to intention to grant', 'Doclist grouping should expose a dedi
 hasText('Transfer / recordal filings', 'Doclist/timeline grouping should expose a more specific register-admin label for transfer/recordal packets');
 hasText('Art. 94(3) communication', 'Timeline/doc labels should be able to upgrade examination packet names from OCR/PDF-derived Art. 94(3) evidence');
 hasText('No unitary effect record', 'UPC / UE presentation should avoid echoing overall withdrawn status as if it were a unitary-effect record');
+hasText('Loss-of-rights communication', 'Timeline/detail labeling should upgrade generic examination-row wording for terminal-loss-of-rights documents');
+hasText('historical central-fee date', 'Renewals overview should soften overdue central-fee wording on terminal/withdrawn cases');
+hasText('Historical grace until', 'Renewals overview should soften grace-period wording on terminal/withdrawn cases');
 hasText('Examination communication', 'Doclist grouping should expose a dedicated label for Art. 94(3)/examining-division communication packets');
 hasText('Response to examination communication', 'Doclist grouping should expose a dedicated label for applicant responses to examining-division communications');
 hasText('tr.epoRP-docgrp td:first-child{box-shadow:inset 3px 0 0 #3b82f6}', 'Doclist group header should show a strong blue left guide line');
@@ -253,6 +257,8 @@ hasText('const nextDeadline = selectNextDeadline(deadlines, latestEpoIsLossOfRig
 hasText('const nextDeadlineNote = activeDeadlineNoteText(deadlines, latestEpoIsLossOfRights);', 'Overview should surface explanatory text when no active deadline remains after supersession');
 hasText('upcUe: upcUePresentationModel(ue, upcRegistry, federated),', 'Overview should derive UPC / UE wording through the centralized presentation model');
 hasText('timelineSubtitleText(item)', 'Timeline item rendering should dedupe subtitle labels through the centralized formatter');
+hasText('const detail = normalize(e.detail || \'\');', 'Event/legal timeline items should stop embedding their source labels inside detail text now that subtitle rendering handles source separately');
+hasText('const terminalPosture = /closed|withdrawn|refused|revoked/i.test', 'Renewals overview should detect terminal case posture before choosing overdue vs historical wording');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
 hasText("if (url.searchParams.has('documentId')) return false;", 'Case-page detection should skip document-viewer URLs');

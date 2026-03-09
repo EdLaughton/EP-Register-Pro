@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.95
+// @version      7.0.96
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.95';
+  const VERSION = '7.0.96';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -4784,11 +4784,27 @@
     return String(sameDate?.category || '');
   }
 
+  function genericDocLabel(model = {}, pdfDeadlines = {}) {
+    const title = normalize(model.title || '').toLowerCase();
+    const bundle = String(model.groupKind || model.bundle || '');
+    const pdfLabel = pdfCategoryBundleLabel(docModelPdfCategory(model, pdfDeadlines), bundle);
+    if (pdfLabel) return pdfLabel;
+    if (/deemed to be withdrawn|loss of rights|rule\s*112\(1\)/.test(title)) return 'Loss-of-rights communication';
+    if (/examination started|examining division becomes responsible|request for examination filed/.test(title)) return 'Examination milestone';
+    if (/notification of forthcoming publication|publication in section/i.test(title)) return 'Publication formalities';
+    if (/communication to designated inventor/.test(title)) return 'Inventor notification';
+    if (/search started/.test(title)) return 'Search milestone';
+    if (/communication of amended entries concerning the representative|submission concerning change of applicant'?s representative/.test(title)) return 'Representative change filings';
+    if (bundle === 'Examination') return 'Examination communication';
+    if (bundle === 'Other') return 'Formalities / other';
+    return '';
+  }
+
   function timelineDocDetail(model, groupLabel = '', pdfDeadlines = {}) {
-    const pdfLabel = pdfCategoryBundleLabel(docModelPdfCategory(model, pdfDeadlines), model.groupKind || model.bundle || '');
+    const genericLabel = genericDocLabel(model, pdfDeadlines);
     const procedure = normalize(model.procedure || '');
     const bits = [];
-    if (pdfLabel && pdfLabel !== groupLabel) bits.push(pdfLabel);
+    if (genericLabel && genericLabel !== groupLabel) bits.push(genericLabel);
     if (groupLabel) bits.push(groupLabel);
     if (!bits.length && procedure) bits.push(procedure);
     if (bits.length > 1) {
@@ -4798,7 +4814,10 @@
   }
 
   function timelineSubtitleText(item = {}) {
-    const detailBits = String(item.detail || '').split(/\s*·\s*/).map((bit) => normalize(bit)).filter(Boolean);
+    const detailBits = String(item.detail || '')
+      .split(/\s*(?:·|\n)+\s*/)
+      .map((bit) => normalize(bit))
+      .filter(Boolean);
     const bits = [...detailBits, normalize(item.source || ''), normalize(item.actor || '')]
       .filter(Boolean)
       .filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx);
@@ -4911,7 +4930,7 @@
 
     if (opts.showEventHistory) {
       for (const e of eventHistory.events || []) {
-        const detail = [e.detail, 'Event history'].filter(Boolean).join('\n');
+        const detail = normalize(e.detail || '');
         items.push({
           type: 'item',
           dateStr: e.dateStr,
@@ -4927,7 +4946,7 @@
 
     if (opts.showLegalStatusRows) {
       for (const e of legal.events || []) {
-        const detail = [e.detail, 'Legal status'].filter(Boolean).join('\n');
+        const detail = normalize(e.detail || '');
         items.push({
           type: 'item',
           dateStr: e.dateStr,
@@ -5098,12 +5117,15 @@
     const yearsFromFiling = filingDateObj ? Math.max(0, Math.floor((Date.now() - filingDateObj.getTime()) / (365.25 * 86400000))) : null;
     const patentYearFromFiling = yearsFromFiling != null ? yearsFromFiling + 1 : null;
     const nextDueDays = m.renewal.nextDue ? Math.ceil((m.renewal.nextDue.getTime() - Date.now()) / 86400000) : null;
-    const dueLevel = nextDueDays == null ? 'info' : (nextDueDays < 0 ? 'bad' : nextDueDays <= 30 ? 'bad' : nextDueDays <= 75 ? 'warn' : 'ok');
+    const terminalPosture = /closed|withdrawn|refused|revoked/i.test(`${m.stage || ''} ${m.status || ''} ${m.federated?.status || ''}`);
+    const dueLevel = terminalPosture
+      ? 'info'
+      : (nextDueDays == null ? 'info' : (nextDueDays < 0 ? 'bad' : nextDueDays <= 30 ? 'bad' : nextDueDays <= 75 ? 'warn' : 'ok'));
     const dueText = m.renewal.nextDue
-      ? `${esc(formatDate(m.renewal.nextDue))}${nextDueDays != null ? ` · ${nextDueDays >= 0 ? formatDaysHuman(nextDueDays) : `${formatDaysHuman(nextDueDays).slice(1)} overdue`}` : ''}`
+      ? `${esc(formatDate(m.renewal.nextDue))}${terminalPosture ? ' · historical central-fee date' : (nextDueDays != null ? ` · ${nextDueDays >= 0 ? formatDaysHuman(nextDueDays) : `${formatDaysHuman(nextDueDays).slice(1)} overdue`}` : '')}`
       : 'Not available';
     const graceText = m.renewal.graceUntil
-      ? `Grace until ${esc(formatDate(m.renewal.graceUntil))}${m.renewal.dueState === 'grace' ? ' (surcharge period active)' : ''}`
+      ? `${terminalPosture ? 'Historical grace until' : 'Grace until'} ${esc(formatDate(m.renewal.graceUntil))}${m.renewal.dueState === 'grace' && !terminalPosture ? ' (surcharge period active)' : ''}`
       : '';
     const federatedPaidYear = Number(String(m.federated?.renewalFeesPaidUntil || '').match(/Year\s+(\d+)/i)?.[1] || 0) || null;
     const effectivePaidYear = Math.max(Number(m.renewal.highestYear || 0) || 0, Number(federatedPaidYear || 0) || 0) || null;
@@ -5113,12 +5135,12 @@
     const latestRenewalNote = m.renewal.latest
       ? `Last payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}`
       : (federatedPaidYear ? `Federated register reports payments through Year ${federatedPaidYear}` : 'No renewal payment event cached.');
-    const basisSummary = `${m.renewal.explanatoryBasis} · ${m.renewal.confidence || 'low'} confidence`;
+    const basisSummary = `${m.renewal.explanatoryBasis} · ${m.renewal.confidence || 'low'} confidence${terminalPosture ? ' · shown as historical fee context because the case appears closed/withdrawn' : ''}`;
 
     return `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
       <div class="epoRP-l">Status</div><div class="epoRP-v">${esc(patentYearStatus)}<div class="epoRP-m">${esc(latestRenewalNote)}</div></div>
       <div class="epoRP-l">Forum</div><div class="epoRP-v">${esc(m.renewal.feeForum || 'Unknown')}</div>
-      <div class="epoRP-l">Next fee</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}${graceText ? `<div class="epoRP-m">${graceText}</div>` : ''}</div>
+      <div class="epoRP-l">${terminalPosture ? 'Central-fee schedule' : 'Next fee'}</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}${graceText ? `<div class="epoRP-m">${graceText}</div>` : ''}</div>
       ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Grant mention</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
     </div><div class="epoRP-m">${esc(basisSummary)}</div></div>`;
   }
