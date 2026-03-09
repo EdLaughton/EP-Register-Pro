@@ -49,6 +49,7 @@ function loadUserscriptHooks() {
     'timelineSubtitleText',
     'pdfCategoryBundleLabel',
     'genericDocLabel',
+    'shouldAppendSingleRunLabel',
   ];
 
   const instrumented = source.replace(/\}\)\(\);\s*$/, `window.__EPRP_TEST_HOOKS = { ${hookNames.join(', ')} };})();`);

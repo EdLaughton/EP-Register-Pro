@@ -4818,10 +4818,21 @@
       .split(/\s*(?:·|\n)+\s*/)
       .map((bit) => normalize(bit))
       .filter(Boolean);
-    const bits = [...detailBits, normalize(item.source || ''), normalize(item.actor || '')]
+    const actor = normalize(item.actor || '');
+    const bits = [...detailBits, normalize(item.source || ''), actor && actor !== 'Other' ? actor : '']
       .filter(Boolean)
       .filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx);
     return bits.join(' · ');
+  }
+
+  function shouldAppendSingleRunLabel(itemDetail = '', groupLabel = '') {
+    const detail = normalize(itemDetail).toLowerCase();
+    const label = normalize(groupLabel).toLowerCase();
+    if (!label) return false;
+    if (!detail) return true;
+    if (detail.includes(label)) return false;
+    if (/^(examination|other|formalities \/ other)$/i.test(groupLabel)) return false;
+    return true;
   }
 
   function timelineDocItemsFromDocs(caseNo, docs = [], pdfDeadlines = {}) {
@@ -4854,7 +4865,7 @@
 
       if (!shouldGroup) {
         runItems.forEach((item) => {
-          item.detail = [item.detail, groupableBundles.has(run.bundle) ? groupLabel : '']
+          item.detail = [item.detail, groupableBundles.has(run.bundle) && shouldAppendSingleRunLabel(item.detail, groupLabel) ? groupLabel : '']
             .filter(Boolean)
             .filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx)
             .join(' · ');

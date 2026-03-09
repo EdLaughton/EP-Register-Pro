@@ -259,6 +259,8 @@ hasText('upcUe: upcUePresentationModel(ue, upcRegistry, federated),', 'Overview 
 hasText('timelineSubtitleText(item)', 'Timeline item rendering should dedupe subtitle labels through the centralized formatter');
 hasText('const detail = normalize(e.detail || \'\');', 'Event/legal timeline items should stop embedding their source labels inside detail text now that subtitle rendering handles source separately');
 hasText('const terminalPosture = /closed|withdrawn|refused|revoked/i.test', 'Renewals overview should detect terminal case posture before choosing overdue vs historical wording');
+hasText("actor && actor !== 'Other' ? actor : ''", 'Timeline subtitle rendering should omit the generic actor=Other suffix when it adds no value');
+hasText('shouldAppendSingleRunLabel(item.detail, groupLabel)', 'Single-item document rows should skip broad run labels like Examination/Other when a stronger upgraded label already exists');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
 hasText("if (url.searchParams.has('documentId')) return false;", 'Case-page detection should skip document-viewer URLs');
