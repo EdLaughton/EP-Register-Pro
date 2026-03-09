@@ -53,6 +53,7 @@ function loadUserscriptHooks() {
     'overviewPartialState',
     'normalizeOptions',
     'refineDocumentClassification',
+    'sourceStatusTooltip',
   ];
 
   const instrumented = source.replace(/\}\)\(\);\s*$/, `window.__EPRP_TEST_HOOKS = { ${hookNames.join(', ')} };})();`);

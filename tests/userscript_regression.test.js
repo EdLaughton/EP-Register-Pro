@@ -46,6 +46,7 @@ hasText("if (!hasSavedOpenState && defaultOpen) openGroups.add(groupKey);", 'Doc
 hasText("if (key === 'doclistGroupsExpandedByDefault') clearDoclistOpenGroups(runtime.appNo || '');", 'Changing the doclist default-open toggle should clear saved per-case group state so refresh uses the new preference');
 hasText("const sessionPersisted = loadSessionJson(`${OPTIONS_KEY}:session`, null);", 'Options loading should fall back to a session-storage copy when site-local persistence is flaky across refreshes');
 hasText("saveSessionJson(`${OPTIONS_KEY}:session`, next);", 'Option writes should store a session backup so refresh keeps recent settings even if localStorage persistence is unreliable');
+hasText('title=\"${esc(rightTitle)}\"', 'Top-right source badge should expose detailed per-source status on hover');
 notHas(/persistLiveTimelineGroups\(/, 'Timeline open-state persistence should be removed so timeline groups start collapsed on each render');
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
 has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');

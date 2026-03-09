@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.1.04
+// @version      7.1.05
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.1.04';
+  const VERSION = '7.1.05';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -551,6 +551,11 @@
     if (counts.error) parts.push(`${counts.error} error`);
     if (counts.missing) parts.push(`${counts.missing} pending`);
     return parts.join(' · ') || '0 loaded';
+  }
+
+  function sourceStatusTooltip(caseEntry) {
+    const sources = caseEntry?.sources || {};
+    return SOURCES.map((s) => `${sourceLabel(s.key)}: ${String(sources[s.key]?.status || 'missing')}`).join('\n');
   }
 
   function sourceStatusLevel(counts) {
@@ -5498,9 +5503,12 @@
       statusText = 'No main data';
     }
 
+    const rightTitle = runtime.fetching
+      ? `Loading…\n${sourceStatusTooltip(c)}`
+      : sourceStatusTooltip(c);
     return {
       left: `<span class="epoRP-bdg ${esc(statusLevel)}">${esc(statusText)}</span>`,
-      right: `<span class="epoRP-bdg ${runtime.fetching ? 'info' : sourceStatusLevel(counts)}">${runtime.fetching ? esc(runtime.fetchLabel) : esc(sourceStatusSummaryText(counts))}</span>`,
+      right: `<span class="epoRP-bdg ${runtime.fetching ? 'info' : sourceStatusLevel(counts)}" title="${esc(rightTitle)}">${runtime.fetching ? esc(runtime.fetchLabel) : esc(sourceStatusSummaryText(counts))}</span>`,
     };
   }
 
