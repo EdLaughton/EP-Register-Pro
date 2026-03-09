@@ -14,6 +14,7 @@ function hasText(text, message) {
 // Freshness / cache reuse semantics
 has(/function\s+isFresh\(src,\s*refreshHours,\s*config\s*=\s*\{\}\)/, 'Freshness helper should support config for reusable statuses / dependency stamps');
 hasText("const reusableStatuses = allowEmpty ? new Set(['ok', 'empty']) : new Set(['ok']);", 'Error sources must not be treated as fresh');
+hasText("if (config.allowNotFound) reusableStatuses.add('notfound');", 'Freshness helper should optionally reuse cached notFound pages without treating them as errors');
 hasText("if (config.dependencyStamp != null && String(src?.dependencyStamp || '') !== String(config.dependencyStamp || '')) return false;", 'Freshness helper should invalidate derived cache when upstream dependency stamp changes');
 
 // Lifecycle / route safety
@@ -48,6 +49,9 @@ hasText("{ key: 'federated', slug: 'federated', title: 'EP Federated register' }
 hasText("{ key: 'citations', slug: 'citations', title: 'EP Citations' }", 'Citations should be a first-class cached source');
 has(/function\s+parseFederated\s*\(/, 'Federated-register parser missing');
 has(/function\s+parseCitations\s*\(/, 'Citations parser missing');
+has(/function\s+classifyParsedSourceState\s*\(/, 'Base-source fetches should classify placeholder/empty pages instead of treating every successful fetch as ok');
+hasText("status: classified.status", 'Base-source cache writes should persist classified ok/empty/notFound state');
+hasText('Background prefetch finish (${sourceStatusSummaryText(counts)})', 'Prefetch summary should report mixed ok/empty/notFound outcomes instead of raw ok counts only');
 has(/function\s+sectionRowsByHeader\s*\(/, 'Header-rowspan section extraction should be centralized for real Register table parsing');
 has(/function\s+parseMainPublications\s*\(/, 'Main-page publication parsing should handle multi-row Register publication tables');
 has(/function\s+caseSnapshot\s*\(/, 'Case-source reads should be centralized behind a caseSnapshot helper');

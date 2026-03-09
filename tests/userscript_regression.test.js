@@ -115,8 +115,9 @@ has(/withProofLine:\s*scanned\.filter\(/, 'PDF summary logging should include pr
 has(/withResponsePeriod:\s*scanned\.filter\(/, 'PDF summary logging should include response-period hit count');
 has(/withOcr:\s*scanned\.filter\(/, 'PDF summary logging should include OCR-path usage count');
 has(/function\s+sourceDiagnostics\s*\(/, 'Source diagnostics helper should summarize parsed feature payloads');
-has(/addLog\(caseNo,\s*'ok',\s*`Parse success \$\{src\.key\}`,[\s\S]*sourceDiagnostics\(src\.key,\s*parsed\)/, 'Fetch parse success logs should include feature-level source diagnostics');
-has(/addLog\(caseNo,\s*'info',\s*'Live parse success',[\s\S]*sourceDiagnostics\(sourceKey,\s*data\)/, 'Live parse logs should include feature-level source diagnostics');
+hasText("const parseMessage = classified.status === 'ok'", 'Fetch parse logging should classify ok vs empty/notFound outcomes before logging');
+has(/addLog\(caseNo,\s*parseLevel,\s*parseMessage,[\s\S]*sourceDiagnostics\(src\.key,\s*parsed\)/, 'Fetch parse logs should include feature-level source diagnostics for classified source states');
+has(/addLog\(caseNo,\s*parseLevel,\s*parseMessage,[\s\S]*sourceDiagnostics\(sourceKey,\s*data\)/, 'Live parse logs should include feature-level source diagnostics for classified source states');
 hasText('const logs = (getCase(caseNo).logs || []).slice(-MAX_LOGS_PER_APP).reverse();', 'Operation console should render latest logs first');
 hasText('autoPrefetchDoneByCase', 'Init should track per-case auto-prefetch completion in current page session');
 hasText('lastRegisterTabByCase', 'Init should track previous register tab per case to detect same-case tab switches');

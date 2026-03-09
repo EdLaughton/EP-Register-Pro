@@ -343,6 +343,13 @@
     caseEntry.meta.lastMainStage = String(data?.statusStage || inferStatusStage(data?.statusRaw || '') || '');
   }
 
+  function clearMainSourceMeta(caseEntry) {
+    if (!caseEntry) return;
+    caseEntry.meta = caseEntry.meta || {};
+    caseEntry.meta.lastMainStatusRaw = '';
+    caseEntry.meta.lastMainStage = '';
+  }
+
   function storeCaseSource(caseNo, key, payload = {}) {
     if (!caseNo || !key) return null;
     const title = payload.title || sourceTitle(key);
@@ -362,7 +369,10 @@
       if (payload.data !== undefined) next.data = payload.data;
 
       c.sources[key] = next;
-      if (key === 'main' && payload.data && payload.status === 'ok') syncMainSourceMeta(c, payload.data);
+      if (key === 'main') {
+        if (payload.data && payload.status === 'ok') syncMainSourceMeta(c, payload.data);
+        else clearMainSourceMeta(c);
+      }
     });
   }
 
@@ -439,12 +449,123 @@
     return keys.map((key) => `<div class="epoRP-optval-row"><div class="epoRP-optval-k">${esc(key)}</div><div class="epoRP-optval-v">${esc(optionValueText(o[key]))}</div></div>`).join('');
   }
 
+  function parsedSourceHasContent(sourceKey, data = {}) {
+    const d = data && typeof data === 'object' ? data : {};
+    switch (sourceKey) {
+      case 'main':
+        return !!(
+          normalize(d.title || '')
+          || normalize(d.statusRaw || '')
+          || normalize(d.filingDate || '')
+          || normalize(d.applicant || '')
+          || (Array.isArray(d.priorities) && d.priorities.length)
+          || (Array.isArray(d.publications) && d.publications.length)
+          || (Array.isArray(d.recentEvents) && d.recentEvents.length)
+        );
+      case 'doclist':
+        return !!(Array.isArray(d.docs) && d.docs.length);
+      case 'event':
+        return !!(Array.isArray(d.events) && d.events.length);
+      case 'family':
+        return !!(Array.isArray(d.publications) && d.publications.length);
+      case 'legal':
+        return !!((Array.isArray(d.events) && d.events.length) || (Array.isArray(d.renewals) && d.renewals.length));
+      case 'federated':
+        return !!(
+          normalize(d.status || '')
+          || normalize(d.upMemberStates || '')
+          || normalize(d.invalidationDate || '')
+          || normalize(d.renewalFeesPaidUntil || '')
+          || normalize(d.recordUpdated || '')
+          || normalize(d.applicantProprietor || '')
+          || (Array.isArray(d.states) && d.states.length)
+        );
+      case 'citations':
+        return !!((Array.isArray(d.entries) && d.entries.length) || (Array.isArray(d.phases) && d.phases.length));
+      case 'ueMain':
+        return !!(normalize(d.ueStatus || '') || normalize(d.upcOptOut || '') || normalize(d.memberStates || ''));
+      default:
+        return !!Object.keys(d).length;
+    }
+  }
+
+  function placeholderPageState(doc) {
+    const page = bodyText(doc).toLowerCase();
+    if (!page) return '';
+    if (/no files were found|no files containing your search terms|your search terms(?:.|\n){0,120}no files|no matching files were found/.test(page)) return 'notFound';
+    if (/there are no items to display|no items found|no data available|no results found/.test(page)) return 'empty';
+    return '';
+  }
+
+  function classifyParsedSourceState(sourceKey, doc, data = {}) {
+    const hasContent = parsedSourceHasContent(sourceKey, data);
+    const placeholderState = placeholderPageState(doc);
+
+    if (placeholderState === 'notFound' && !hasContent) {
+      return {
+        status: sourceKey === 'main' ? 'notFound' : 'empty',
+        reason: 'placeholder-no-files',
+      };
+    }
+
+    if (placeholderState === 'empty' && !hasContent) {
+      return {
+        status: 'empty',
+        reason: 'placeholder-empty',
+      };
+    }
+
+    if (!hasContent) {
+      return {
+        status: sourceKey === 'main' ? 'empty' : 'empty',
+        reason: 'no-usable-data',
+      };
+    }
+
+    return {
+      status: 'ok',
+      reason: placeholderState ? 'content-overrode-placeholder' : 'parsed-data',
+    };
+  }
+
+  function sourceStatusCounts(caseEntry) {
+    const counts = { ok: 0, empty: 0, notFound: 0, error: 0, missing: 0 };
+    for (const src of SOURCES) {
+      const status = String(caseEntry?.sources?.[src.key]?.status || '').toLowerCase();
+      if (status === 'ok') counts.ok += 1;
+      else if (status === 'empty') counts.empty += 1;
+      else if (status === 'notfound') counts.notFound += 1;
+      else if (status === 'error') counts.error += 1;
+      else counts.missing += 1;
+    }
+    return counts;
+  }
+
+  function sourceStatusSummaryText(counts) {
+    if ((counts.ok || 0) === SOURCES.length) return `${counts.ok}/${SOURCES.length} ok`;
+    const parts = [];
+    if (counts.ok) parts.push(`${counts.ok} ok`);
+    if (counts.empty) parts.push(`${counts.empty} empty`);
+    if (counts.notFound) parts.push(`${counts.notFound} not found`);
+    if (counts.error) parts.push(`${counts.error} error`);
+    if (counts.missing) parts.push(`${counts.missing} pending`);
+    return parts.join(' · ') || `0/${SOURCES.length}`;
+  }
+
+  function sourceStatusLevel(counts) {
+    if ((counts.error || 0) > 0) return 'bad';
+    if ((counts.notFound || 0) > 0 || (counts.empty || 0) > 0) return 'warn';
+    if ((counts.ok || 0) > 0 && (counts.missing || 0) === 0) return 'ok';
+    return 'info';
+  }
+
   function isFresh(src, refreshHours, config = {}) {
     const sameParser = src?.parserVersion === VERSION;
     const ageMs = Number(refreshHours || 0) * 3600000;
     const allowEmpty = !!config.allowEmpty;
     const status = String(src?.status || '').toLowerCase();
     const reusableStatuses = allowEmpty ? new Set(['ok', 'empty']) : new Set(['ok']);
+    if (config.allowNotFound) reusableStatuses.add('notfound');
     if (!reusableStatuses.has(status)) return false;
     if (config.dependencyStamp != null && String(src?.dependencyStamp || '') !== String(config.dependencyStamp || '')) return false;
     return !!(sameParser && src?.fetchedAt && ageMs > 0 && Date.now() - src.fetchedAt < ageMs);
@@ -1893,9 +2014,16 @@
     if (!sourceKey) return;
     try {
       const data = parseSource(sourceKey, document, caseNo);
-      addLog(caseNo, 'info', 'Live parse success', { transport: 'dom', ...sourceDiagnostics(sourceKey, data) });
+      const classified = classifyParsedSourceState(sourceKey, document, data);
+      const parseMessage = classified.status === 'ok'
+        ? 'Live parse success'
+        : classified.status === 'notFound'
+          ? 'Live parse result not found'
+          : 'Live parse result empty';
+      const parseLevel = classified.status === 'ok' ? 'info' : classified.status === 'notFound' ? 'warn' : 'info';
+      addLog(caseNo, parseLevel, parseMessage, { transport: 'dom', status: classified.status, reason: classified.reason, ...sourceDiagnostics(sourceKey, data) });
       storeCaseSource(caseNo, sourceKey, {
-        status: 'ok',
+        status: classified.status,
         url: location.href,
         transport: 'dom',
         data,
@@ -3582,7 +3710,7 @@
       const needed = SOURCES.filter((s) => {
         if (force) return true;
         const cached = getCase(caseNo).sources[s.key];
-        const fresh = isFresh(cached, opts.refreshHours);
+        const fresh = isFresh(cached, opts.refreshHours, { allowEmpty: true, allowNotFound: true });
         if (fresh) addLog(caseNo, 'info', `Skip fresh source ${s.key}`);
         return !fresh;
       });
@@ -3618,12 +3746,20 @@
           if (controller.signal.aborted) return;
 
           addLog(caseNo, 'ok', `Fetch success ${src.key}`, { source: src.key, sizeKb: +(html.length / 1024).toFixed(2), transport: 'fetch' });
-          const parsed = parseSource(src.key, parseHtml(html), caseNo);
-          addLog(caseNo, 'ok', `Parse success ${src.key}`, { transport: 'fetch', ...sourceDiagnostics(src.key, parsed) });
+          const parsedDoc = parseHtml(html);
+          const parsed = parseSource(src.key, parsedDoc, caseNo);
+          const classified = classifyParsedSourceState(src.key, parsedDoc, parsed);
+          const parseMessage = classified.status === 'ok'
+            ? `Parse success ${src.key}`
+            : classified.status === 'notFound'
+              ? `Parse result not found ${src.key}`
+              : `Parse result empty ${src.key}`;
+          const parseLevel = classified.status === 'ok' ? 'ok' : classified.status === 'notFound' ? 'warn' : 'info';
+          addLog(caseNo, parseLevel, parseMessage, { transport: 'fetch', status: classified.status, reason: classified.reason, ...sourceDiagnostics(src.key, parsed) });
 
           storeCaseSource(caseNo, src.key, {
             title: src.title,
-            status: 'ok',
+            status: classified.status,
             url,
             transport: 'fetch',
             data: parsed,
@@ -3659,9 +3795,13 @@
         }
 
         const c = getCase(caseNo);
-        const okCount = SOURCES.filter((s) => c.sources[s.key]?.status === 'ok').length;
+        const counts = sourceStatusCounts(c);
         const statusBySource = Object.fromEntries(SOURCES.map((s) => [s.key, c.sources[s.key]?.status || 'missing']));
-        addLog(caseNo, 'ok', `Background prefetch finish (${okCount}/${SOURCES.length} sources ok)`, { source: 'prefetch', statusBySource });
+        addLog(caseNo, counts.error ? 'warn' : 'ok', `Background prefetch finish (${sourceStatusSummaryText(counts)})`, {
+          source: 'prefetch',
+          counts,
+          statusBySource,
+        });
         runtime.fetching = false;
         runtime.fetchLabel = 'Idle';
         runtime.abortController = null;
@@ -4177,17 +4317,21 @@
     const storedStatusRaw = c.meta?.lastMainStatusRaw || '';
     const stageText = normalize(main.statusRaw || storedStatusRaw).toLowerCase();
     const statusStage = main.statusStage || c.meta?.lastMainStage || inferStatusStage(stageText);
+    const mainSourceStatus = String(c.sources.main?.status || '').toLowerCase();
+    const mainUnavailable = mainSourceStatus === 'notfound' || mainSourceStatus === 'empty';
 
-    const stage = statusStage
-      || (docs.some((d) => d.bundle === 'Grant package')
-        ? 'Grant / post-grant'
-        : docs.some((d) => d.bundle === 'Examination')
-          ? 'Examination'
-          : docs.some((d) => d.bundle === 'Search package')
-            ? 'Search'
-            : docs.some((d) => d.bundle === 'Filing package')
-              ? 'Filing'
-              : 'Unknown');
+    const stage = mainUnavailable
+      ? 'Unavailable'
+      : (statusStage
+        || (docs.some((d) => d.bundle === 'Grant package')
+          ? 'Grant / post-grant'
+          : docs.some((d) => d.bundle === 'Examination')
+            ? 'Examination'
+            : docs.some((d) => d.bundle === 'Search package')
+              ? 'Search'
+              : docs.some((d) => d.bundle === 'Filing package')
+                ? 'Filing'
+                : 'Unknown'));
 
     const deadlines = inferProceduralDeadlines(main, docs, eventHistory, legal, pdfDeadlines);
 
@@ -4227,20 +4371,24 @@
     const citationPhases = Array.isArray(citations.phases) ? citations.phases : [];
 
     const model = {
-      title: main.title || '—',
+      title: main.title || (mainSourceStatus === 'notfound' ? 'No Register file found' : '—'),
       applicant: main.applicant || '—',
       representative: main.representative || '—',
       appNo: caseNo,
       filingDate: main.filingDate || '—',
       priority: main.priorityText || '—',
       stage,
-      status: (main.statusRaw || storedStatusRaw || '—').split('\n')[0],
-      statusSimple: main.statusSimple || 'Unknown',
-      statusLevel: main.statusLevel || 'warn',
-      applicationType: main.applicationType || parseApplicationType(main),
-      parentCase: main.parentCase || '',
-      divisionalChildren: main.divisionalChildren || [],
-      hasDivisionals: !!main.hasDivisionals,
+      status: mainSourceStatus === 'notfound'
+        ? 'No Register file found for this application number.'
+        : mainSourceStatus === 'empty'
+          ? 'Main tab returned no usable case data.'
+          : (main.statusRaw || storedStatusRaw || '—').split('\n')[0],
+      statusSimple: mainSourceStatus === 'notfound' ? 'Not found' : (mainSourceStatus === 'empty' ? 'No main data' : (main.statusSimple || 'Unknown')),
+      statusLevel: mainSourceStatus === 'notfound' ? 'bad' : (mainSourceStatus === 'empty' ? 'warn' : (main.statusLevel || 'warn')),
+      applicationType: mainUnavailable ? 'Unavailable' : (main.applicationType || parseApplicationType(main)),
+      parentCase: mainUnavailable ? '' : (main.parentCase || ''),
+      divisionalChildren: mainUnavailable ? [] : (main.divisionalChildren || []),
+      hasDivisionals: mainUnavailable ? false : !!main.hasDivisionals,
       recentMainEvent: main.recentEvents?.[0] || (legal.events || [])[0] || null,
       latestEpo,
       latestApplicant,
@@ -4814,11 +4962,23 @@
 
   function renderBadges(caseNo) {
     const c = getCase(caseNo);
-    const loaded = SOURCES.filter((s) => c.sources[s.key]?.status === 'ok').length;
-    const statusLevel = c.sources.main?.data?.statusLevel || 'info';
+    const counts = sourceStatusCounts(c);
+    const mainSource = c.sources.main || {};
+    const mainStatus = String(mainSource.status || '').toLowerCase();
+    let statusLevel = mainSource.data?.statusLevel || 'info';
+    let statusText = mainSource.data?.statusSimple || 'Unknown';
+
+    if (mainStatus === 'notfound') {
+      statusLevel = 'bad';
+      statusText = 'Not found';
+    } else if (mainStatus === 'empty') {
+      statusLevel = 'warn';
+      statusText = 'No main data';
+    }
+
     return {
-      left: `<span class="epoRP-bdg ${esc(statusLevel)}">${esc(c.sources.main?.data?.statusSimple || 'Unknown')}</span>`,
-      right: `<span class="epoRP-bdg ${runtime.fetching ? 'info' : 'ok'}">${runtime.fetching ? esc(runtime.fetchLabel) : `${loaded}/${SOURCES.length}`}</span>`,
+      left: `<span class="epoRP-bdg ${esc(statusLevel)}">${esc(statusText)}</span>`,
+      right: `<span class="epoRP-bdg ${runtime.fetching ? 'info' : sourceStatusLevel(counts)}">${runtime.fetching ? esc(runtime.fetchLabel) : esc(sourceStatusSummaryText(counts))}</span>`,
     };
   }
 
@@ -5057,7 +5217,7 @@
       return;
     }
 
-    const staleSources = SOURCES.filter((s) => !isFresh(getCase(caseNo).sources[s.key], options().refreshHours)).map((s) => s.key);
+    const staleSources = SOURCES.filter((s) => !isFresh(getCase(caseNo).sources[s.key], options().refreshHours, { allowEmpty: true, allowNotFound: true })).map((s) => s.key);
     const needsRefresh = staleSources.length > 0;
 
     if (runtime.autoPrefetchDoneByCase[caseNo]) {

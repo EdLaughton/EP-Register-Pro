@@ -1,4 +1,5 @@
 const assert = require('assert');
+const { JSDOM } = require('jsdom');
 const {
   loadFixtureDocument,
   loadFixtureText,
@@ -45,6 +46,16 @@ assert(family.publications.some((p) => p.no === 'EP4623169' && p.kind === 'A1'),
 
 const ue = hooks.parseUe(docs.ueMain);
 assert((ue.ueStatus || ue.statusRaw || '').length > 0, 'UE parser should parse the live ueMain capture without crashing');
+
+const placeholderMainDoc = new JSDOM('<!doctype html><html><body><div>No files were found for your search terms.</div></body></html>', {
+  url: 'https://register.epo.org/application?number=EP19205846&tab=main&lng=en',
+}).window.document;
+const placeholderDoclistDoc = new JSDOM('<!doctype html><html><body><div>No files were found for your search terms.</div></body></html>', {
+  url: 'https://register.epo.org/application?number=EP19205846&tab=doclist&lng=en',
+}).window.document;
+assert.strictEqual(hooks.classifyParsedSourceState('main', placeholderMainDoc, { appNo: 'EP19205846' }).status, 'notFound', 'Main-tab placeholder pages should classify as notFound when no usable case data is present');
+assert.strictEqual(hooks.classifyParsedSourceState('doclist', placeholderDoclistDoc, { docs: [] }).status, 'empty', 'Auxiliary placeholder pages should classify as empty instead of healthy ok loads');
+assert.strictEqual(hooks.classifyParsedSourceState('main', docs.main, main).status, 'ok', 'Real main Register captures should remain classified as ok');
 
 const pdfR71 = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'r71_communication.txt'), {
   docDateStr: '10.01.2026',
