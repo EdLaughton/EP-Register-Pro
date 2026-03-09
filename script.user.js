@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.98
+// @version      7.0.99
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.98';
+  const VERSION = '7.0.99';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -91,6 +91,7 @@
     showRenewals: true,
     showUpcUe: true,
     showCitations: true,
+    doclistGroupsExpandedByDefault: true,
     timelineDensity: 'standard',
     timelineEventLevel: 'info',
     timelineLegalLevel: 'warn',
@@ -1606,9 +1607,14 @@
       const visibleCount = groupRows.filter((r) => !r.classList.contains('epoRP-filter-hidden')).length;
       groupHeader.classList.toggle('epoRP-filter-hidden', visibleCount === 0);
       const label = groupHeader.querySelector('.epoRP-docgrp-label');
+      const meta = groupHeader.querySelector('.epoRP-docgrp-meta');
       if (label) {
         const base = label.getAttribute('data-bundle') || 'Group';
-        label.textContent = `${base} (${visibleCount}/${groupRows.length})`;
+        label.textContent = base;
+      }
+      if (meta) {
+        const count = meta.querySelector('.epoRP-docgrp-count');
+        if (count) count.textContent = doclistGroupCountText(visibleCount, groupRows.length);
       }
     });
   }
@@ -1698,6 +1704,7 @@
       procedure,
       dateStr,
       rowText,
+      pages: String(entry.pages || ''),
       bundle: entry.bundle || cls.bundle || 'Other',
       actor: entry.actor || cls.actor || 'Other',
       url: entry.url || '',
@@ -1715,9 +1722,10 @@
       if (!cells.length) continue;
       const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[2] || cells[1] || cells[0] || row);
       const procedure = text(cells[3] || '');
+      const pages = text(cells[4] || '');
       const rowText = text(row);
       const dateStr = rowText.match(DATE_RE)?.[1] || '';
-      rowModels.push(doclistEntryModel({ row, title, procedure, dateStr, rowText }));
+      rowModels.push(doclistEntryModel({ row, title, procedure, pages, dateStr, rowText }));
     }
     return rowModels;
   }
@@ -1907,11 +1915,30 @@
     }));
   }
 
+  function doclistPageTotal(run) {
+    return (run?.models || []).reduce((sum, model) => sum + (Number(String(model?.pages || '').match(/\d+/)?.[0] || 0) || 0), 0);
+  }
+
+  function doclistGroupCountText(visibleCount, totalCount) {
+    if (!totalCount) return '0 items';
+    if (visibleCount == null || visibleCount === totalCount) return `${totalCount} item${totalCount === 1 ? '' : 's'}`;
+    return `${visibleCount} of ${totalCount} items`;
+  }
+
+  function doclistGroupSummaryHtml(run, visibleCount = null) {
+    const totalCount = Number(run?.rows?.length || 0);
+    const totalPages = doclistPageTotal(run);
+    const countText = doclistGroupCountText(visibleCount, totalCount);
+    const pagesText = totalPages > 0 ? `${totalPages} page${totalPages === 1 ? '' : 's'}` : '';
+    return `<span class="epoRP-docgrp-meta"><span class="epoRP-docgrp-count">${esc(countText)}</span>${pagesText ? `<span class="epoRP-docgrp-pages">${esc(pagesText)}</span>` : ''}</span>`;
+  }
+
   function attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState, pdfDeadlines = {}) {
     const groupId = `g${gid}`;
     const groupKey = doclistGroupKey(caseNo, run.bundle, gid);
-    const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;
-    if (!hasSavedOpenState) openGroups.add(groupKey);
+    const defaultOpen = !!options().doclistGroupsExpandedByDefault;
+    const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : defaultOpen;
+    if (!hasSavedOpenState && defaultOpen) openGroups.add(groupKey);
     const firstRow = run.rows[0];
     const cells = [...firstRow.querySelectorAll('td')];
 
@@ -1922,7 +1949,7 @@
     const td = document.createElement('td');
     td.colSpan = Math.max(1, cells.length);
     const bundleLabel = doclistRunLabel(run, pdfDeadlines);
-    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)} (${run.rows.length})</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
+    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
     headerRow.appendChild(td);
     firstRow.parentElement?.insertBefore(headerRow, firstRow);
 
@@ -5377,26 +5404,33 @@
   function renderOptions(caseNo) {
     const o = options();
     const checkbox = (id, key, title, help) => `<label class="epoRP-or"><div><div class="epoRP-ol">${esc(title)}</div><div class="epoRP-oh">${esc(help)}</div></div><input id="${id}" type="checkbox" ${o[key] ? 'checked' : ''}></label>`;
+    const selectRow = (id, title, help, inner) => `<label class="epoRP-or"><div><div class="epoRP-ol">${esc(title)}</div><div class="epoRP-oh">${esc(help)}</div></div><select id="${id}" class="epoRP-in">${inner}</select></label>`;
+    const section = (title, help, body) => `<div class="epoRP-optsec"><div class="epoRP-optsec-h">${esc(title)}</div>${help ? `<div class="epoRP-optsec-m">${esc(help)}</div>` : ''}<div class="epoRP-optsec-b">${body}</div></div>`;
 
     return `<div class="epoRP-c"><h4>Options</h4>
-      ${checkbox('epoRP-opt-shift', 'shiftBody', 'Shift page body', 'Adds right padding so Register content is not hidden under panel.')}
-      ${checkbox('epoRP-opt-preload', 'preloadAllTabs', 'Preload all case tabs in background', 'Loads main/doclist/event/family/legal/federated/citations/ueMain in background and fills cache.')}
-      ${checkbox('epoRP-opt-pubs', 'showPublications', 'Show publications on timeline', 'Includes publication entries from main + family sources.')}
-      ${checkbox('epoRP-opt-events', 'showEventHistory', 'Show event-history rows', 'Includes EP Event history source rows in timeline.')}
-      ${checkbox('epoRP-opt-legal', 'showLegalStatusRows', 'Show legal-status rows', 'Includes EP Legal status rows in timeline.')}
-      ${checkbox('epoRP-opt-ren', 'showRenewals', 'Show renewals panel', 'Displays pre-/post-grant and UE-sensitive renewal explanation in Overview.')}
-      ${checkbox('epoRP-opt-upc', 'showUpcUe', 'Show UPC/UE panel', 'Displays inferred UE + UPC opt-out state with notes.')}
-      ${checkbox('epoRP-opt-cit', 'showCitations', 'Show citations panel', 'Displays a compact cited-art summary grouped by phase.')}
-      <label class="epoRP-or"><div><div class="epoRP-ol">Timeline density</div><div class="epoRP-oh">Compact / standard / verbose visual density.</div></div>
-        <select id="epoRP-opt-density" class="epoRP-in"><option value="compact" ${o.timelineDensity === 'compact' ? 'selected' : ''}>Compact</option><option value="standard" ${o.timelineDensity === 'standard' ? 'selected' : ''}>Standard</option><option value="verbose" ${o.timelineDensity === 'verbose' ? 'selected' : ''}>Verbose</option></select>
-      </label>
-      <label class="epoRP-or"><div><div class="epoRP-ol">Timeline event importance</div><div class="epoRP-oh">Visual severity for event-history items.</div></div>
-        <select id="epoRP-opt-event-level" class="epoRP-in"><option value="info" ${o.timelineEventLevel === 'info' ? 'selected' : ''}>Info</option><option value="warn" ${o.timelineEventLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="bad" ${o.timelineEventLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${o.timelineEventLevel === 'ok' ? 'selected' : ''}>Low</option></select>
-      </label>
-      <label class="epoRP-or"><div><div class="epoRP-ol">Timeline legal importance</div><div class="epoRP-oh">Visual severity for legal-status items.</div></div>
-        <select id="epoRP-opt-legal-level" class="epoRP-in"><option value="warn" ${o.timelineLegalLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="info" ${o.timelineLegalLevel === 'info' ? 'selected' : ''}>Info</option><option value="bad" ${o.timelineLegalLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${o.timelineLegalLevel === 'ok' ? 'selected' : ''}>Low</option></select>
-      </label>
-      <div class="epoRP-actions"><button class="epoRP-btn" id="epoRP-reload">Reload all background pages</button><button class="epoRP-btn" id="epoRP-clear">Clear this case cache</button><button class="epoRP-btn" id="epoRP-clear-logs">Clear operation console</button></div>
+      ${section('Layout', 'Panel placement and page-shift behaviour.', [
+        checkbox('epoRP-opt-shift', 'shiftBody', 'Shift page body', 'Adds right padding so Register content is not hidden under panel.'),
+      ].join(''))}
+      ${section('Data loading', 'How aggressively the sidebar prefetches Register sources.', [
+        checkbox('epoRP-opt-preload', 'preloadAllTabs', 'Preload all case tabs in background', 'Loads main/doclist/event/family/legal/federated/citations/ueMain in background and fills cache.'),
+      ].join(''))}
+      ${section('Overview panels', 'Show or hide overview cards.', [
+        checkbox('epoRP-opt-ren', 'showRenewals', 'Show renewals panel', 'Displays pre-/post-grant and UE-sensitive renewal explanation in Overview.'),
+        checkbox('epoRP-opt-upc', 'showUpcUe', 'Show UPC/UE panel', 'Displays inferred UE + UPC opt-out state with notes.'),
+        checkbox('epoRP-opt-cit', 'showCitations', 'Show citations panel', 'Displays a compact cited-art summary grouped by phase.'),
+      ].join(''))}
+      ${section('Timeline', 'Timeline density and which sources feed it.', [
+        checkbox('epoRP-opt-pubs', 'showPublications', 'Show publications on timeline', 'Includes publication entries from main + family sources.'),
+        checkbox('epoRP-opt-events', 'showEventHistory', 'Show event-history rows', 'Includes EP Event history source rows in timeline.'),
+        checkbox('epoRP-opt-legal', 'showLegalStatusRows', 'Show legal-status rows', 'Includes EP Legal status rows in timeline.'),
+        selectRow('epoRP-opt-density', 'Timeline density', 'Compact / standard / verbose visual density.', `<option value="compact" ${o.timelineDensity === 'compact' ? 'selected' : ''}>Compact</option><option value="standard" ${o.timelineDensity === 'standard' ? 'selected' : ''}>Standard</option><option value="verbose" ${o.timelineDensity === 'verbose' ? 'selected' : ''}>Verbose</option>`),
+        selectRow('epoRP-opt-event-level', 'Timeline event importance', 'Visual severity for event-history items.', `<option value="info" ${o.timelineEventLevel === 'info' ? 'selected' : ''}>Info</option><option value="warn" ${o.timelineEventLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="bad" ${o.timelineEventLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${o.timelineEventLevel === 'ok' ? 'selected' : ''}>Low</option>`),
+        selectRow('epoRP-opt-legal-level', 'Timeline legal importance', 'Visual severity for legal-status items.', `<option value="warn" ${o.timelineLegalLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="info" ${o.timelineLegalLevel === 'info' ? 'selected' : ''}>Info</option><option value="bad" ${o.timelineLegalLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${o.timelineLegalLevel === 'ok' ? 'selected' : ''}>Low</option>`),
+      ].join(''))}
+      ${section('Doclist grouping', 'How grouped document packets behave on the doclist tab.', [
+        checkbox('epoRP-opt-docgrp-default-open', 'doclistGroupsExpandedByDefault', 'Expand doclist groups by default', 'When there is no saved per-group state yet, open groups automatically instead of starting collapsed.'),
+      ].join(''))}
+      ${section('Maintenance', 'Manual refresh and cache controls for this case.', `<div class="epoRP-actions"><button class="epoRP-btn" id="epoRP-reload">Reload all background pages</button><button class="epoRP-btn" id="epoRP-clear">Clear this case cache</button><button class="epoRP-btn" id="epoRP-clear-logs">Clear operation console</button></div>`)}
       <div class="epoRP-console-wrap">
         <div class="epoRP-ol">Current option values</div>
         <div class="epoRP-oh">Effective values for all sidebar parameters.</div>
@@ -5507,6 +5541,7 @@
     wireToggle('epoRP-opt-ren', 'showRenewals');
     wireToggle('epoRP-opt-upc', 'showUpcUe');
     wireToggle('epoRP-opt-cit', 'showCitations');
+    wireToggle('epoRP-opt-docgrp-default-open', 'doclistGroupsExpandedByDefault');
 
     b.querySelector('#epoRP-opt-density')?.addEventListener('change', (event) => {
       setOptions({ timelineDensity: event.target.value || 'standard' });
@@ -5828,6 +5863,10 @@
     .epoRP-dr:last-child{border-bottom:0}
     .epoRP-dn{font-weight:700}
     .epoRP-dd{font-size:11px}
+    .epoRP-optsec{border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;padding:8px 10px;margin-top:8px}
+    .epoRP-optsec-h{font-size:12px;font-weight:800;color:#0f172a}
+    .epoRP-optsec-m{font-size:10px;color:#64748b;margin-top:2px}
+    .epoRP-optsec-b{margin-top:6px}
     .epoRP-or{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #edf2f7}
     .epoRP-or:last-child{border-bottom:0}
     .epoRP-ol{font-weight:700;font-size:11px}
@@ -5860,6 +5899,13 @@
     .epoRP-docgrp-sel{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#1e3a8a;white-space:nowrap;cursor:pointer}
     .epoRP-docgrp-sel input{margin:0}
     .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent !important;background-image:none !important;border:0 !important;border-radius:0;box-shadow:none !important;padding:0;appearance:none !important;-webkit-appearance:none !important}
+     .epoRP-docgrp-btn::-moz-focus-inner{border:0;padding:0}
+     .epoRP-docgrp-btn:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;border-radius:6px}
++    .epoRP-docgrp-main{display:flex;justify-content:space-between;align-items:center;gap:10px;min-width:0;flex:1}
++    .epoRP-docgrp-label{min-width:0}
++    .epoRP-docgrp-meta{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:#1d4ed8;white-space:nowrap}
++    .epoRP-docgrp-pages{color:#334155}
+     .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}
     .epoRP-docgrp-btn::-moz-focus-inner{border:0;padding:0}
     .epoRP-docgrp-btn:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;border-radius:6px}
     .epoRP-docgrp-arrow{font-size:15px;transition:transform .15s ease}

@@ -40,8 +40,9 @@ has(/function\s+persistLiveDoclistGroups\s*\(/, 'Doclist open-group persistence 
 has(/function\s+timelineAttorneyImportance\s*\(/, 'Timeline importance classifier helper missing');
 hasText('deemed to be withdrawn|application deemed to be withdrawn|loss of rights', 'Timeline importance classifier should escalate loss-of-rights events for attorney triage');
 hasText('deadline|time limit|final date|summons to oral proceedings|rule\\s*116', 'Timeline importance classifier should mark prosecution-critical events as warn-level');
-hasText('const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : true;', 'Doclist grouping should auto-expand by default when no saved state exists');
-hasText('if (!hasSavedOpenState) openGroups.add(groupKey);', 'Doclist auto-expanded state should seed open-groups set on first grouping pass');
+hasText("const defaultOpen = !!options().doclistGroupsExpandedByDefault;", 'Doclist grouping should derive default expand/collapse behaviour from a dedicated option');
+hasText("const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : defaultOpen;", 'Doclist grouping should respect the configured default expand/collapse state when there is no saved per-group state');
+hasText("if (!hasSavedOpenState && defaultOpen) openGroups.add(groupKey);", 'Doclist auto-expanded state should only seed open groups when default-open behaviour is enabled');
 notHas(/persistLiveTimelineGroups\(/, 'Timeline open-state persistence should be removed so timeline groups start collapsed on each render');
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
 has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');
@@ -138,8 +139,8 @@ has(/inferProceduralDeadlines\(main,\s*docs,\s*eventHistory,\s*legal,\s*pdfDeadl
 // Timeline controls (include/exclude + importance)
 has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
 has(/checkbox\('epoRP-opt-legal'/, 'Timeline legal include toggle missing from options');
-has(/id="epoRP-opt-event-level"/, 'Timeline event level selector missing from options');
-has(/id="epoRP-opt-legal-level"/, 'Timeline legal level selector missing from options');
+has(/epoRP-opt-event-level/, 'Timeline event level selector missing from options');
+has(/epoRP-opt-legal-level/, 'Timeline legal level selector missing from options');
 
 // Options diagnostics console + effective key/value snapshot
 has(/function\s+renderLogConsole\s*\(caseNo\)/, 'Operation console renderer missing');
@@ -156,6 +157,8 @@ has(/renderOptionSnapshot\(\)/, 'Options view should render option key/value sna
 has(/renderLogConsole\(caseNo\)/, 'Options view should render operation console scoped to current case');
 has(/b\.querySelector\('#epoRP-clear-logs'\)\?\.addEventListener\('click',\s*\(\)\s*=>\s*\{[\s\S]*?c\.logs\s*=\s*\[\];[\s\S]*?renderPanel\(\);[\s\S]*?\}\);/, 'Clear operation console control should empty case logs and rerender options');
 hasText('Current option values', 'Options view should show a section listing effective option values');
+hasText('Expand doclist groups by default', 'Options view should expose a dedicated default expand/collapse toggle for doclist packet groups');
+hasText('class="epoRP-optsec"', 'Options view should organize settings into visually separated categories');
 
 // Publications parsing + tab readability improvements
 has(/function\s+normalizePublicationNumber\s*\(/, 'Publication-number normalization helper missing');
@@ -195,6 +198,8 @@ has(/headerRow\.classList\.toggle\('open',\s*nextExpanded\)/, 'All-documents gro
 has(/epoRP-docgrp-open/, 'All-documents grouped rows should get expanded-state class for background differentiation');
 has(/function\s+getDoclistOpenGroups\s*\(/, 'All-documents open-state persistence helper missing');
 has(/epoRP-docgrp-check/, 'All-documents group header should include a select-all checkbox');
+hasText('epoRP-docgrp-meta', 'All-documents group header should render item-count/page-total metadata');
+hasText('doclistGroupSummaryHtml(run)', 'All-documents group header should render centralized item-count/page-total summary text');
 has(/dispatchEvent\(new Event\('change',\s*\{ bubbles: true \}\)\)/, 'Group select-all should emit row checkbox change events');
 has(/epoRP-docgrp-item\.epoRP-docgrp-last\.epoRP-docgrp-open td\{border-bottom:2px solid #bfdbfe\}/, 'All-documents grouped rows should draw a bottom boundary line when expanded');
 has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-documents group header control should suppress native button chrome');

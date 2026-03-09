@@ -83,6 +83,8 @@ has(/function\s+timelineDocItemsFromDocs\s*\(/, 'Timeline should be built from t
 has(/function\s+timelineSubtitleText\s*\(/, 'Timeline rendering should centralize subtitle deduplication instead of concatenating noisy repeated labels inline');
 has(/function\s+genericDocLabel\s*\(/, 'Timeline/detail rendering should centralize label upgrades for generic Other/Examination document rows');
 has(/function\s+shouldAppendSingleRunLabel\s*\(/, 'Single-item document rows should decide centrally whether broad run labels like Examination/Other add value');
+has(/function\s+doclistPageTotal\s*\(/, 'Doclist grouping should centralize grouped-page summation for header metadata');
+has(/function\s+doclistGroupCountText\s*\(/, 'Doclist grouping should centralize item-count wording for packet headers');
 has(/function\s+selectNextDeadline\s*\(/, 'Overview should centralize active-deadline selection so spent/superseded clocks can be suppressed');
 has(/function\s+activeDeadlineNoteText\s*\(/, 'Overview should centralize explanatory text when no active deadline remains on a closed posture');
 has(/function\s+upcUePresentationModel\s*\(/, 'UPC / UE overview should centralize non-unitary wording instead of repeating federated withdrawn status in the UE field');

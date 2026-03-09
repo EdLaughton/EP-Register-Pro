@@ -51,6 +51,7 @@ function loadUserscriptHooks() {
     'genericDocLabel',
     'shouldAppendSingleRunLabel',
     'overviewPartialState',
+    'normalizeOptions',
   ];
 
   const instrumented = source.replace(/\}\)\(\);\s*$/, `window.__EPRP_TEST_HOOKS = { ${hookNames.join(', ')} };})();`);

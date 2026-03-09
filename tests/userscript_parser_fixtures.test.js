@@ -126,6 +126,7 @@ assert.strictEqual(grantTextClassification.level, 'warn', 'Grant-text communicat
 assert.strictEqual(grantTextClassification.actor, 'EPO', 'Grant-text communication rows should remain EPO grant-package items instead of being misclassified as applicant responses');
 assert.strictEqual(hooks.shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), false, 'Single-item timeline rows should not append broad run labels when a stronger upgraded label already exists');
 assert.strictEqual(hooks.overviewPartialState({ sources: { main: { status: 'empty' }, doclist: { status: 'ok' }, event: { status: 'ok' }, family: { status: 'empty' }, legal: { status: 'empty' }, federated: { status: 'empty' }, citations: { status: 'empty' }, ueMain: { status: 'empty' } } }).note, 'Main Register data is temporarily unavailable. Showing partial data from doclist, event history. Still empty: family, legal status, federated, citations, UE/UPC.', 'Overview should explain partial-data states in plain language when the main Register source is empty');
+assert.strictEqual(hooks.normalizeOptions({ doclistGroupsExpandedByDefault: 'off' }).doclistGroupsExpandedByDefault, false, 'Options normalization should accept falsey string forms for the new doclist default-open toggle');
 
 const supersededDeadline = hooks.selectNextDeadline([
   { label: 'R71(3) response period', date: new Date('2024-02-10T00:00:00Z'), resolved: false, superseded: true },
