@@ -43,6 +43,7 @@ hasText('deadline|time limit|final date|summons to oral proceedings|rule\\s*116'
 hasText("const defaultOpen = !!options().doclistGroupsExpandedByDefault;", 'Doclist grouping should derive default expand/collapse behaviour from a dedicated option');
 hasText("const isOpen = hasSavedOpenState ? openGroups.has(groupKey) : defaultOpen;", 'Doclist grouping should respect the configured default expand/collapse state when there is no saved per-group state');
 hasText("if (!hasSavedOpenState && defaultOpen) openGroups.add(groupKey);", 'Doclist auto-expanded state should only seed open groups when default-open behaviour is enabled');
+hasText("if (key === 'doclistGroupsExpandedByDefault') clearDoclistOpenGroups(runtime.appNo || '');", 'Changing the doclist default-open toggle should clear saved per-case group state so refresh uses the new preference');
 notHas(/persistLiveTimelineGroups\(/, 'Timeline open-state persistence should be removed so timeline groups start collapsed on each render');
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
 has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');
@@ -198,6 +199,7 @@ has(/headerRow\.classList\.toggle\('open',\s*nextExpanded\)/, 'All-documents gro
 has(/epoRP-docgrp-open/, 'All-documents grouped rows should get expanded-state class for background differentiation');
 has(/function\s+getDoclistOpenGroups\s*\(/, 'All-documents open-state persistence helper missing');
 has(/epoRP-docgrp-check/, 'All-documents group header should include a select-all checkbox');
+notHas(/>Select<|>All</, 'All-documents group header should keep the checkbox-only control without extra header text');
 hasText('epoRP-docgrp-meta', 'All-documents group header should render item-count/page-total metadata');
 hasText('doclistGroupSummaryHtml(run)', 'All-documents group header should render centralized item-count/page-total summary text');
 has(/dispatchEvent\(new Event\('change',\s*\{ bubbles: true \}\)\)/, 'Group select-all should emit row checkbox change events');

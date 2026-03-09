@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.1.02
+// @version      7.1.03
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.1.02';
+  const VERSION = '7.1.03';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -827,6 +827,17 @@
       for (const k of keys) if (!keep.has(k)) delete byCase[k];
     }
 
+    setUiState({ doclistOpenByCase: byCase });
+  }
+
+  function clearDoclistOpenGroups(caseNo = '') {
+    const normalized = normalize(String(caseNo || ''));
+    const state = uiState();
+    const byCase = { ...(state.doclistOpenByCase || {}) };
+    if (normalized) delete byCase[normalized];
+    else {
+      for (const key of Object.keys(byCase)) delete byCase[key];
+    }
     setUiState({ doclistOpenByCase: byCase });
   }
 
@@ -1949,7 +1960,7 @@
     const td = document.createElement('td');
     td.colSpan = Math.max(1, cells.length);
     const bundleLabel = doclistRunLabel(run, pdfDeadlines);
-    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all items in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>Select</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
+    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all items in this group" aria-label="Select all items in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
     headerRow.appendChild(td);
     firstRow.parentElement?.insertBefore(headerRow, firstRow);
 
@@ -5533,6 +5544,7 @@
         const nextValue = !!el.checked;
         if (!!options()[key] === nextValue) return;
         setOptions({ [key]: nextValue });
+        if (key === 'doclistGroupsExpandedByDefault') clearDoclistOpenGroups(runtime.appNo || '');
         applyBodyShift();
         renderPanel();
       };
