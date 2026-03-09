@@ -233,9 +233,15 @@ has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s
 hasText('const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();', 'Doclist parser should use a safe fallback case number for sourceUrl generation');
 hasText("sourceUrl(fallbackCaseNo, 'doclist')", 'Doclist parser should avoid undefined caseNo when generating fallback doclist URLs');
 hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use explicit R71(3) wording for grant package groups');
+hasText('Response to intention to grant', 'Doclist grouping should expose a dedicated label for applicant responses to R71(3) packets');
+hasText('Examination communication', 'Doclist grouping should expose a dedicated label for Art. 94(3)/examining-division communication packets');
+hasText('Response to examination communication', 'Doclist grouping should expose a dedicated label for applicant responses to examining-division communications');
 hasText('tr.epoRP-docgrp td:first-child{box-shadow:inset 3px 0 0 #3b82f6}', 'Doclist group header should show a strong blue left guide line');
 hasText('tr.epoRP-docgrp-item.epoRP-docgrp-open td:first-child{box-shadow:inset 3px 0 0 #93c5fd}', 'Doclist grouped child rows should show a lighter blue continuation guide line');
 has(/if \(sameDateGrantSignals\) model\.bundle = 'Grant package';/, 'Doclist grouping should fold same-date bibliographic rows into intention-to-grant group when grant signals are present');
+has(/const\s+runKey\s*=\s*`\$\{kind\}\|\$\{model\.dateStr \|\| ''\}`;/, 'Doclist grouping runs should be anchored to date as well as group kind so repeated cycles do not merge across dates');
+has(/if \(hasGrantResponse && model\.actor === 'Applicant' && model\.signals\.isResponseCompanion\)/, 'Doclist grouping should promote same-date applicant companion filings into grant-response packets when explicit grant-response rows are present');
+has(/if \(hasExamResponse && model\.actor === 'Applicant' && model\.signals\.isResponseCompanion\)/, 'Doclist grouping should promote same-date applicant companion filings into examination-response packets when explicit examination-response rows are present');
 has(/const\s+isLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed to be withdrawn\|loss of rights/, 'Document classification should mark loss-of-rights communications as EPO actions');
 has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute a structural signature for change detection');
 has(/runtime\.doclistGroupSigByCase\[caseNo\]\s*===\s*signature/, 'Doclist grouping should skip full regroup when table signature is unchanged');

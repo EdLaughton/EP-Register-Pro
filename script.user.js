@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.90
+// @version      7.0.91
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.90';
+  const VERSION = '7.0.91';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1490,7 +1490,10 @@
   }
 
   function doclistBundleLabel(bundle) {
-    if (bundle === 'Grant package') return 'Intention to grant (R71(3) EPC)';
+    if (bundle === 'Grant package' || bundle === 'Grant communication') return 'Intention to grant (R71(3) EPC)';
+    if (bundle === 'Grant response') return 'Response to intention to grant';
+    if (bundle === 'Examination communication') return 'Examination communication';
+    if (bundle === 'Examination response') return 'Response to examination communication';
     return bundle;
   }
 
@@ -1593,29 +1596,138 @@
     });
   }
 
+  function doclistGroupingSignals(title, procedure = '') {
+    const t = String(title || '').toLowerCase();
+    const p = String(procedure || '').toLowerCase();
+    return {
+      isReceipt: /\(electronic\) receipt|acknowledgement of receipt|receipt of electronic submission|auto-acknowledgement/.test(t),
+      isGrantCommunication: /communication about intention to grant|intention to grant \(signatures\)|text intended for grant|annex to the communication about intention to grant|bibliographic data of the european patent application/.test(t),
+      isGrantResponseExplicit: /request for correction\/amendment of the text proposed for grant|text proposed for grant|approval of the text|disapproval of the communication of intention to grant|translation of the claim|translation of claims|grant and publication fee|grant and printing fee|fee for grant|fee for publishing|fee for printing/.test(t),
+      isExamCommunication: !/reply to|response to|intention to grant|text intended for grant|text proposed for grant/.test(t) && /article\s*94\(3\)|art\.?\s*94\(3\)|communication from the examining division|despatch of a communication from the examining division|summons to oral proceedings|rule\s*116|examining division has become responsible/.test(`${t} ${p}`),
+      isExamResponseExplicit: /reply to (?:a )?communication from the examining division|response to (?:a )?communication from the examining division|reply to summons|response to summons|observations in reply|arguments in reply|request for oral proceedings/.test(t),
+      isSearchPackage: /search report|search opinion|written opinion|search strategy|communication regarding the transmission of the european search report|copy of the international search report|partial international search report/.test(t),
+      isSearchResponseExplicit: /amendments received before examination|amended claims filed after receipt of \(?(?:european\)? )?search report|amended description filed after receipt of \(?(?:european\)? )?search report|correction of deficiencies in written opinion\/amendment/.test(t),
+      isResponseCompanion: /reply|response|amend|claims|description|drawings|letter accompanying subsequently filed items|subsequently filed items|observations|arguments|request|translation|annotations/.test(t),
+    };
+  }
+
+  function doclistDateBlocks(rowModels) {
+    const blocks = [];
+    let current = [];
+    let currentDate = '';
+    for (const model of rowModels) {
+      if (!current.length || model.dateStr === currentDate) {
+        current.push(model);
+        currentDate = model.dateStr;
+        continue;
+      }
+      blocks.push(current);
+      current = [model];
+      currentDate = model.dateStr;
+    }
+    if (current.length) blocks.push(current);
+    return blocks;
+  }
+
   function doclistRowModels(rows) {
     const rowModels = [];
     for (const row of rows) {
       const cells = [...row.querySelectorAll('td')];
       if (!cells.length) continue;
-      const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[1] || cells[0] || row);
+      const title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || text(cells[2] || cells[1] || cells[0] || row);
+      const procedure = text(cells[3] || '');
       const rowText = text(row);
       const dateStr = rowText.match(DATE_RE)?.[1] || '';
-      const bundle = classifyDocument(title, rowText).bundle || 'Other';
-      rowModels.push({ row, title, dateStr, rowText, bundle });
+      const cls = classifyDocument(title, procedure);
+      rowModels.push({
+        row,
+        title,
+        procedure,
+        dateStr,
+        rowText,
+        bundle: cls.bundle || 'Other',
+        actor: cls.actor || 'Other',
+        signals: doclistGroupingSignals(title, procedure),
+        groupKind: '',
+      });
     }
     return rowModels;
   }
 
   function normalizeGrantPackageRowModels(rowModels) {
-    for (const model of rowModels) {
-      if (!/bibliographic data of the european patent application/i.test(model.title || '')) continue;
-      const sameDateGrantSignals = rowModels.some((other) => {
-        if (other === model) return false;
-        if (other.dateStr !== model.dateStr) return false;
-        return /intention to grant|rule\s*71\(3\)|text intended for grant|communication about intention to grant|annex to the communication about intention to grant/i.test(other.title || '');
-      });
-      if (sameDateGrantSignals) model.bundle = 'Grant package';
+    for (const block of doclistDateBlocks(rowModels)) {
+      for (const model of block) {
+        if (!/bibliographic data of the european patent application/i.test(model.title || '')) continue;
+        const sameDateGrantSignals = block.some((other) => {
+          if (other === model) return false;
+          return /intention to grant|rule\s*71\(3\)|text intended for grant|communication about intention to grant|annex to the communication about intention to grant/i.test(other.title || '');
+        });
+        if (sameDateGrantSignals) model.bundle = 'Grant package';
+      }
+    }
+    return rowModels;
+  }
+
+  function doclistBaseGroupKind(model) {
+    if (model.bundle === 'Grant package') {
+      return model.signals.isGrantCommunication ? 'Grant communication' : 'Grant response';
+    }
+    if (model.bundle === 'Search package') return 'Search package';
+    if (model.bundle === 'Response to search') return 'Response to search';
+    if (model.bundle === 'Filing package') return 'Filing package';
+    if (model.bundle === 'Applicant filings') return 'Applicant filings';
+    if (model.bundle === 'Examination') return model.signals.isExamCommunication ? 'Examination communication' : 'Examination';
+    return model.bundle || 'Other';
+  }
+
+  function normalizeDoclistGroupKinds(rowModels) {
+    for (const block of doclistDateBlocks(rowModels)) {
+      const hasGrantCommunication = block.some((model) => model.signals.isGrantCommunication);
+      const hasGrantResponse = block.some((model) => model.signals.isGrantResponseExplicit);
+      const hasExamCommunication = block.some((model) => model.signals.isExamCommunication);
+      const hasExamResponse = block.some((model) => model.signals.isExamResponseExplicit);
+      const hasSearchPackage = block.some((model) => model.signals.isSearchPackage);
+      const hasSearchResponse = block.some((model) => model.signals.isSearchResponseExplicit);
+
+      for (const model of block) {
+        model.groupKind = doclistBaseGroupKind(model);
+        if (model.signals.isReceipt) {
+          model.groupKind = 'Other';
+          continue;
+        }
+        if (hasGrantCommunication && model.signals.isGrantCommunication) {
+          model.groupKind = 'Grant communication';
+          continue;
+        }
+        if (hasGrantResponse && model.signals.isGrantResponseExplicit) {
+          model.groupKind = 'Grant response';
+          continue;
+        }
+        if (hasGrantResponse && model.actor === 'Applicant' && model.signals.isResponseCompanion) {
+          model.groupKind = 'Grant response';
+          continue;
+        }
+        if (hasExamCommunication && model.signals.isExamCommunication) {
+          model.groupKind = 'Examination communication';
+          continue;
+        }
+        if (hasExamResponse && model.signals.isExamResponseExplicit) {
+          model.groupKind = 'Examination response';
+          continue;
+        }
+        if (hasExamResponse && model.actor === 'Applicant' && model.signals.isResponseCompanion) {
+          model.groupKind = 'Examination response';
+          continue;
+        }
+        if (hasSearchPackage && model.signals.isSearchPackage) {
+          model.groupKind = 'Search package';
+          continue;
+        }
+        if (hasSearchResponse && model.actor === 'Applicant' && model.signals.isResponseCompanion) {
+          model.groupKind = 'Response to search';
+          continue;
+        }
+      }
     }
     return rowModels;
   }
@@ -1624,14 +1736,30 @@
     const runs = [];
     let run = null;
     for (const model of rowModels) {
-      if (!run || run.bundle !== model.bundle) {
-        run = { bundle: model.bundle, rows: [model.row] };
+      const kind = model.groupKind || model.bundle || 'Other';
+      const runKey = `${kind}|${model.dateStr || ''}`;
+      if (!run || run.key !== runKey) {
+        run = { key: runKey, bundle: kind, groupKind: kind, dateStr: model.dateStr || '', rows: [model.row], models: [model] };
         runs.push(run);
       } else {
         run.rows.push(model.row);
+        run.models.push(model);
       }
     }
     return runs;
+  }
+
+  function doclistGroupingPreview(doc) {
+    const table = bestTable(doc, ['date', 'document']) || bestTable(doc, ['document type']);
+    if (!table) return [];
+    const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
+    return doclistRuns(normalizeDoclistGroupKinds(normalizeGrantPackageRowModels(doclistRowModels(rows)))).map((run) => ({
+      bundle: run.bundle,
+      label: doclistBundleLabel(run.bundle),
+      dateStr: run.dateStr,
+      size: run.rows.length,
+      titles: run.models.map((model) => model.title),
+    }));
   }
 
   function attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState) {
@@ -1731,8 +1859,8 @@
     resetDoclistGrouping(table);
 
     const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
-    const groupable = new Set(['Search package', 'Grant package', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
-    const runs = doclistRuns(normalizeGrantPackageRowModels(doclistRowModels(rows)));
+    const groupable = new Set(['Search package', 'Grant communication', 'Grant response', 'Examination communication', 'Examination response', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
+    const runs = doclistRuns(normalizeDoclistGroupKinds(normalizeGrantPackageRowModels(doclistRowModels(rows))));
 
     let gid = 0;
     for (const run of runs) {

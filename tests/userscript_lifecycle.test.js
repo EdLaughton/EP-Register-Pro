@@ -75,6 +75,9 @@ has(/function\s+appendCoreCommunicationDeadlines\s*\(/, 'Core deadline families 
 has(/function\s+pdfDeadlineCandidates\s*\(/, 'PDF deadline candidate selection should be isolated from the main refresh flow');
 has(/function\s+scanPdfDeadlineCandidate\s*\(/, 'Per-document PDF scanning should be isolated from refresh orchestration');
 has(/function\s+ensureDoclistFilterWrap\s*\(/, 'Doclist filter UI setup should be isolated from group rebuild logic');
+has(/function\s+doclistGroupingSignals\s*\(/, 'Doclist grouping should derive explicit grant/examination/search signals from row titles');
+has(/function\s+doclistDateBlocks\s*\(/, 'Doclist grouping should normalize same-date procedural packets before building runs');
+has(/function\s+normalizeDoclistGroupKinds\s*\(/, 'Doclist grouping should assign cycle-aware group kinds before rendering DOM headers');
 has(/function\s+attachDoclistGroupRun\s*\(/, 'Doclist group DOM wiring should be isolated from group discovery');
 
 console.log('userscript lifecycle checks passed');

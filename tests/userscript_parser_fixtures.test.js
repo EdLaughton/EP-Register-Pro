@@ -57,6 +57,28 @@ assert.strictEqual(hooks.classifyParsedSourceState('main', placeholderMainDoc, {
 assert.strictEqual(hooks.classifyParsedSourceState('doclist', placeholderDoclistDoc, { docs: [] }).status, 'empty', 'Auxiliary placeholder pages should classify as empty instead of healthy ok loads');
 assert.strictEqual(hooks.classifyParsedSourceState('main', docs.main, main).status, 'ok', 'Real main Register captures should remain classified as ok');
 
+const repeatedGrantPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP19205846', 'doclist.html'], 'https://register.epo.org/application?number=EP19205846&tab=doclist&lng=en'));
+assert(repeatedGrantPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '08.09.2023' && g.size === 4), 'Doclist grouping should keep the 08.09.2023 grant-response packet together instead of splitting it into search-response rows');
+assert(repeatedGrantPreview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '10.05.2023' && g.size === 6), 'Doclist grouping should keep each R71 communication packet anchored to its own date');
+assert(repeatedGrantPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '21.04.2023' && g.size === 4), 'Doclist grouping should keep the 21.04.2023 disapproval/resumption response packet separate from the older 22.12.2022 grant packet');
+
+const repeatedGrantControlPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP24189818', 'doclist.html'], 'https://register.epo.org/application?number=EP24189818&tab=doclist&lng=en'));
+assert(repeatedGrantControlPreview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '18.11.2025' && g.size === 6), 'Repeated-grant control should expose the latest 18.11.2025 grant packet as its own grouped cycle');
+assert(repeatedGrantControlPreview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '07.10.2025' && g.size === 3), 'Repeated-grant control should keep the earlier 07.10.2025 grant packet separate from later grant-response rows');
+
+const syntheticArt94Doc = new JSDOM(`<!doctype html><html><body><table><thead><tr><th><input type="checkbox"></th><th>Date</th><th>Document type</th><th>Procedure</th><th>Number of pages</th></tr></thead><tbody>
+<tr><td><input type="checkbox"></td><td>07.08.2023</td><td><a>Communication from the Examining Division pursuant to Article 94(3) EPC</a></td><td>Search / examination</td><td>5</td></tr>
+<tr><td><input type="checkbox"></td><td>07.08.2023</td><td><a>Annex to the communication from the Examining Division pursuant to Article 94(3) EPC</a></td><td>Search / examination</td><td>2</td></tr>
+<tr><td><input type="checkbox"></td><td>11.12.2023</td><td><a>Reply to a communication from the Examining Division</a></td><td>Search / examination</td><td>3</td></tr>
+<tr><td><input type="checkbox"></td><td>11.12.2023</td><td><a>Claims</a></td><td>Search / examination</td><td>8</td></tr>
+<tr><td><input type="checkbox"></td><td>11.12.2023</td><td><a>Amended description with annotations</a></td><td>Search / examination</td><td>12</td></tr>
+</tbody></table></body></html>`, {
+  url: 'https://register.epo.org/application?number=EP00000000&tab=doclist&lng=en',
+}).window.document;
+const syntheticArt94Preview = hooks.doclistGroupingPreview(syntheticArt94Doc);
+assert(syntheticArt94Preview.some((g) => g.label === 'Examination communication' && g.dateStr === '07.08.2023' && g.size === 2), 'Doclist grouping should keep same-date Art. 94(3) communication rows together');
+assert(syntheticArt94Preview.some((g) => g.label === 'Response to examination communication' && g.dateStr === '11.12.2023' && g.size === 3), 'Doclist grouping should promote same-date applicant claims/amendments into the Art. 94(3) response packet');
+
 const pdfR71 = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'r71_communication.txt'), {
   docDateStr: '10.01.2026',
   docTitle: 'Communication about intention to grant',
