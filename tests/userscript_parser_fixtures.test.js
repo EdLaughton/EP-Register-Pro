@@ -58,13 +58,19 @@ assert.strictEqual(hooks.classifyParsedSourceState('doclist', placeholderDoclist
 assert.strictEqual(hooks.classifyParsedSourceState('main', docs.main, main).status, 'ok', 'Real main Register captures should remain classified as ok');
 
 const repeatedGrantPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP19205846', 'doclist.html'], 'https://register.epo.org/application?number=EP19205846&tab=doclist&lng=en'));
-assert(repeatedGrantPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '08.09.2023' && g.size === 4), 'Doclist grouping should keep the 08.09.2023 grant-response packet together instead of splitting it into search-response rows');
+assert(repeatedGrantPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '08.09.2023' && g.size === 5), 'Doclist grouping should keep the full 08.09.2023 grant-response packet together, including the electronic receipt');
 assert(repeatedGrantPreview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '10.05.2023' && g.size === 6), 'Doclist grouping should keep each R71 communication packet anchored to its own date');
-assert(repeatedGrantPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '21.04.2023' && g.size === 4), 'Doclist grouping should keep the 21.04.2023 disapproval/resumption response packet separate from the older 22.12.2022 grant packet');
+assert(repeatedGrantPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '21.04.2023' && g.size === 5), 'Doclist grouping should keep the full 21.04.2023 disapproval/resumption packet together, including the electronic receipt');
 
 const repeatedGrantControlPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP24189818', 'doclist.html'], 'https://register.epo.org/application?number=EP24189818&tab=doclist&lng=en'));
 assert(repeatedGrantControlPreview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '18.11.2025' && g.size === 6), 'Repeated-grant control should expose the latest 18.11.2025 grant packet as its own grouped cycle');
+assert(repeatedGrantControlPreview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '15.10.2025' && g.size === 2), 'Repeated-grant control should keep same-day R71 response rows and receipt together');
 assert(repeatedGrantControlPreview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '07.10.2025' && g.size === 3), 'Repeated-grant control should keep the earlier 07.10.2025 grant packet separate from later grant-response rows');
+
+const euroPctPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP24837586', 'doclist.html'], 'https://register.epo.org/application?number=EP24837586&tab=doclist&lng=en'));
+assert(euroPctPreview.some((g) => g.label === 'Response to search' && g.dateStr === '09.09.2025' && g.size === 5), 'Doclist grouping should keep same-day search-response packets together, including the receipt');
+assert(euroPctPreview.some((g) => g.label === 'Filing package' && g.dateStr === '26.06.2025' && g.size === 4), 'Doclist grouping should treat the Euro-PCT entry-day bundle as one filing package instead of splitting the ISR copy away');
+assert(euroPctPreview.some((g) => g.label === 'Filing package' && g.dateStr === '19.12.2024' && g.size === 8), 'Doclist grouping should consolidate the Euro-PCT filing-day packet into one filing package');
 
 const syntheticArt94Doc = new JSDOM(`<!doctype html><html><body><table><thead><tr><th><input type="checkbox"></th><th>Date</th><th>Document type</th><th>Procedure</th><th>Number of pages</th></tr></thead><tbody>
 <tr><td><input type="checkbox"></td><td>07.08.2023</td><td><a>Communication from the Examining Division pursuant to Article 94(3) EPC</a></td><td>Search / examination</td><td>5</td></tr>

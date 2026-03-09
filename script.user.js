@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.91
+// @version      7.0.92
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/main/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.91';
+  const VERSION = '7.0.92';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1605,9 +1605,11 @@
       isGrantResponseExplicit: /request for correction\/amendment of the text proposed for grant|text proposed for grant|approval of the text|disapproval of the communication of intention to grant|translation of the claim|translation of claims|grant and publication fee|grant and printing fee|fee for grant|fee for publishing|fee for printing/.test(t),
       isExamCommunication: !/reply to|response to|intention to grant|text intended for grant|text proposed for grant/.test(t) && /article\s*94\(3\)|art\.?\s*94\(3\)|communication from the examining division|despatch of a communication from the examining division|summons to oral proceedings|rule\s*116|examining division has become responsible/.test(`${t} ${p}`),
       isExamResponseExplicit: /reply to (?:a )?communication from the examining division|response to (?:a )?communication from the examining division|reply to summons|response to summons|observations in reply|arguments in reply|request for oral proceedings/.test(t),
-      isSearchPackage: /search report|search opinion|written opinion|search strategy|communication regarding the transmission of the european search report|copy of the international search report|partial international search report/.test(t),
+      isSearchPackage: /^(?:communication regarding the transmission of the european search report|european search opinion|european search report|information on search strategy|copy of the international search report|partial international search report|written opinion(?: of the isa)?|isr: cited documents|copy of the international preliminary report on patentability|provisional opinion accompanying the partial search results)/.test(t),
       isSearchResponseExplicit: /amendments received before examination|amended claims filed after receipt of \(?(?:european\)? )?search report|amended description filed after receipt of \(?(?:european\)? )?search report|correction of deficiencies in written opinion\/amendment/.test(t),
-      isResponseCompanion: /reply|response|amend|claims|description|drawings|letter accompanying subsequently filed items|subsequently filed items|observations|arguments|request|translation|annotations/.test(t),
+      isFilingSignal: /^(?:abstract|claims|description|drawings|designation of inventor|request for grant|electronic request for grant|priority document|published international application|request for entry into the european phase|priority search results|document concerning fees and payments|confirmation of effective date of early entry)\b/.test(t),
+      isApplicantAdminSignal: /submission concerning|annexes in respect of a client data request|letter accompanying subsequently filed items|result of consultation by telephone\/in person|change of applicant'?s representative|communication of amended entries concerning the representative/.test(t),
+      isResponseCompanion: /reply|response|amend|claims|description|drawings|letter accompanying subsequently filed items|subsequently filed items|observations|arguments|request|translation|annotations|abstract|designation of inventor|priority document|published international application|document concerning fees and payments|priority search results|confirmation of effective date of early entry/.test(t),
     };
   }
 
@@ -1688,22 +1690,17 @@
       const hasExamResponse = block.some((model) => model.signals.isExamResponseExplicit);
       const hasSearchPackage = block.some((model) => model.signals.isSearchPackage);
       const hasSearchResponse = block.some((model) => model.signals.isSearchResponseExplicit);
+      const hasFilingPacket = block.some((model) => model.bundle === 'Filing package' || model.signals.isFilingSignal);
+      const hasApplicantPacket = !hasGrantCommunication && !hasGrantResponse && !hasExamCommunication && !hasExamResponse && !hasSearchPackage && !hasSearchResponse && block.some((model) => model.bundle === 'Applicant filings' || model.signals.isApplicantAdminSignal);
 
       for (const model of block) {
         model.groupKind = doclistBaseGroupKind(model);
-        if (model.signals.isReceipt) {
-          model.groupKind = 'Other';
-          continue;
-        }
+
         if (hasGrantCommunication && model.signals.isGrantCommunication) {
           model.groupKind = 'Grant communication';
           continue;
         }
-        if (hasGrantResponse && model.signals.isGrantResponseExplicit) {
-          model.groupKind = 'Grant response';
-          continue;
-        }
-        if (hasGrantResponse && model.actor === 'Applicant' && model.signals.isResponseCompanion) {
+        if (hasGrantResponse && (model.signals.isGrantResponseExplicit || model.signals.isReceipt || (model.actor === 'Applicant' && model.signals.isResponseCompanion))) {
           model.groupKind = 'Grant response';
           continue;
         }
@@ -1711,20 +1708,24 @@
           model.groupKind = 'Examination communication';
           continue;
         }
-        if (hasExamResponse && model.signals.isExamResponseExplicit) {
+        if (hasExamResponse && (model.signals.isExamResponseExplicit || model.signals.isReceipt || (model.actor === 'Applicant' && model.signals.isResponseCompanion))) {
           model.groupKind = 'Examination response';
           continue;
         }
-        if (hasExamResponse && model.actor === 'Applicant' && model.signals.isResponseCompanion) {
-          model.groupKind = 'Examination response';
+        if (hasSearchResponse && (model.signals.isReceipt || (model.actor === 'Applicant' && model.signals.isResponseCompanion))) {
+          model.groupKind = 'Response to search';
+          continue;
+        }
+        if (hasFilingPacket && !hasGrantCommunication && !hasGrantResponse && !hasExamCommunication && !hasExamResponse && !hasSearchResponse && (model.signals.isReceipt || model.signals.isFilingSignal || model.bundle === 'Filing package' || model.signals.isSearchPackage)) {
+          model.groupKind = 'Filing package';
           continue;
         }
         if (hasSearchPackage && model.signals.isSearchPackage) {
           model.groupKind = 'Search package';
           continue;
         }
-        if (hasSearchResponse && model.actor === 'Applicant' && model.signals.isResponseCompanion) {
-          model.groupKind = 'Response to search';
+        if (hasApplicantPacket && (model.signals.isReceipt || model.signals.isApplicantAdminSignal || model.bundle === 'Applicant filings')) {
+          model.groupKind = 'Applicant filings';
           continue;
         }
       }
