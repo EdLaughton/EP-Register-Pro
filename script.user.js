@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.1.01
+// @version      7.1.02
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.1.01';
+  const VERSION = '7.1.02';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -543,14 +543,14 @@
   }
 
   function sourceStatusSummaryText(counts) {
-    if ((counts.ok || 0) === SOURCES.length) return `${counts.ok}/${SOURCES.length} ok`;
+    if ((counts.ok || 0) === SOURCES.length) return `${counts.ok} loaded`;
     const parts = [];
-    if (counts.ok) parts.push(`${counts.ok} ok`);
+    if (counts.ok) parts.push(`${counts.ok} loaded`);
     if (counts.empty) parts.push(`${counts.empty} empty`);
     if (counts.notFound) parts.push(`${counts.notFound} not found`);
     if (counts.error) parts.push(`${counts.error} error`);
     if (counts.missing) parts.push(`${counts.missing} pending`);
-    return parts.join(' · ') || `0/${SOURCES.length}`;
+    return parts.join(' · ') || '0 loaded';
   }
 
   function sourceStatusLevel(counts) {
@@ -1949,7 +1949,7 @@
     const td = document.createElement('td');
     td.colSpan = Math.max(1, cells.length);
     const bundleLabel = doclistRunLabel(run, pdfDeadlines);
-    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>All</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
+    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all items in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"><span>Select</span></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
     headerRow.appendChild(td);
     firstRow.parentElement?.insertBefore(headerRow, firstRow);
 
@@ -4730,12 +4730,14 @@
     const applicantAfterLatestEpo = !!(latestEpoDate && latestApplicantDate && latestApplicantDate > latestEpoDate);
 
     const waitingOn = latestEpoIsLossOfRights
-      ? (applicantAfterLatestEpo ? 'EPO' : 'Applicant')
+      ? (applicantAfterLatestEpo ? 'EPO recovery outcome' : 'No active step')
       : (latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant');
 
     const waitingDays = waitingOn === 'EPO' && latestApplicantDate
       ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000)
-      : null;
+      : waitingOn === 'EPO recovery outcome' && latestApplicantDate
+        ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000)
+        : null;
 
     let recoveryOptions = '';
     if (latestEpoIsLossOfRights) {
@@ -4776,6 +4778,8 @@
       latestEpo,
       latestApplicant,
       partialState,
+      latestEpoIsLossOfRights,
+      applicantAfterLatestEpo,
       waitingOn,
       waitingDays,
       recoveryOptions,
@@ -4882,9 +4886,10 @@
   function timelineDocDetail(model, groupLabel = '', pdfDeadlines = {}) {
     const genericLabel = genericDocLabel(model, pdfDeadlines);
     const procedure = normalize(model.procedure || '');
+    const broadGroupLabel = /^(examination|other|formalities \/ other)$/i.test(normalize(groupLabel));
     const bits = [];
     if (genericLabel && genericLabel !== groupLabel) bits.push(genericLabel);
-    if (groupLabel) bits.push(groupLabel);
+    if (groupLabel && !(genericLabel && broadGroupLabel)) bits.push(groupLabel);
     if (!bits.length && procedure) bits.push(procedure);
     if (bits.length > 1) {
       return bits.filter((bit) => !/^(search \/ examination|all documents)$/i.test(bit)).filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx).join(' · ');
@@ -5195,7 +5200,9 @@
     const waitingLevel = m.waitingDays == null ? 'info' : (m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok');
     const waitingSummary = m.waitingOn === 'EPO'
       ? `EPO${m.waitingDays != null ? ` · <span class="epoRP-bdg ${waitingLevel}">${formatDaysHuman(m.waitingDays)} since applicant response</span>` : ''}`
-      : 'Applicant';
+      : m.waitingOn === 'EPO recovery outcome'
+        ? `EPO recovery outcome${m.waitingDays != null ? ` · <span class="epoRP-bdg ${waitingLevel}">${formatDaysHuman(m.waitingDays)} since applicant reply</span>` : ''}`
+        : 'No active step';
 
     return `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : (m.nextDeadlineNote ? `<div>—</div><div class="epoRP-m">${esc(m.nextDeadlineNote)}</div>` : '—')}</div>
@@ -5228,14 +5235,15 @@
     const latestRenewalNote = m.renewal.latest
       ? `Last payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}`
       : (federatedPaidYear ? `Federated register reports payments through Year ${federatedPaidYear}` : 'No renewal payment event cached.');
-    const basisSummary = `${m.renewal.explanatoryBasis} · ${m.renewal.confidence || 'low'} confidence${terminalPosture ? ' · shown as historical fee context because the case appears closed/withdrawn' : ''}`;
+    const confidenceBadge = `<span class="epoRP-bdg info">${esc(`${m.renewal.confidence || 'low'} confidence`)}</span>`;
+    const postureNote = terminalPosture ? 'Shown as historical fee context because the case appears closed/withdrawn.' : '';
 
     return `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
       <div class="epoRP-l">Status</div><div class="epoRP-v">${esc(patentYearStatus)}<div class="epoRP-m">${esc(latestRenewalNote)}</div></div>
       <div class="epoRP-l">Forum</div><div class="epoRP-v">${esc(m.renewal.feeForum || 'Unknown')}</div>
       <div class="epoRP-l">${terminalPosture ? 'Central-fee schedule' : 'Next fee'}</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}${graceText ? `<div class="epoRP-m">${graceText}</div>` : ''}</div>
       ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Grant mention</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
-    </div><div class="epoRP-m">${esc(basisSummary)}</div></div>`;
+    </div><div class="epoRP-m">${esc(m.renewal.explanatoryBasis)}</div><div class="epoRP-m">${confidenceBadge}${postureNote ? ` <span>${esc(postureNote)}</span>` : ''}</div></div>`;
   }
 
   function renderOverviewFederatedCard(m) {
@@ -5849,13 +5857,17 @@
     .epoRP-sb{font-size:11px;color:#64748b;white-space:pre-wrap}
     .epoRP-grp{border:1px solid #e2e8f0;border-radius:10px;padding:0;background:#f8fafc;margin-bottom:7px;overflow:hidden}
     .epoRP-grp[open]{background:#eef6ff;border-color:#bfdbfe;box-shadow:inset 0 0 0 1px #dbeafe}
-    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:6px 4px;cursor:pointer;list-style:none;align-items:center;background:transparent;border:0;border-radius:0;appearance:none;-webkit-appearance:none}
+    .epoRP-grph{display:grid;grid-template-columns:12px 72px 1fr 14px;gap:8px;padding:7px 6px;cursor:pointer;list-style:none;align-items:center;background:transparent;border:0;border-radius:0;appearance:none;-webkit-appearance:none}
+    .epoRP-grph .epoRP-mn{font-weight:800}
+    .epoRP-grph .epoRP-sb{color:#475569}
     .epoRP-grp[open] .epoRP-grph{background:#e2efff;border-bottom:1px solid #c7dcff}
     .epoRP-grph::marker{content:''}
     .epoRP-grph::-webkit-details-marker{display:none}
     .epoRP-garrow{font-size:16px;font-weight:700;color:#334155;justify-self:end;transition:transform .15s ease}
     .epoRP-grp[open] .epoRP-garrow{transform:rotate(90deg)}
     .epoRP-grp .epoRP-grpi{margin-left:12px;border-left:2px dotted #93c5fd;padding:4px 0 2px 10px;background:transparent}
+    .epoRP-grp .epoRP-it.in-group .epoRP-mn{font-weight:600}
+    .epoRP-grp .epoRP-it.in-group .epoRP-sb{opacity:.92}
     .epoRP-grp:not([open]) .epoRP-grpi{display:none}
     .epoRP-today{border-top:2px solid #1d4ed8;margin:10px 0 8px;padding-top:4px;font-size:11px;color:#1e40af;font-weight:700}
     .epoRP-dl{display:flex;flex-direction:column;gap:4px}
@@ -5896,7 +5908,7 @@
     tr.epoRP-docgrp td:first-child{box-shadow:inset 3px 0 0 #3b82f6}
     tr.epoRP-docgrp.open td{background:#dbeafe;border-top-color:#93c5fd;border-bottom-color:#bfdbfe}
     .epoRP-docgrp-head{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
-    .epoRP-docgrp-sel{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#1e3a8a;white-space:nowrap;cursor:pointer;padding:2px 7px;border:1px solid #bfdbfe;border-radius:999px;background:#ffffff}
+    .epoRP-docgrp-sel{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:#1e3a8a;white-space:nowrap;cursor:pointer;padding:2px 6px;border:1px solid #bfdbfe;border-radius:999px;background:#ffffff;opacity:.92}
     .epoRP-docgrp-sel input{margin:0}
     .epoRP-docgrp-btn{all:unset;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;cursor:pointer;font-weight:700;color:#1e3a8a;background:transparent !important;background-image:none !important;border:0 !important;border-radius:0;box-shadow:none !important;padding:0 2px 0 0;appearance:none !important;-webkit-appearance:none !important}
     .epoRP-docgrp-btn::-moz-focus-inner{border:0;padding:0}
