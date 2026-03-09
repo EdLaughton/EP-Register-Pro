@@ -43,6 +43,11 @@ function loadUserscriptHooks() {
     'doclistGroupingPreview',
     'timelineDocGroupingPreview',
     'upcRegistryNoteText',
+    'selectNextDeadline',
+    'activeDeadlineNoteText',
+    'upcUePresentationModel',
+    'timelineSubtitleText',
+    'pdfCategoryBundleLabel',
   ];
 
   const instrumented = source.replace(/\}\)\(\);\s*$/, `window.__EPRP_TEST_HOOKS = { ${hookNames.join(', ')} };})();`);

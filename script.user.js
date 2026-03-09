@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.0.94
+// @version      7.0.95
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.0.94';
+  const VERSION = '7.0.95';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -1795,6 +1795,39 @@
     return String(sameDate?.category || '');
   }
 
+  function pdfCategoryBundleLabel(pdfCategory = '', bundle = '') {
+    const category = normalize(pdfCategory).toLowerCase();
+    const kind = String(bundle || '');
+    if (!category) return '';
+
+    if (/(?:article|art\.?)\s*94\s*\(\s*3\s*\)/i.test(category)) {
+      if (kind === 'Examination communication' || kind === 'Examination') return 'Art. 94(3) communication';
+      if (kind === 'Examination response' || kind === 'Response to search') return 'Response to Art. 94(3) communication';
+    }
+
+    if (/rule\s*116/i.test(category)) {
+      if (kind === 'Examination communication' || kind === 'Examination') return 'Rule 116 summons / communication';
+      if (kind === 'Examination response') return 'Response to Rule 116 summons';
+    }
+
+    if (/rule\s*161\s*\/\s*162/i.test(category)) {
+      if (kind === 'Search package' || kind === 'Examination communication' || kind === 'Examination') return 'Rule 161/162 communication';
+      if (kind === 'Response to search' || kind === 'Examination response') return 'Response to Rule 161/162 communication';
+    }
+
+    if (/rule\s*70\s*\(\s*2\s*\)/i.test(category)) {
+      if (kind === 'Search package') return 'Rule 70(2) / search communication';
+      if (kind === 'Response to search') return 'Response to Rule 70(2) communication';
+    }
+
+    if (/communication response period/.test(category)) {
+      if (kind === 'Examination communication' || kind === 'Examination') return 'Examination communication';
+      if (kind === 'Examination response') return 'Response to examination communication';
+    }
+
+    return '';
+  }
+
   function doclistRunLabel(run, pdfDeadlines = {}) {
     const bundle = String(run?.bundle || run?.groupKind || 'Other');
     const base = doclistBundleLabel(bundle);
@@ -1808,27 +1841,7 @@
       return base;
     }
 
-    if (/(?:article|art\.?)\s*94\s*\(\s*3\s*\)/i.test(pdfCategory)) {
-      if (bundle === 'Examination communication') return 'Art. 94(3) communication';
-      if (bundle === 'Examination response') return 'Response to Art. 94(3) communication';
-    }
-
-    if (/rule\s*116/i.test(pdfCategory)) {
-      if (bundle === 'Examination communication') return 'Rule 116 summons / communication';
-      if (bundle === 'Examination response') return 'Response to Rule 116 summons';
-    }
-
-    if (/rule\s*161\s*\/\s*162/i.test(pdfCategory)) {
-      if (bundle === 'Search package' || bundle === 'Examination communication') return 'Rule 161/162 communication';
-      if (bundle === 'Response to search' || bundle === 'Examination response') return 'Response to Rule 161/162 communication';
-    }
-
-    if (/rule\s*70\s*\(\s*2\s*\)/i.test(pdfCategory)) {
-      if (bundle === 'Search package') return 'Rule 70(2) / search communication';
-      if (bundle === 'Response to search') return 'Response to Rule 70(2) communication';
-    }
-
-    return base;
+    return pdfCategoryBundleLabel(pdfCategory, bundle) || base;
   }
 
   function doclistGroupingPreview(doc, pdfDeadlines = {}) {
@@ -4095,6 +4108,10 @@
       .filter((h) => h.date);
   }
 
+  function isTerminalEpoOutcomeText(textValue = '') {
+    return /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|application refused|application rejected|revoked|revocation|not maintained|rights restored refused|re-establishment.*rejected/.test(String(textValue || '').toLowerCase());
+  }
+
   function buildDeadlineComputationContext(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
     const out = [];
     const records = buildDeadlineRecords(docs, eventHistory, legal);
@@ -4104,11 +4121,6 @@
     const isDivisional = /divisional/.test(appType);
     const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
     const filingDate = parseDateString(main.filingDate);
-
-    const push = (entry) => {
-      if (!entry?.date || Number.isNaN(entry.date.getTime())) return;
-      out.push(entry);
-    };
 
     const latestRecord = (regex) => records.find((r) => regex.test(`${r.title || ''} ${r.detail || ''}`));
     const hasPdfHint = (regex) => pdfHints.some((h) => regex.test(String(h.label || '')));
@@ -4126,6 +4138,36 @@
 
     const hasFeeSignalAfter = (anchorDate, regex = /payment|fee paid|paid|examination fee|designation fee|grant and publishing fee|grant and publication fee|renewal fee/i) =>
       hasAfter(anchorDate, (r) => regex.test(`${r.title} ${r.detail}`));
+
+    const terminalEpoOutcomeAfter = (anchorDate, dueDate = null) => {
+      const anchorTs = anchorDate?.getTime?.() || 0;
+      const dueTs = dueDate?.getTime?.() || 0;
+      let match = null;
+      for (const r of [...records].sort((a, b) => (parseDateString(a.dateStr)?.getTime?.() || 0) - (parseDateString(b.dateStr)?.getTime?.() || 0))) {
+        const dt = parseDateString(r.dateStr);
+        if (!dt || r.actor !== 'EPO') continue;
+        if (anchorTs && dt.getTime() <= anchorTs) continue;
+        if (dueTs && dt.getTime() <= dueTs) continue;
+        if (!isTerminalEpoOutcomeText(`${r.title} ${r.detail}`)) continue;
+        match = { dateStr: r.dateStr, title: r.title || '', detail: r.detail || '' };
+        break;
+      }
+      return match;
+    };
+
+    const push = (entry) => {
+      if (!entry?.date || Number.isNaN(entry.date.getTime())) return;
+      const dueDate = entry.date;
+      const anchorDate = parseDateString(entry.sourceDate || '') || dueDate;
+      const terminal = terminalEpoOutcomeAfter(anchorDate, dueDate);
+      const next = { ...entry };
+      if (terminal && !next.resolved) {
+        next.superseded = true;
+        next.supersededBy = terminal;
+        next.method = normalize([next.method || '', `superseded by later EPO outcome on ${terminal.dateStr}`].filter(Boolean).join(' · '));
+      }
+      out.push(next);
+    };
 
     const resolveHintByActivity = (label, anchorDate) => {
       const l = String(label || '').toLowerCase();
@@ -4193,6 +4235,7 @@
       hasAfter,
       hasApplicantResponseAfter,
       hasFeeSignalAfter,
+      terminalEpoOutcomeAfter,
       resolveHintByActivity,
       addMonthsDeadline,
     };
@@ -4502,6 +4545,55 @@
     };
   }
 
+  function selectNextDeadline(deadlines = [], latestEpoIsLossOfRights = false, now = new Date()) {
+    const actionable = (deadlines || [])
+      .filter((d) => !d.reference && !d.resolved && !d.superseded)
+      .sort((a, b) => a.date - b.date);
+
+    if (!actionable.length) return null;
+    const upcoming = actionable.find((d) => d.date > now);
+    if (upcoming) return upcoming;
+    if (latestEpoIsLossOfRights) return null;
+    return actionable[0] || null;
+  }
+
+  function activeDeadlineNoteText(deadlines = [], latestEpoIsLossOfRights = false) {
+    const actionable = (deadlines || []).filter((d) => !d.reference && !d.resolved && !d.superseded);
+    if (actionable.length && latestEpoIsLossOfRights) {
+      return 'No active procedural deadline detected on the current withdrawn/closed posture; remaining clocks are historical or low-confidence.';
+    }
+    if (actionable.length) return '';
+    if ((deadlines || []).some((d) => d.superseded) && latestEpoIsLossOfRights) {
+      return 'No active procedural deadline detected; later EPO loss-of-rights events superseded earlier response periods.';
+    }
+    if ((deadlines || []).some((d) => d.resolved)) {
+      return 'No active procedural deadline detected; earlier response periods appear already answered.';
+    }
+    return latestEpoIsLossOfRights ? 'No active procedural deadline detected on the current withdrawn/closed posture.' : '';
+  }
+
+  function upcUePresentationModel(ue = {}, upcRegistry = null, federated = {}) {
+    const ueStatusRaw = normalize(ue.ueStatus || ue.statusRaw || '');
+    const federatedStatus = normalize(federated.status || '');
+    const hasUpCoverage = !!normalize(federated.upMemberStates || '');
+    const hasUnitaryEffectRecord = /unitary effect registered|request for unitary effect|unitary patent/i.test(ueStatusRaw);
+    const mirrorsFederatedStatus = ueStatusRaw && federatedStatus && ueStatusRaw === federatedStatus;
+    const unitaryEffect = hasUnitaryEffectRecord
+      ? ueStatusRaw
+      : mirrorsFederatedStatus && !hasUpCoverage
+        ? 'No unitary effect record'
+        : (ueStatusRaw || 'Unknown');
+    const upcRegistryStatus = upcRegistry
+      ? (upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found'))
+      : (ue.upcOptOut || 'Unknown');
+
+    return {
+      unitaryEffect,
+      upcRegistryStatus,
+      note: upcRegistryNoteText(upcRegistry, ue),
+    };
+  }
+
   function overviewCacheKey(caseNo, opts, c) {
     const optPart = [
       opts.showRenewals,
@@ -4574,11 +4666,8 @@
         : 'Loss-of-rights posture detected. Check further processing first; if unavailable, consider Rule 136 re-establishment.';
     }
 
-    const actionableDeadlines = deadlines.filter((d) => !d.reference && !d.resolved);
-    const nextDeadline = actionableDeadlines.find((d) => d.date > new Date())
-      || actionableDeadlines[0]
-      || null;
-
+    const nextDeadline = selectNextDeadline(deadlines, latestEpoIsLossOfRights);
+    const nextDeadlineNote = activeDeadlineNoteText(deadlines, latestEpoIsLossOfRights);
     const daysToDeadline = nextDeadline ? Math.ceil((nextDeadline.date.getTime() - Date.now()) / 86400000) : null;
 
     const federatedStates = Array.isArray(federated.states) ? federated.states : [];
@@ -4612,6 +4701,7 @@
       waitingDays,
       recoveryOptions,
       nextDeadline,
+      nextDeadlineNote,
       daysToDeadline,
       publications,
       deadlines: deadlines.sort((a, b) => a.date - b.date),
@@ -4630,11 +4720,7 @@
         entries: citationEntries,
         phases: citationPhases,
       },
-      upcUe: {
-        ueStatus: ue.ueStatus || 'Unknown',
-        upcOptOut: upcRegistry ? (upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')) : (ue.upcOptOut || 'Unknown'),
-        note: upcRegistryNoteText(upcRegistry, ue),
-      },
+      upcUe: upcUePresentationModel(ue, upcRegistry, federated),
       docs,
     };
 
@@ -4687,6 +4773,38 @@
     return `${caseNo}|${optPart}|${srcPart}`;
   }
 
+  function docModelPdfCategory(model, pdfDeadlines = {}) {
+    const scanned = Array.isArray(pdfDeadlines?.scanned) ? pdfDeadlines.scanned : [];
+    if (!scanned.length || !model) return '';
+    const modelDate = normalizeDateString(model.dateStr || '');
+    const modelTitle = normalize(model.title || '').toLowerCase();
+    const exact = scanned.find((entry) => normalizeDateString(entry?.dateStr || '') === modelDate && normalize(entry?.title || '').toLowerCase() === modelTitle && normalize(entry?.category || ''));
+    if (exact?.category) return String(exact.category);
+    const sameDate = scanned.find((entry) => normalizeDateString(entry?.dateStr || '') === modelDate && normalize(entry?.category || ''));
+    return String(sameDate?.category || '');
+  }
+
+  function timelineDocDetail(model, groupLabel = '', pdfDeadlines = {}) {
+    const pdfLabel = pdfCategoryBundleLabel(docModelPdfCategory(model, pdfDeadlines), model.groupKind || model.bundle || '');
+    const procedure = normalize(model.procedure || '');
+    const bits = [];
+    if (pdfLabel && pdfLabel !== groupLabel) bits.push(pdfLabel);
+    if (groupLabel) bits.push(groupLabel);
+    if (!bits.length && procedure) bits.push(procedure);
+    if (bits.length > 1) {
+      return bits.filter((bit) => !/^(search \/ examination|all documents)$/i.test(bit)).filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx).join(' · ');
+    }
+    return bits[0] || procedure || 'All documents';
+  }
+
+  function timelineSubtitleText(item = {}) {
+    const detailBits = String(item.detail || '').split(/\s*·\s*/).map((bit) => normalize(bit)).filter(Boolean);
+    const bits = [...detailBits, normalize(item.source || ''), normalize(item.actor || '')]
+      .filter(Boolean)
+      .filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx);
+    return bits.join(' · ');
+  }
+
   function timelineDocItemsFromDocs(caseNo, docs = [], pdfDeadlines = {}) {
     const groupableBundles = new Set(['Search package', 'Grant communication', 'Grant response', 'Examination communication', 'Examination response', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
     const runs = doclistRuns(normalizeDoclistGroupKinds(normalizeGrantPackageRowModels(doclistDocModels(docs))));
@@ -4694,7 +4812,7 @@
 
     const timelineItemFromDocModel = (model, groupLabel = '') => {
       const actor = model.actor || 'Other';
-      const detail = [model.procedure || 'All documents', groupLabel].filter(Boolean).join(' · ');
+      const detail = timelineDocDetail(model, groupLabel, pdfDeadlines);
       return {
         type: 'item',
         dateStr: model.dateStr,
@@ -4709,7 +4827,7 @@
 
     for (const run of runs) {
       const groupLabel = doclistRunLabel(run, pdfDeadlines);
-      const runItems = (run.models || []).map((model) => timelineItemFromDocModel(model));
+      const runItems = (run.models || []).map((model) => timelineItemFromDocModel(model, groupLabel));
       const actorSet = [...new Set(runItems.map((item) => item.actor).filter(Boolean))].filter((actor) => actor !== 'Other');
       const actor = actorSet.length === 1 ? actorSet[0] : (actorSet.length > 1 ? 'Mixed' : (runItems[0]?.actor || 'Other'));
       const runLevel = topLevel(runItems.map((item) => item.level));
@@ -4717,7 +4835,10 @@
 
       if (!shouldGroup) {
         runItems.forEach((item) => {
-          item.detail = [item.detail, shouldGroup ? '' : (groupableBundles.has(run.bundle) ? groupLabel : '')].filter(Boolean).join(' · ');
+          item.detail = [item.detail, groupableBundles.has(run.bundle) ? groupLabel : '']
+            .filter(Boolean)
+            .filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx)
+            .join(' · ');
           out.push(item);
         });
         continue;
@@ -4899,7 +5020,7 @@
   function renderOverviewDetailedDeadlines(m) {
     const detailedDeadlines = m.deadlines.filter((d) => {
       if (d.reference && /20-year term from filing/i.test(String(d.label || ''))) return false;
-      if (d.resolved) return false;
+      if (d.resolved || d.superseded) return false;
       if (!m.nextDeadline) return true;
       const sameLabel = d.label === m.nextDeadline.label;
       const sameDate = formatDate(d.date) === formatDate(m.nextDeadline.date);
@@ -4965,7 +5086,7 @@
       : 'Applicant';
 
     return `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
-      <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : '—'}</div>
+      <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : (m.nextDeadlineNote ? `<div>—</div><div class="epoRP-m">${esc(m.nextDeadlineNote)}</div>` : '—')}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
       ${m.recoveryOptions ? `<div class="epoRP-l">Recovery</div><div class="epoRP-v"><div class="epoRP-m">${esc(m.recoveryOptions)}</div></div>` : ''}
       <div class="epoRP-l">Waiting on</div><div class="epoRP-v">${waitingSummary}</div>
@@ -5050,15 +5171,15 @@
     const notableStates = Array.isArray(m.federated?.notableStates) ? m.federated.notableStates : [];
     const noteParts = [];
     if (m.upcUe.note) noteParts.push(m.upcUe.note);
-    if (/Unitary effect registered/i.test(m.upcUe.ueStatus)) noteParts.push('Opt-out is generally not relevant once unitary effect is registered.');
+    if (/Unitary effect registered/i.test(m.upcUe.unitaryEffect)) noteParts.push('Opt-out is generally not relevant once unitary effect is registered.');
     if (trackedStates) noteParts.push(`Federated register tracks ${trackedStates} national/UP record${trackedStates === 1 ? '' : 's'}${m.federated?.recordUpdated ? ` (updated ${m.federated.recordUpdated})` : ''}.`);
     if (notableStates.length) noteParts.push(`Notable states: ${notableStates.map((s) => `${s.state}${s.notInForceSince ? ` (not in force since ${s.notInForceSince})` : ''}`).join(', ')}`);
 
     return `<div class="epoRP-c"><h4>UPC / UE</h4><div class="epoRP-g">
-      <div class="epoRP-l">Unitary effect</div><div class="epoRP-v">${esc(m.upcUe.ueStatus)}</div>
-      <div class="epoRP-l">Opt-out</div><div class="epoRP-v">${esc(m.upcUe.upcOptOut)}</div>
+      <div class="epoRP-l">Unitary effect record</div><div class="epoRP-v">${esc(m.upcUe.unitaryEffect)}</div>
+      <div class="epoRP-l">UPC registry</div><div class="epoRP-v">${esc(m.upcUe.upcRegistryStatus)}</div>
       <div class="epoRP-l">UP coverage</div><div class="epoRP-v">${upStates ? `${esc(upStates)} <span class="epoRP-bdg ok">${upCount} states</span>` : '—'}</div>
-      <div class="epoRP-l">National status</div><div class="epoRP-v">${esc(m.federated?.status || '—')}</div>
+      <div class="epoRP-l">Federated status</div><div class="epoRP-v">${esc(m.federated?.status || '—')}</div>
       <div class="epoRP-l">Renewals paid to</div><div class="epoRP-v">${esc(m.federated?.renewalFeesPaidUntil || '—')}</div>
       <div class="epoRP-l">Invalidation</div><div class="epoRP-v">${esc(m.federated?.invalidationDate || '—')}</div>
     </div><div class="epoRP-m">${esc(noteParts.filter(Boolean).join(' '))}</div></div>`;
@@ -5103,7 +5224,7 @@
       <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
       <div>
         <div class="epoRP-mn">${item.url ? `<a class="epoRP-a" href="${esc(item.url)}">${esc(item.title)}</a>` : esc(item.title)}</div>
-        <div class="epoRP-sb">${esc([item.detail, item.source, item.actor].filter(Boolean).join(' · '))}</div>
+        <div class="epoRP-sb">${esc(timelineSubtitleText(item))}</div>
       </div>
     </div>`;
   }
@@ -5140,7 +5261,7 @@
             <div class="epoRP-d">${esc(item.dateStr || '—')}</div>
             <div>
               <div class="epoRP-mn">${esc(item.title)} (${(item.items || []).length})</div>
-              <div class="epoRP-sb">Grouped items · ${esc(item.source || 'Documents')} · ${esc(item.actor || 'Mixed')}</div>
+              <div class="epoRP-sb">${esc([item.source || 'Documents', item.actor || 'Mixed'].filter(Boolean).join(' · '))}</div>
             </div>
             <div class="epoRP-garrow">▸</div>
           </summary>

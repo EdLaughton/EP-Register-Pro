@@ -113,6 +113,18 @@ assert(syntheticArt94TimelinePreview.some((g) => g.title === 'Art. 94(3) communi
 
 assert.strictEqual(hooks.upcRegistryNoteText({ status: 'No registry match found', patentNumbers: ['EP3816364'] }), 'Registry checked for EP3816364.', 'UPC overview note should mention checked EP publication candidates instead of rendering undefined');
 assert.strictEqual(hooks.upcRegistryNoteText(null, { ueStatus: 'The application is deemed to be withdrawn' }), 'Taken from UP/legal data where available.', 'UPC overview note should retain the UP/legal fallback when no UPC registry result is cached');
+assert.strictEqual(hooks.upcUePresentationModel({ ueStatus: 'The application is deemed to be withdrawn' }, { status: 'No registry match found', patentNumbers: ['EP3816364'] }, { status: 'The application is deemed to be withdrawn' }).unitaryEffect, 'No unitary effect record', 'UPC/UE presentation should not parrot overall withdrawn status as if it were a unitary-effect record');
+assert.strictEqual(hooks.upcUePresentationModel({ ueStatus: 'The application is deemed to be withdrawn' }, { status: 'No registry match found', patentNumbers: ['EP3816364'] }, { status: 'The application is deemed to be withdrawn' }).upcRegistryStatus, 'No registry match found', 'UPC/UE presentation should surface explicit UPC registry status separately from unitary-effect wording');
+assert.strictEqual(hooks.pdfCategoryBundleLabel('Art. 94(3) response period', 'Examination communication'), 'Art. 94(3) communication', 'PDF-derived categories should be able to upgrade generic examination communication labels');
+assert.strictEqual(hooks.timelineSubtitleText({ detail: 'Event history', source: 'Event history', actor: 'EPO' }), 'Event history · EPO', 'Timeline subtitle rendering should dedupe repeated source/detail labels');
+
+const supersededDeadline = hooks.selectNextDeadline([
+  { label: 'R71(3) response period', date: new Date('2024-02-10T00:00:00Z'), resolved: false, superseded: true },
+], true, new Date('2026-01-01T00:00:00Z'));
+assert.strictEqual(supersededDeadline, null, 'Closed/loss-of-rights cases should not keep superseded overdue periods as the active next deadline');
+assert.strictEqual(hooks.activeDeadlineNoteText([
+  { label: 'R71(3) response period', date: new Date('2024-02-10T00:00:00Z'), resolved: false, superseded: true },
+], true), 'No active procedural deadline detected; later EPO loss-of-rights events superseded earlier response periods.', 'Actionable status should explain why no active deadline is shown after terminal EPO events');
 
 const pdfR71 = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'r71_communication.txt'), {
   docDateStr: '10.01.2026',

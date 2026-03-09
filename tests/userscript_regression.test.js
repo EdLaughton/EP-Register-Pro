@@ -216,7 +216,7 @@ has(/const\s+filingSummary\s*=\s*normalize\(\[/, 'Overview should build a conden
 hasText("termReferenceDate ? `20-year term ${termReferenceDate}` : ''", 'Overview filing summary should include the 20-year term reference inline without extra years-remaining noise');
 notHas(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Overview should not render a separate 20-year term row after condensing filing metadata');
 has(/if \(d\.reference && \/20-year term from filing\/i\.test\(String\(d\.label \|\| ''\)\)\) return false;/, 'Detailed clocks should avoid duplicating 20-year term reference row already shown in top summary');
-has(/if \(d\.resolved\) return false;/, 'Detailed clocks should hide deadlines already resolved by subsequent activity');
+has(/if \(d\.resolved \|\| d\.superseded\) return false;/, 'Detailed clocks should hide deadlines already resolved or superseded by later activity/outcomes');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
 hasText('Loss-of-rights posture detected.', 'Actionable status should expose concise recovery guidance for loss-of-rights postures');
@@ -236,6 +236,7 @@ hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use expli
 hasText('Response to intention to grant', 'Doclist grouping should expose a dedicated label for applicant responses to R71(3) packets');
 hasText('Transfer / recordal filings', 'Doclist/timeline grouping should expose a more specific register-admin label for transfer/recordal packets');
 hasText('Art. 94(3) communication', 'Timeline/doc labels should be able to upgrade examination packet names from OCR/PDF-derived Art. 94(3) evidence');
+hasText('No unitary effect record', 'UPC / UE presentation should avoid echoing overall withdrawn status as if it were a unitary-effect record');
 hasText('Examination communication', 'Doclist grouping should expose a dedicated label for Art. 94(3)/examining-division communication packets');
 hasText('Response to examination communication', 'Doclist grouping should expose a dedicated label for applicant responses to examining-division communications');
 hasText('tr.epoRP-docgrp td:first-child{box-shadow:inset 3px 0 0 #3b82f6}', 'Doclist group header should show a strong blue left guide line');
@@ -248,7 +249,10 @@ has(/const\s+isLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed t
 has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute a structural signature for change detection');
 has(/runtime\.doclistGroupSigByCase\[caseNo\]\s*===\s*signature/, 'Doclist grouping should skip full regroup when table signature is unchanged');
 hasText('items.push(...timelineDocItemsFromDocs(caseNo, docs, pdfDeadlines));', 'Timeline should reuse the shared doclist packet-grouping model instead of keeping a stale parallel bundling path');
-hasText('note: upcRegistryNoteText(upcRegistry, ue),', 'Overview UPC note should be derived through the centralized candidate-aware formatter');
+hasText('const nextDeadline = selectNextDeadline(deadlines, latestEpoIsLossOfRights);', 'Overview should suppress stale overdue clocks on closed/loss-of-rights postures via centralized next-deadline selection');
+hasText('const nextDeadlineNote = activeDeadlineNoteText(deadlines, latestEpoIsLossOfRights);', 'Overview should surface explanatory text when no active deadline remains after supersession');
+hasText('upcUe: upcUePresentationModel(ue, upcRegistry, federated),', 'Overview should derive UPC / UE wording through the centralized presentation model');
+hasText('timelineSubtitleText(item)', 'Timeline item rendering should dedupe subtitle labels through the centralized formatter');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
 hasText("if (url.searchParams.has('documentId')) return false;", 'Case-page detection should skip document-viewer URLs');

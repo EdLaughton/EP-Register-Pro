@@ -80,6 +80,10 @@ has(/function\s+doclistDateBlocks\s*\(/, 'Doclist grouping should normalize same
 has(/function\s+doclistDocModels\s*\(/, 'Timeline/doclist grouping should share parsed document-entry normalization instead of keeping separate bundle heuristics');
 has(/function\s+doclistRunLabel\s*\(/, 'Doclist/timeline grouping should centralize packet label naming, including OCR-derived label upgrades');
 has(/function\s+timelineDocItemsFromDocs\s*\(/, 'Timeline should be built from the shared doclist packet-grouping model rather than a separate bundle combiner');
+has(/function\s+timelineSubtitleText\s*\(/, 'Timeline rendering should centralize subtitle deduplication instead of concatenating noisy repeated labels inline');
+has(/function\s+selectNextDeadline\s*\(/, 'Overview should centralize active-deadline selection so spent/superseded clocks can be suppressed');
+has(/function\s+activeDeadlineNoteText\s*\(/, 'Overview should centralize explanatory text when no active deadline remains on a closed posture');
+has(/function\s+upcUePresentationModel\s*\(/, 'UPC / UE overview should centralize non-unitary wording instead of repeating federated withdrawn status in the UE field');
 has(/function\s+upcRegistryNoteText\s*\(/, 'UPC overview note text should be centralized so empty registry results do not render undefined patent numbers');
 has(/function\s+normalizeDoclistGroupKinds\s*\(/, 'Doclist grouping should assign cycle-aware group kinds before rendering DOM headers');
 has(/function\s+attachDoclistGroupRun\s*\(/, 'Doclist group DOM wiring should be isolated from group discovery');
