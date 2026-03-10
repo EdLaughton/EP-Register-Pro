@@ -158,8 +158,27 @@ assert.strictEqual(hooks.upcUePresentationModel({ ueStatus: 'The application is 
 assert.strictEqual(hooks.pdfCategoryBundleLabel('Art. 94(3) response period', 'Examination communication'), 'Art. 94(3) communication', 'PDF-derived categories should be able to upgrade generic examination communication labels');
 assert.strictEqual(hooks.timelineSubtitleText({ detail: 'published on 17.07.2024 [2024/29]\nEvent history', source: 'Event history', actor: 'EPO' }), 'published on 17.07.2024 [2024/29] · Event history · EPO', 'Timeline subtitle rendering should dedupe repeated source/detail labels even when the duplicate source tag arrives on a new line');
 assert.strictEqual(hooks.timelineSubtitleText({ detail: 'Formalities / other', source: 'Documents', actor: 'Other' }), 'Formalities / other · Documents', 'Timeline subtitle rendering should omit the useless actor=Other tail for generic document items');
-assert.strictEqual(hooks.genericDocLabel({ title: 'Application deemed to be withdrawn ( translations of claims/payment missing)', bundle: 'Examination' }), 'Loss-of-rights communication', 'Generic document labels should upgrade terminal examination-row wording beyond the raw Examination bucket');
+assert.strictEqual(hooks.genericDocLabel({ title: 'Application deemed to be withdrawn ( translations of claims/payment missing)', bundle: 'Examination' }), 'Grant-formalities failure', 'Generic document labels should distinguish grant-formality failures from broader loss-of-rights wording');
+assert.strictEqual(hooks.genericDocLabel({ title: 'Application deemed to be withdrawn (non-entry into European phase)', bundle: 'Examination' }), 'Euro-PCT non-entry failure', 'Generic document labels should expose Euro-PCT non-entry failures directly');
+assert.strictEqual(hooks.genericDocLabel({ title: 'Decision to allow further processing', bundle: 'Other' }), 'Further processing', 'Generic document labels should promote further-processing decisions out of the raw Other bucket');
 assert.strictEqual(hooks.genericDocLabel({ title: 'Communication to designated inventor', bundle: 'Other' }), 'Inventor notification', 'Generic document labels should upgrade common filing-formality rows beyond the raw Other bucket');
+assert.strictEqual(hooks.docPacketExplanation('Extended European search package'), 'European search packet including an extended-ESR annex.', 'Packet explanations should give the user a clearer explanation of extended search bundles');
+assert.strictEqual(hooks.familyRoleSummary({ applicationType: 'Divisional', parentCase: 'EP3440098', divisionalChildren: ['EP25215625'] }).label, 'Divisional child with descendants', 'Family-role summaries should distinguish divisional children that already have their own descendants');
+const conflictMain = hooks.parseMain(loadFixtureDocument(['cases', 'EP23182542', 'main.html'], 'https://register.epo.org/application?number=EP23182542&tab=main&lng=en'), 'EP23182542');
+const conflictDoclist = hooks.parseDoclist(loadFixtureDocument(['cases', 'EP23182542', 'doclist.html'], 'https://register.epo.org/application?number=EP23182542&tab=doclist&lng=en'));
+const conflictEvent = hooks.parseEventHistory(loadFixtureDocument(['cases', 'EP23182542', 'event.html'], 'https://register.epo.org/application?number=EP23182542&tab=event&lng=en'), 'EP23182542');
+const conflictLegal = hooks.parseLegal(loadFixtureDocument(['cases', 'EP23182542', 'legal.html'], 'https://register.epo.org/application?number=EP23182542&tab=legal&lng=en'), 'EP23182542');
+const conflictPosture = hooks.proceduralPostureModel(conflictMain, conflictDoclist.docs, conflictEvent, conflictLegal);
+assert.strictEqual(conflictPosture.label, 'Granted', 'Procedural posture should keep the current granted state after further processing cures an earlier adverse event');
+assert.strictEqual(conflictPosture.recoveredBeforeGrant, true, 'Procedural posture should detect that the case recovered from an adverse posture before grant');
+assert(/Recovered from earlier grant-formalities failure via further processing before grant\./.test(conflictPosture.note), 'Procedural posture note should explain the recovery path in plain language for conflict-history cases');
+const recoveryMain = hooks.parseMain(loadFixtureDocument(['cases', 'EP23758527', 'main.html'], 'https://register.epo.org/application?number=EP23758527&tab=main&lng=en'), 'EP23758527');
+const recoveryDoclist = hooks.parseDoclist(loadFixtureDocument(['cases', 'EP23758527', 'doclist.html'], 'https://register.epo.org/application?number=EP23758527&tab=doclist&lng=en'));
+const recoveryEvent = hooks.parseEventHistory(loadFixtureDocument(['cases', 'EP23758527', 'event.html'], 'https://register.epo.org/application?number=EP23758527&tab=event&lng=en'), 'EP23758527');
+const recoveryLegal = hooks.parseLegal(loadFixtureDocument(['cases', 'EP23758527', 'legal.html'], 'https://register.epo.org/application?number=EP23758527&tab=legal&lng=en'), 'EP23758527');
+const recoveryPosture = hooks.proceduralPostureModel(recoveryMain, recoveryDoclist.docs, recoveryEvent, recoveryLegal);
+assert.strictEqual(recoveryPosture.recovered, true, 'Procedural posture should detect recovery from deemed-withdrawn non-reply cases after further processing');
+assert(/Recovered from earlier no reply to the written opinion via further processing\./.test(recoveryPosture.note), 'Procedural posture note should explain the recovery path for revived written-opinion loss cases');
 const grantTextClassification = hooks.classifyDocument('Text intended for grant (version for approval)', 'Search / examination');
 assert.strictEqual(grantTextClassification.bundle, 'Grant package', 'Grant-text communication rows should remain in the grant-package bucket');
 assert.strictEqual(grantTextClassification.level, 'warn', 'Grant-text communication rows should retain the expected grant-package severity');
@@ -179,7 +198,7 @@ const supersededDeadline = hooks.selectNextDeadline([
 assert.strictEqual(supersededDeadline, null, 'Closed/loss-of-rights cases should not keep superseded overdue periods as the active next deadline');
 assert.strictEqual(hooks.activeDeadlineNoteText([
   { label: 'R71(3) response period', date: new Date('2024-02-10T00:00:00Z'), resolved: false, superseded: true },
-], true), 'No active procedural deadline detected; later EPO loss-of-rights events superseded earlier response periods.', 'Actionable status should explain why no active deadline is shown after terminal EPO events');
+], true), 'No active procedural deadline detected; later loss-of-rights events superseded earlier response periods.', 'Actionable status should explain why no active deadline is shown after terminal EPO events');
 
 const pdfR71 = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'r71_communication.txt'), {
   docDateStr: '10.01.2026',

@@ -126,6 +126,7 @@ function caseDoc(caseNo, tab) {
 
   assert.strictEqual(main.applicationType, 'Divisional', 'Grant-intended control should remain classified as divisional');
   assert.strictEqual(main.parentCase, 'EP3440098', 'Grant-intended control should expose its parent case number');
+  assert.strictEqual(main.statusSimple, 'Grant intended (R71(3))', 'Grant-intended control should condense the raw R71 status into the clearer grant-intended badge text');
   assert(/Grant of patent is intended/i.test(main.statusRaw || ''), 'Grant-intended control should preserve the R71/grant-intended status text');
   assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '07.11.2025' && g.size === 6), 'Grant-intended control should keep the full R71 packet together under the intention-to-grant label');
   assert(preview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '09.03.2026' && g.size === 5), 'Grant-intended control should keep the post-R71 translations/receipt bundle together as the response-to-grant packet');
@@ -147,6 +148,8 @@ function caseDoc(caseNo, tab) {
 
   assert.strictEqual(main.applicationType, 'Divisional', 'Conflict-history control should remain classified as divisional');
   assert.strictEqual(main.parentCase, 'EP4070092', 'Conflict-history control should expose its parent case number');
+  assert.strictEqual(Array.from(main.divisionalChildren || []).join(','), 'EP25215625', 'Conflict-history control should keep downstream divisional links to application numbers only, not publication numbers');
+  assert.strictEqual(main.statusSimple, 'Granted', 'Conflict-history control should condense the final top-level status to Granted despite earlier loss-of-rights detours');
   assert(/The patent has been granted/i.test(main.statusRaw || ''), 'Conflict-history control should preserve the granted top-level status after further processing');
   assert(doclist.docs.some((d) => /Decision to grant a European patent/i.test(d.title)), 'Conflict-history control should keep the grant-decision document in the doclist parse');
   assert(doclist.docs.some((d) => /Application deemed to be withdrawn \( translations of claims\/payment missing\)/i.test(d.title)), 'Conflict-history control should keep the post-R71 deemed-withdrawn document in the doclist parse');
@@ -173,9 +176,10 @@ function caseDoc(caseNo, tab) {
 
   assert.strictEqual(main.applicationType, 'Divisional', 'Extended-ESR control should remain classified as divisional');
   assert.strictEqual(main.parentCase, 'EP4168798', 'Extended-ESR control should expose its parent case number');
+  assert.strictEqual(main.statusSimple, 'Published', 'Extended-ESR control should keep a simple published/search-stage badge');
   assert(/The application has been published/i.test(main.statusRaw || ''), 'Extended-ESR control should preserve its published/search-stage status');
   assert(doclist.docs.some((d) => /Document annexed to the Extended European Search Report/i.test(d.title)), 'Extended-ESR control should retain the extended-ESR annex document in the doclist parse');
-  assert(preview.some((g) => g.dateStr === '19.02.2026' && g.size === 5 && g.titles.some((title) => /Extended European Search Report/i.test(title))), 'Extended-ESR control should keep the full search packet together even when an extended-search annex is present');
+  assert(preview.some((g) => g.label === 'Extended European search package' && g.dateStr === '19.02.2026' && g.size === 5 && g.titles.some((title) => /Extended European Search Report/i.test(title))), 'Extended-ESR control should keep the full search packet together under an extended-search label when an annex is present');
   assert(eventHistory.events.some((e) => /Publication of search report/i.test(e.title)), 'Extended-ESR control should retain the search-report publication event');
   assert(legal.renewals.some((r) => r.year === 5), 'Extended-ESR control should retain renewal-fee history already visible during early search-stage prosecution');
   assert(family.publications.some((p) => p.no === 'EP4168798' && p.kind === 'B1'), 'Extended-ESR control should retain the parent-family grant publication reference');
@@ -250,8 +254,10 @@ function caseDoc(caseNo, tab) {
 
   assert.strictEqual(main.applicationType, 'Divisional', 'Reason-coded withdrawn control should remain classified as divisional');
   assert.strictEqual(main.parentCase, 'EP3800978', 'Reason-coded withdrawn control should expose its parent case number');
+  assert.strictEqual(main.statusSimple, 'Deemed withdrawn', 'Reason-coded withdrawn control should use the sharper deemed-withdrawn badge instead of a generic withdrawn/closed label');
   assert(/deemed to be withdrawn/i.test(main.statusRaw || ''), 'Reason-coded withdrawn control should preserve deemed-withdrawn wording in the main status');
   assert(doclist.docs.some((d) => /non-payment of examination fee\/designation fee\/non-reply to Written Opinion/i.test(d.title)), 'Reason-coded withdrawn control should retain the explicit non-payment/non-reply loss document');
+  assert(preview.some((g) => g.label === 'Fees / written-opinion failure' && g.dateStr === '05.01.2023' && g.size === 1), 'Reason-coded withdrawn control should promote the reason-coded deemed-withdrawn singleton out of the generic Examination label');
   assert(preview.some((g) => g.label === 'European search package' && g.dateStr === '20.04.2022' && g.size === 4), 'Reason-coded withdrawn control should keep the ESR packet together under the European-search label');
   assert(eventHistory.events.some((e) => /Application deemed to be withdrawn/i.test(e.title)), 'Reason-coded withdrawn control should retain the deemed-withdrawn event-history entry');
   assert(legal.renewals.some((r) => r.year === 4), 'Reason-coded withdrawn control should retain renewal-fee history through year 4');

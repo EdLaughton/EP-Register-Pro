@@ -228,6 +228,9 @@ has(/const\s+detailedDeadlines\s*=\s*m\.deadlines\.filter\(/, 'Overview should c
 hasText('Detailed clocks', 'Overview should embed detailed/reference clocks inside actionable status');
 notHas(/Deadlines & clocks \(detailed\)/, 'Overview should no longer render a separate Deadlines & clocks section');
 hasText('Type / stage', 'Overview should combine type and stage in a single summary row');
+hasText('Family role', 'Overview should surface explicit family/divisional role in the top summary card');
+hasText('Current posture', 'Actionable status should surface the current controlling procedural posture explicitly');
+has(/function\s+proceduralPostureModel\s*\(/, 'Overview/timeline posture narrative should be derived from a dedicated procedural-posture helper');
 has(/const\s+termReference\s*=\s*m\.deadlines\.find\(/, 'Overview should compute 20-year term reference from deadline model');
 has(/const\s+filingSummary\s*=\s*normalize\(\[/, 'Overview should build a condensed filing summary line');
 hasText("termReferenceDate ? `20-year term ${termReferenceDate}` : ''", 'Overview filing summary should include the 20-year term reference inline without extra years-remaining noise');
@@ -236,9 +239,9 @@ has(/if \(d\.reference && \/20-year term from filing\/i\.test\(String\(d\.label 
 has(/if \(d\.resolved \|\| d\.superseded\) return false;/, 'Detailed clocks should hide deadlines already resolved or superseded by later activity/outcomes');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
-hasText('Loss-of-rights posture detected.', 'Actionable status should expose concise recovery guidance for loss-of-rights postures');
-has(/const\s+latestEpoIsLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed to be withdrawn\|loss of rights/, 'Overview model should detect loss-of-rights posture from latest EPO action');
-has(/const\s+waitingOn\s*=\s*latestEpoIsLossOfRights/, 'Waiting-on allocation should use dedicated loss-of-rights logic');
+hasText('Adverse posture detected.', 'Actionable status should expose concise recovery guidance for adverse/loss-of-rights postures');
+has(/const\s+posture\s*=\s*proceduralPostureModel\(/, 'Overview model should derive the current controlling posture from a dedicated posture helper');
+has(/const\s+waitingOn\s*=\s*posture\.currentClosed/, 'Waiting-on allocation should use the dedicated posture model instead of ad-hoc latest-row checks');
 has(/const\s+nextDeadlineMetaLines\s*=\s*\[\];/, 'Actionable status should build tidy next-deadline metadata lines');
 hasText('Basis: ${nextDeadlineMethod}', 'Actionable status should render method evidence as a dedicated Basis line');
 notHas(/nextDeadlineMeta\s*=\s*m\.nextDeadline/, 'Legacy one-line next-deadline metadata blob should be removed');
@@ -252,6 +255,7 @@ hasText("sourceUrl(fallbackCaseNo, 'doclist')", 'Doclist parser should avoid und
 hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use explicit R71(3) wording for grant package groups');
 hasText('Response to intention to grant', 'Doclist grouping should expose a dedicated label for applicant responses to R71(3) packets');
 hasText('Transfer / recordal filings', 'Doclist/timeline grouping should expose a more specific register-admin label for transfer/recordal packets');
+hasText('Extended European search package', 'Doclist/timeline grouping should surface extended-ESR packets with a more specific search label');
 hasText('Art. 94(3) communication', 'Timeline/doc labels should be able to upgrade examination packet names from OCR/PDF-derived Art. 94(3) evidence');
 hasText('No unitary effect record', 'UPC / UE presentation should avoid echoing overall withdrawn status as if it were a unitary-effect record');
 hasText('Loss-of-rights communication', 'Timeline/detail labeling should upgrade generic examination-row wording for terminal-loss-of-rights documents');
@@ -269,8 +273,8 @@ has(/const\s+isLossOfRights\s*=\s*\/deemed to be withdrawn\|application deemed t
 has(/function\s+doclistGroupingSignature\s*\(/, 'Doclist grouping should compute a structural signature for change detection');
 has(/runtime\.doclistGroupSigByCase\[caseNo\]\s*===\s*signature/, 'Doclist grouping should skip full regroup when table signature is unchanged');
 hasText('items.push(...timelineDocItemsFromDocs(caseNo, docs, pdfDeadlines));', 'Timeline should reuse the shared doclist packet-grouping model instead of keeping a stale parallel bundling path');
-hasText('const nextDeadline = selectNextDeadline(deadlines, latestEpoIsLossOfRights);', 'Overview should suppress stale overdue clocks on closed/loss-of-rights postures via centralized next-deadline selection');
-hasText('const nextDeadlineNote = activeDeadlineNoteText(deadlines, latestEpoIsLossOfRights);', 'Overview should surface explanatory text when no active deadline remains after supersession');
+hasText('const nextDeadline = selectNextDeadline(deadlines, posture.currentClosed);', 'Overview should suppress stale overdue clocks on closed/loss-of-rights postures via centralized next-deadline selection');
+hasText('const nextDeadlineNote = activeDeadlineNoteText(deadlines, posture.currentClosed, posture);', 'Overview should surface explanatory text when no active deadline remains after supersession');
 hasText('upcUe: upcUePresentationModel(ue, upcRegistry, federated),', 'Overview should derive UPC / UE wording through the centralized presentation model');
 hasText('timelineSubtitleText(item)', 'Timeline item rendering should dedupe subtitle labels through the centralized formatter');
 hasText('const detail = normalize(e.detail || \'\');', 'Event/legal timeline items should stop embedding their source labels inside detail text now that subtitle rendering handles source separately');

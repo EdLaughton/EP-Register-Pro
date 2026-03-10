@@ -1363,11 +1363,18 @@
     const normalized = dedupeMultiline(raw);
     const t = normalize(normalized).toLowerCase();
     if (!t) return { simple: 'Unknown', level: 'warn' };
+    if (/no opposition filed within time limit/.test(t)) return { simple: 'Granted (no opposition)', level: 'ok' };
     if (/grant of patent is intended|rule\s*71\(3\)/i.test(normalized)) return { simple: 'Grant intended (R71(3))', level: 'warn' };
+    if (/patent has been granted|the patent has been granted/.test(t)) return { simple: 'Granted', level: 'ok' };
+    if (/application deemed to be withdrawn.*non-entry into european phase/.test(t)) return { simple: 'Deemed withdrawn (non-entry)', level: 'bad' };
+    if (/application deemed to be withdrawn.*translations of claims\/payment missing/.test(t)) return { simple: 'Deemed withdrawn (grant formalities)', level: 'bad' };
+    if (/application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(t)) return { simple: 'Deemed withdrawn (fees / no WO reply)', level: 'bad' };
+    if (/application deemed to be withdrawn.*non-reply to written opinion/.test(t)) return { simple: 'Deemed withdrawn (no WO reply)', level: 'bad' };
+    if (/deemed to be withdrawn/.test(t)) return { simple: 'Deemed withdrawn', level: 'bad' };
+    if (/withdrawn by applicant|application withdrawn/.test(t)) return { simple: 'Withdrawn', level: 'bad' };
+    if (/revoked|refused|expired|lapsed/.test(t)) return { simple: 'Closed', level: 'bad' };
     if (/application has been published|has been published/.test(t)) return { simple: 'Published', level: 'info' };
-    if (/granted|patent has been granted/.test(t)) return { simple: 'Granted', level: 'ok' };
-    if (/revoked|refused|withdrawn|deemed to be withdrawn|expired|lapsed/.test(t)) return { simple: 'Withdrawn/closed', level: 'bad' };
-    if (/examination/.test(t)) return { simple: 'Examination', level: 'info' };
+    if (/request for examination was made|examination/.test(t)) return { simple: 'Examination', level: 'info' };
     if (/search/.test(t)) return { simple: 'Search', level: 'info' };
     const oneLine = normalize(normalized.split('\n')[0] || normalized);
     return { simple: oneLine || 'Unknown', level: 'info' };
@@ -1377,12 +1384,48 @@
     const t = normalize(statusRaw || '').toLowerCase();
     if (!t) return '';
     if (/revoked|refused|withdrawn|deemed to be withdrawn|lapsed|expired|closed/.test(t)) return 'Closed';
-    if (/rule\s*71\(3\)|intention to grant|mention of grant|granted/.test(t)) return 'Grant / post-grant';
-    if (/article\s*94\(3\)|art\.\s*94\(3\)|examining division|examination/.test(t)) return 'Examination';
+    if (/no opposition filed within time limit/.test(t)) return 'Post-grant';
+    if (/patent has been granted|the patent has been granted|grant decision|decision to grant/.test(t)) return 'Granted';
+    if (/grant of patent is intended|rule\s*71\(3\)|intention to grant/.test(t)) return 'R71 / grant intended';
+    if (/article\s*94\(3\)|art\.\s*94\(3\)|examining division|request for examination was made|examination/.test(t)) return 'Examination';
     if (/search report|search opinion|written opinion|\bsearch\b/.test(t)) return 'Search';
     if (/filing/.test(t)) return 'Filing';
     if (/published|publication/.test(t)) return 'Post-publication';
     return '';
+  }
+
+  function familyRoleSummary(mainData = {}) {
+    const parentCase = normalize(mainData.parentCase || '').toUpperCase();
+    const divisionalChildren = Array.isArray(mainData.divisionalChildren) ? mainData.divisionalChildren.filter(Boolean) : [];
+
+    if (parentCase && divisionalChildren.length) {
+      return {
+        label: 'Divisional child with descendants',
+        note: `Child of ${parentCase} and already parent to ${divisionalChildren.length} divisional application${divisionalChildren.length === 1 ? '' : 's'}.`,
+      };
+    }
+    if (parentCase) {
+      return {
+        label: 'Divisional child',
+        note: `Child of ${parentCase}.`,
+      };
+    }
+    if (divisionalChildren.length) {
+      return {
+        label: 'Parent with divisionals',
+        note: `${divisionalChildren.length} divisional application${divisionalChildren.length === 1 ? '' : 's'} linked from the main Register page.`,
+      };
+    }
+    if (/divisional/i.test(String(mainData.applicationType || ''))) {
+      return {
+        label: 'Divisional-linked family',
+        note: 'Divisional posture detected, but no explicit parent/child links were parsed from the current main page.',
+      };
+    }
+    return {
+      label: 'No explicit divisional role',
+      note: '',
+    };
   }
 
   function parseApplicationType(mainData) {
@@ -1494,8 +1537,9 @@
 
     const divisionalChildrenFromHeader = extractEpNumbersByHeader(doc, /\bDivisional application(?:\(s\))?\b/i);
     const divisionalSection = String(pageText).match(/Divisional\s+application(?:\(s\))?[\s\S]{0,400}/i)?.[0] || '';
+    const divisionalChildAppsFromText = [...divisionalSection.matchAll(/\b(EP\d{8})(?:\.\d)?\b\s*(?:&nbsp;|\s)*\//gi)].map((m) => String(m[1] || '').toUpperCase());
     const divisionalChildrenFromText = [...divisionalSection.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
-    const divisionalChildren = dedupe([...divisionalChildrenFromHeader, ...divisionalChildrenFromText], (x) => x);
+    const divisionalChildren = dedupe((divisionalChildAppsFromText.length ? divisionalChildAppsFromText : [...divisionalChildrenFromHeader, ...divisionalChildrenFromText]), (x) => x);
     const mainPublications = parseMainPublications(doc, 'EP (this file)');
 
     const internationalField = dedupeMultiline(fieldByLabel(doc, [/^International application\b/i, /^International publication\b/i, /^PCT application\b/i]));
@@ -2011,10 +2055,30 @@
       return 'Supplementary European search package';
     }
 
+    if (/extended european search report|document annexed to the extended european search report/.test(titles)) {
+      return 'Extended European search package';
+    }
+
     if (/communication regarding the transmission of the european search report|european search opinion|european search report|information on search strategy/.test(titles)) {
       return 'European search package';
     }
 
+    return '';
+  }
+
+  function specialRunLabel(run) {
+    const titles = (run?.models || []).map((model) => normalize(model.title || '').toLowerCase()).filter(Boolean).join('\n');
+    if (!titles) return '';
+
+    if (/decision to grant a european patent/.test(titles)) return 'Grant decision';
+    if (/decision to allow further processing/.test(titles)) return 'Further processing';
+    if (/transmission of the certificate for a european patent pursuant to rule\s*74/.test(titles)) return 'Patent certificate';
+    if (/grant of extension of time limit/.test(titles)) return 'Extension of time limit';
+    if (/application deemed to be withdrawn.*non-entry into european phase/.test(titles)) return 'Euro-PCT non-entry failure';
+    if (/application deemed to be withdrawn.*translations of claims\/payment missing/.test(titles)) return 'Grant-formalities failure';
+    if (/application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(titles)) return 'Fees / written-opinion failure';
+    if (/application deemed to be withdrawn.*non-reply to written opinion/.test(titles)) return 'Written-opinion loss';
+    if (/loss of rights|rule\s*112\(1\)/.test(titles)) return 'Loss-of-rights communication';
     return '';
   }
 
@@ -2029,10 +2093,10 @@
       if (/representative/.test(titles)) return 'Representative change filings';
       if (/client data request|consultation by telephone\/in person/.test(titles)) return 'Register admin filings';
       if (/reply to the invitation to remedy deficiencies|invitation to remedy deficiencies/.test(titles)) return 'Filing-deficiency response';
-      return base;
+      return specialRunLabel(run) || base;
     }
 
-    return pdfCategoryBundleLabel(pdfCategory, bundle) || searchRunLabel(run) || base;
+    return pdfCategoryBundleLabel(pdfCategory, bundle) || searchRunLabel(run) || specialRunLabel(run) || base;
   }
 
   function doclistPageTotal(run) {
@@ -2069,7 +2133,8 @@
     const td = document.createElement('td');
     td.colSpan = Math.max(1, cells.length);
     const bundleLabel = doclistRunLabel(run, pdfDeadlines);
-    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all items in this group" aria-label="Select all items in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}"><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
+    const bundleExplanation = docPacketExplanation(bundleLabel);
+    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all items in this group" aria-label="Select all items in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}" ${bundleExplanation ? `title="${esc(bundleExplanation)}"` : ''}><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
     headerRow.appendChild(td);
     firstRow.parentElement?.insertBefore(headerRow, firstRow);
 
@@ -4255,6 +4320,95 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     ], (r) => `${r.dateStr}|${r.title}|${r.detail}|${r.source}`).sort(compareDateDesc);
   }
 
+  function postureRecord(records = [], regex) {
+    return (records || []).find((record) => regex.test(`${record.title || ''} ${record.detail || ''}`.toLowerCase())) || null;
+  }
+
+  function postureRecordDate(record) {
+    return parseDateString(record?.dateStr || '');
+  }
+
+  function postureLossLabel(record) {
+    const text = `${record?.title || ''} ${record?.detail || ''}`.toLowerCase();
+    if (/non-entry into european phase/.test(text)) return 'non-entry into European phase';
+    if (/translations of claims\/payment missing/.test(text)) return 'grant-formalities failure';
+    if (/non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(text)) return 'fees / written-opinion failure';
+    if (/non-reply to written opinion/.test(text)) return 'no reply to the written opinion';
+    if (/loss of rights|rule\s*112\(1\)/.test(text)) return 'loss-of-rights communication';
+    if (/withdrawn/.test(text)) return 'withdrawn posture';
+    return 'adverse procedural posture';
+  }
+
+  function postureRecoveryLabel(record) {
+    const text = `${record?.title || ''} ${record?.detail || ''}`.toLowerCase();
+    if (/further processing/.test(text)) return 'further processing';
+    if (/re-establishment|rights re-established/.test(text)) return 're-establishment';
+    return 'recovery procedure';
+  }
+
+  function proceduralPostureModel(main, docs, eventHistory = {}, legal = {}) {
+    const statusRaw = dedupeMultiline(main?.statusRaw || '');
+    const statusSummary = summarizeStatus(statusRaw);
+    const records = buildDeadlineRecords(docs, eventHistory, legal);
+    const latestLoss = postureRecord(records, /application deemed to be withdrawn|deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|withdrawn by applicant|application withdrawn/);
+    const detailedLoss = postureRecord(records, /non-entry into european phase|translations of claims\/payment missing|non-payment of examination fee\/designation fee\/non-reply to written opinion|non-reply to written opinion/);
+    const effectiveLoss = detailedLoss || latestLoss;
+    const latestRecovery = postureRecord(records, /decision to allow further processing|further processing|request for further processing|re-establishment|rights re-established/);
+    const latestGrantDecision = postureRecord(records, /decision to grant a european patent|mention of grant|patent granted|the patent has been granted/);
+    const latestNoOpposition = postureRecord(records, /no opposition filed within time limit/);
+    const latestR71 = postureRecord(records, /grant of patent is intended|intention to grant|rule\s*71\(3\)|text intended for grant/);
+
+    const latestLossDate = postureRecordDate(latestLoss);
+    const latestRecoveryDate = postureRecordDate(latestRecovery);
+    const latestGrantDecisionDate = postureRecordDate(latestGrantDecision);
+    const recovered = !!(latestLossDate && latestRecoveryDate && latestRecoveryDate >= latestLossDate);
+    const recoveredBeforeGrant = !!(recovered && latestGrantDecisionDate && latestGrantDecisionDate >= latestRecoveryDate);
+    const currentClosed = statusSummary.level === 'bad';
+    const currentNoOpposition = /granted \(no opposition\)/i.test(statusSummary.simple || '') || /no opposition filed within time limit/i.test(statusRaw.toLowerCase());
+    const currentGranted = currentNoOpposition || /^granted$/i.test(statusSummary.simple || '') || /patent has been granted|the patent has been granted/i.test(statusRaw.toLowerCase());
+    const currentGrantIntended = /grant intended/i.test(statusSummary.simple || '') || /grant of patent is intended|rule\s*71\(3\)|intention to grant/i.test(statusRaw.toLowerCase());
+    const currentExamination = /request for examination was made|examination/.test(statusRaw.toLowerCase()) && !currentClosed;
+    const currentSearch = /published|search/.test(statusRaw.toLowerCase()) && !currentClosed && !currentGrantIntended && !currentGranted;
+
+    let note = '';
+    if (recoveredBeforeGrant) {
+      note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecovery)} before grant.`;
+    } else if (recovered) {
+      note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecovery)}.`;
+    } else if (currentClosed && effectiveLoss) {
+      note = `Current controlling posture is ${postureLossLabel(effectiveLoss)}.`;
+    } else if (currentGrantIntended && latestR71) {
+      note = 'Current controlling posture is Rule 71(3) / intention-to-grant.';
+    } else if (currentNoOpposition) {
+      note = 'Current controlling posture is granted with the opposition period closed.';
+    } else if (currentGranted) {
+      note = 'Current controlling posture is granted / post-grant.';
+    } else if (currentExamination) {
+      note = 'Current controlling posture is active examination.';
+    } else if (currentSearch) {
+      note = 'Current controlling posture is search / publication stage.';
+    }
+
+    return {
+      label: statusSummary.simple,
+      level: statusSummary.level,
+      note,
+      recovered,
+      recoveredBeforeGrant,
+      currentClosed,
+      currentGranted,
+      currentNoOpposition,
+      currentGrantIntended,
+      currentExamination,
+      currentSearch,
+      latestLoss: effectiveLoss,
+      latestRecovery,
+      latestGrantDecision,
+      latestNoOpposition,
+      latestR71,
+    };
+  }
+
   function pdfHintsWithParsedDates(pdfData = {}) {
     return (Array.isArray(pdfData?.hints) ? pdfData.hints : [])
       .map((h) => ({
@@ -4701,7 +4855,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     };
   }
 
-  function selectNextDeadline(deadlines = [], latestEpoIsLossOfRights = false, now = new Date()) {
+  function selectNextDeadline(deadlines = [], currentClosedPosture = false, now = new Date()) {
     const actionable = (deadlines || [])
       .filter((d) => !d.reference && !d.resolved && !d.superseded)
       .sort((a, b) => a.date - b.date);
@@ -4709,23 +4863,25 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     if (!actionable.length) return null;
     const upcoming = actionable.find((d) => d.date > now);
     if (upcoming) return upcoming;
-    if (latestEpoIsLossOfRights) return null;
+    if (currentClosedPosture) return null;
     return actionable[0] || null;
   }
 
-  function activeDeadlineNoteText(deadlines = [], latestEpoIsLossOfRights = false) {
+  function activeDeadlineNoteText(deadlines = [], currentClosedPosture = false, posture = null) {
     const actionable = (deadlines || []).filter((d) => !d.reference && !d.resolved && !d.superseded);
-    if (actionable.length && latestEpoIsLossOfRights) {
-      return 'No active procedural deadline detected on the current withdrawn/closed posture; remaining clocks are historical or low-confidence.';
+    if (actionable.length && currentClosedPosture) {
+      return 'No active procedural deadline detected on the current withdrawn/closed posture; remaining clocks are historical, appellate, or low-confidence.';
     }
     if (actionable.length) return '';
-    if ((deadlines || []).some((d) => d.superseded) && latestEpoIsLossOfRights) {
-      return 'No active procedural deadline detected; later EPO loss-of-rights events superseded earlier response periods.';
+    if ((deadlines || []).some((d) => d.superseded) && currentClosedPosture) {
+      return 'No active procedural deadline detected; later loss-of-rights events superseded earlier response periods.';
     }
     if ((deadlines || []).some((d) => d.resolved)) {
-      return 'No active procedural deadline detected; earlier response periods appear already answered.';
+      return posture?.recovered
+        ? 'No active procedural deadline detected; earlier response periods appear answered and the case later recovered from an adverse posture.'
+        : 'No active procedural deadline detected; earlier response periods appear already answered.';
     }
-    return latestEpoIsLossOfRights ? 'No active procedural deadline detected on the current withdrawn/closed posture.' : '';
+    return currentClosedPosture ? 'No active procedural deadline detected on the current withdrawn/closed posture.' : '';
   }
 
   function upcUePresentationModel(ue = {}, upcRegistry = null, federated = {}) {
@@ -4780,6 +4936,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const partialState = overviewPartialState(c);
 
     const storedStatusRaw = c.meta?.lastMainStatusRaw || '';
+    const statusSummary = summarizeStatus(main.statusRaw || storedStatusRaw);
     const stageText = normalize(main.statusRaw || storedStatusRaw).toLowerCase();
     const statusStage = main.statusStage || c.meta?.lastMainStage || inferStatusStage(stageText);
     const mainSourceStatus = String(c.sources.main?.status || '').toLowerCase();
@@ -4799,18 +4956,21 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
                 : 'Unknown'));
 
     const deadlines = inferProceduralDeadlines(main, docs, eventHistory, legal, pdfDeadlines);
+    const posture = proceduralPostureModel(main, docs, eventHistory, legal);
 
     const renewal = inferRenewalModel(main, legal, ue);
 
     const latestEpoDate = parseDateString(latestEpo?.dateStr);
     const latestApplicantDate = parseDateString(latestApplicant?.dateStr);
-
-    const latestEpoIsLossOfRights = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|application refused|application rejected/.test(`${String(latestEpo?.title || '')} ${String(latestEpo?.procedure || '')}`.toLowerCase());
+    const latestRecoveryDate = postureRecordDate(posture.latestRecovery);
+    const applicantAfterRecovery = !!(latestRecoveryDate && latestApplicantDate && latestApplicantDate >= latestRecoveryDate);
     const applicantAfterLatestEpo = !!(latestEpoDate && latestApplicantDate && latestApplicantDate > latestEpoDate);
 
-    const waitingOn = latestEpoIsLossOfRights
+    const waitingOn = posture.currentClosed
       ? (applicantAfterLatestEpo ? 'EPO recovery outcome' : 'No active step')
-      : (latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant');
+      : posture.recovered && applicantAfterRecovery
+        ? 'EPO recovery outcome'
+        : (latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant');
 
     const waitingDays = waitingOn === 'EPO' && latestApplicantDate
       ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000)
@@ -4819,20 +4979,29 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         : null;
 
     let recoveryOptions = '';
-    if (latestEpoIsLossOfRights) {
+    if (posture.currentClosed) {
       recoveryOptions = applicantAfterLatestEpo
-        ? 'Loss-of-rights posture detected. Applicant appears to have responded; monitor the EPO recovery outcome.'
-        : 'Loss-of-rights posture detected. Check further processing first; if unavailable, consider Rule 136 re-establishment.';
+        ? 'Adverse posture detected. Applicant appears to have responded; monitor the EPO recovery outcome.'
+        : 'Adverse posture detected. Check further processing first; if unavailable, consider Rule 136 re-establishment.';
+    } else if (posture.recovered) {
+      recoveryOptions = posture.recoveredBeforeGrant
+        ? 'Recovery path completed: an earlier adverse posture was cured before grant.'
+        : 'Recovery path visible: the case appears to have been revived after an earlier adverse posture.';
     }
 
-    const nextDeadline = selectNextDeadline(deadlines, latestEpoIsLossOfRights);
-    const nextDeadlineNote = activeDeadlineNoteText(deadlines, latestEpoIsLossOfRights);
+    const nextDeadline = selectNextDeadline(deadlines, posture.currentClosed);
+    const nextDeadlineNote = activeDeadlineNoteText(deadlines, posture.currentClosed, posture);
     const daysToDeadline = nextDeadline ? Math.ceil((nextDeadline.date.getTime() - Date.now()) / 86400000) : null;
 
     const federatedStates = Array.isArray(federated.states) ? federated.states : [];
     const federatedNotableStates = Array.isArray(federated.notableStates) ? federated.notableStates : [];
     const citationEntries = Array.isArray(citations.entries) ? citations.entries : [];
     const citationPhases = Array.isArray(citations.phases) ? citations.phases : [];
+    const familyRole = familyRoleSummary({
+      applicationType: main.applicationType || parseApplicationType(main),
+      parentCase: main.parentCase || '',
+      divisionalChildren: main.divisionalChildren || [],
+    });
 
     const model = {
       title: main.title || (mainSourceStatus === 'notfound' ? 'No Register file found' : '—'),
@@ -4847,7 +5016,19 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         : mainSourceStatus === 'empty'
           ? 'Main tab returned no usable case data.'
           : (main.statusRaw || storedStatusRaw || '—').split('\n')[0],
+      posture,
+      statusSimple: mainSourceStatus === 'notfound'
+        ? 'Not found'
+        : mainSourceStatus === 'empty'
+          ? 'No main data'
+          : statusSummary.simple,
+      statusLevel: mainSourceStatus === 'notfound'
+        ? 'bad'
+        : mainSourceStatus === 'empty'
+          ? 'warn'
+          : statusSummary.level,
       applicationType: mainUnavailable ? 'Unavailable' : (main.applicationType || parseApplicationType(main)),
+      familyRole,
       parentCase: mainUnavailable ? '' : (main.parentCase || ''),
       divisionalChildren: mainUnavailable ? [] : (main.divisionalChildren || []),
       latestEpo,
@@ -4943,6 +5124,14 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const bundle = String(model.groupKind || model.bundle || '');
     const pdfLabel = pdfCategoryBundleLabel(docModelPdfCategory(model, pdfDeadlines), bundle);
     if (pdfLabel) return pdfLabel;
+    if (/decision to grant a european patent/.test(title)) return 'Grant decision';
+    if (/decision to allow further processing/.test(title)) return 'Further processing';
+    if (/transmission of the certificate for a european patent pursuant to rule\s*74/.test(title)) return 'Patent certificate';
+    if (/grant of extension of time limit/.test(title)) return 'Extension of time limit';
+    if (/application deemed to be withdrawn.*non-entry into european phase/.test(title)) return 'Euro-PCT non-entry failure';
+    if (/application deemed to be withdrawn.*translations of claims\/payment missing/.test(title)) return 'Grant-formalities failure';
+    if (/application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(title)) return 'Fees / written-opinion failure';
+    if (/application deemed to be withdrawn.*non-reply to written opinion/.test(title)) return 'Written-opinion loss';
     if (/deemed to be withdrawn|loss of rights|rule\s*112\(1\)/.test(title)) return 'Loss-of-rights communication';
     if (/examination started|examining division becomes responsible|request for examination filed/.test(title)) return 'Examination milestone';
     if (/notification of forthcoming publication|publication in section/i.test(title)) return 'Publication formalities';
@@ -4968,13 +5157,33 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return bits[0] || procedure || 'All documents';
   }
 
+  function docPacketExplanation(label = '') {
+    const normalized = normalize(label).toLowerCase();
+    if (!normalized) return '';
+    if (normalized === 'international search / iprp') return 'ISA/IPRP packet from the international phase.';
+    if (normalized === 'partial international search') return 'Partial international search packet with the provisional opinion/search results.';
+    if (normalized === 'european search package') return 'European search report packet, including ESR opinion/strategy where present.';
+    if (normalized === 'extended european search package') return 'European search packet including an extended-ESR annex.';
+    if (normalized === 'supplementary european search package') return 'Supplementary European search packet for Euro-PCT regional phase entry.';
+    if (normalized === 'intention to grant (r71(3) epc)') return 'Rule 71(3) grant-intention packet, including text-for-grant documents.';
+    if (normalized === 'response to intention to grant') return 'Applicant response packet to the Rule 71(3) / grant-intention communication.';
+    if (normalized === 'grant decision') return 'Formal grant decision from the EPO.';
+    if (normalized === 'further processing') return 'Recovery packet showing further processing after a missed time limit.';
+    if (normalized === 'euro-pct non-entry failure') return 'Loss-of-rights packet showing failure to complete Euro-PCT entry acts in time.';
+    if (normalized === 'grant-formalities failure') return 'Loss-of-rights packet caused by missing grant-formality acts or payments.';
+    if (normalized === 'fees / written-opinion failure') return 'Loss-of-rights packet caused by fee non-payment and/or no reply to the written opinion.';
+    if (normalized === 'written-opinion loss') return 'Loss-of-rights packet caused by no reply to the written opinion.';
+    return '';
+  }
+
   function timelineSubtitleText(item = {}) {
     const detailBits = String(item.detail || '')
       .split(/\s*(?:·|\n)+\s*/)
       .map((bit) => normalize(bit))
       .filter(Boolean);
     const actor = normalize(item.actor || '');
-    const bits = [...detailBits, normalize(item.source || ''), actor && actor !== 'Other' ? actor : '']
+    const explanation = normalize(item.explanation || '');
+    const bits = [...detailBits, explanation, normalize(item.source || ''), actor && actor !== 'Other' ? actor : '']
       .filter(Boolean)
       .filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx);
     return bits.join(' · ');
@@ -5037,6 +5246,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         source: 'Documents',
         level: runLevel,
         actor,
+        explanation: docPacketExplanation(groupLabel),
         items: runItems,
       });
     }
@@ -5190,8 +5400,10 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       <div class="epoRP-l">Application #</div><div class="epoRP-v">${esc(m.appNo)}</div>
       <div class="epoRP-l">Filing date</div><div class="epoRP-v">${esc(filingSummary)}</div>
       <div class="epoRP-l">Priority</div><div class="epoRP-v">${esc(m.priority)}</div>
-      <div class="epoRP-l">Type / stage</div><div class="epoRP-v">${esc(m.applicationType)}${m.parentCase ? ` (<a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>)` : ''} · ${esc(m.stage)}</div>
+      <div class="epoRP-l">Type / stage</div><div class="epoRP-v">${esc(m.applicationType)} · ${esc(m.stage)}</div>
+      <div class="epoRP-l">Family role</div><div class="epoRP-v">${esc(m.familyRole?.label || '—')}${m.parentCase ? ` · child of <a class="epoRP-a" href="${esc(sourceUrl(m.parentCase, 'main'))}">${esc(m.parentCase)}</a>` : ''}${m.familyRole?.note ? `<div class="epoRP-m">${esc(m.familyRole.note)}</div>` : ''}</div>
       ${m.divisionalChildren?.length ? `<div class="epoRP-l">Divisionals</div><div class="epoRP-v">${m.divisionalChildren.map((ep) => `<a class="epoRP-a" href="${esc(sourceUrl(ep, 'main'))}">${esc(ep)}</a>`).join(', ')}</div>` : ''}
+      <div class="epoRP-l">Status</div><div class="epoRP-v"><span class="epoRP-bdg ${esc(m.statusLevel || 'info')}">${esc(m.statusSimple || 'Unknown')}</span><div class="epoRP-m">${esc(m.status)}</div></div>
       <div class="epoRP-l">Representative</div><div class="epoRP-v">${esc(m.representative)}</div>
     </div></div>`;
   }
@@ -5265,8 +5477,10 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       : m.waitingOn === 'EPO recovery outcome'
         ? `EPO recovery outcome${m.waitingDays != null ? ` · <span class="epoRP-bdg ${waitingLevel}">${formatDaysHuman(m.waitingDays)} since applicant reply</span>` : ''}`
         : 'No active step';
+    const postureBadge = `<span class="epoRP-bdg ${esc(m.posture?.level || m.statusLevel || 'info')}">${esc(m.posture?.label || m.statusSimple || 'Unknown')}</span>`;
 
     return `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
+      <div class="epoRP-l">Current posture</div><div class="epoRP-v">${postureBadge}${m.posture?.note ? `<div class="epoRP-m">${esc(m.posture.note)}</div>` : ''}</div>
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : (m.nextDeadlineNote ? `<div>—</div><div class="epoRP-m">${esc(m.nextDeadlineNote)}</div>` : '—')}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
       ${m.recoveryOptions ? `<div class="epoRP-l">Recovery</div><div class="epoRP-v"><div class="epoRP-m">${esc(m.recoveryOptions)}</div></div>` : ''}
@@ -5452,7 +5666,11 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       out.unshift(`<div class="epoRP-deadlineRow"><div class="epoRP-dot dotted ${level}"></div><div class="epoRP-d">${esc(formatDate(model.nextDeadline.date))}</div><div><div class="epoRP-mn">Next deadline</div><div class="epoRP-sb">${esc(model.nextDeadline.label)} · ${days >= 0 ? formatDaysHuman(days) : `${formatDaysHuman(days).slice(1)} overdue`}</div></div></div>`);
     }
 
-    if (verbose) out.unshift(`<div class="epoRP-m">Verbose mode shows extended source labels and grouped event bodies.</div>`);
+    if (model.posture?.label) {
+      out.unshift(`<div class="epoRP-deadlineRow"><div class="epoRP-dot dotted ${esc(model.posture.level || 'info')}"></div><div class="epoRP-d">Now</div><div><div class="epoRP-mn">Current posture · ${esc(model.posture.label)}</div><div class="epoRP-sb">${esc(model.posture.note || model.status || '')}</div></div></div>`);
+    }
+
+    if (verbose) out.unshift(`<div class="epoRP-m">Verbose mode shows extended source labels, grouped event bodies, and posture explanations.</div>`);
 
     return `<div class="epoRP-c">${out.join('')}</div>`;
   }
