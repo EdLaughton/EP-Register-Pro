@@ -4046,6 +4046,124 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     runtime.fetchCaseNo = null;
   }
 
+  function beginPrefetch(caseNo) {
+    cancelPrefetch();
+    const controller = new AbortController();
+    runtime.abortController = controller;
+    runtime.fetching = true;
+    runtime.fetchCaseNo = caseNo;
+    runtime.fetchLabel = 'Starting';
+    return controller;
+  }
+
+  function prefetchPlan(caseNo, force = false, refreshHours = options().refreshHours) {
+    const needed = [];
+    const freshKeys = [];
+
+    for (const src of SOURCES) {
+      if (force) {
+        needed.push(src);
+        continue;
+      }
+
+      const cached = getCase(caseNo).sources[src.key];
+      const fresh = isFresh(cached, refreshHours, { allowEmpty: true, allowNotFound: true });
+      if (fresh) {
+        freshKeys.push(src.key);
+        addLog(caseNo, 'info', `Skip fresh source ${src.key}`);
+      } else {
+        needed.push(src);
+      }
+    }
+
+    return {
+      needed,
+      neededKeys: needed.map((src) => src.key),
+      freshKeys,
+    };
+  }
+
+  async function prefetchSource(caseNo, src, controller, progress) {
+    if (controller.signal.aborted) return;
+
+    const url = sourceUrl(caseNo, src.slug);
+    runtime.fetchLabel = `${progress.completed + 1}/${progress.total}`;
+    addLog(caseNo, 'info', `Request source ${src.key}`, { source: src.key, transport: 'fetch', url });
+    scheduleRender();
+
+    try {
+      const html = await fetchWithRetry(url, controller.signal);
+      if (controller.signal.aborted) return;
+
+      addLog(caseNo, 'ok', `Fetch success ${src.key}`, { source: src.key, sizeKb: +(html.length / 1024).toFixed(2), transport: 'fetch' });
+      const parsedDoc = parseHtml(html);
+      const parsed = parseSource(src.key, parsedDoc, caseNo);
+      const classified = classifyParsedSourceState(src.key, parsedDoc, parsed);
+      const parseMessage = classified.status === 'ok'
+        ? `Parse success ${src.key}`
+        : classified.status === 'notFound'
+          ? `Parse result not found ${src.key}`
+          : `Parse result empty ${src.key}`;
+      const parseLevel = classified.status === 'ok' ? 'ok' : classified.status === 'notFound' ? 'warn' : 'info';
+      addLog(caseNo, parseLevel, parseMessage, { transport: 'fetch', status: classified.status, reason: classified.reason, ...sourceDiagnostics(src.key, parsed) });
+
+      storeCaseSource(caseNo, src.key, {
+        title: src.title,
+        status: classified.status,
+        url,
+        transport: 'fetch',
+        data: parsed,
+      });
+      addLog(caseNo, 'info', `Cache write ${src.key}`, { source: src.key });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      addLog(caseNo, 'error', `Fetch/parse failure ${src.key}: ${error?.message || error}`, { source: src.key, transport: 'fetch' });
+      storeCaseSource(caseNo, src.key, {
+        title: src.title,
+        status: 'error',
+        url,
+        transport: 'fetch',
+        error: String(error?.message || error),
+      });
+    }
+
+    progress.completed += 1;
+    if (runtime.appNo === caseNo) scheduleRender();
+  }
+
+  async function refreshDerivedPrefetchSources(caseNo, signal, force) {
+    try {
+      await refreshUpcRegistry(caseNo, signal, force);
+    } catch {
+      // non-blocking
+    }
+
+    try {
+      await refreshPdfDeadlines(caseNo, signal, force);
+    } catch {
+      // non-blocking
+    }
+  }
+
+  function completePrefetch(caseNo, controller) {
+    if (runtime.abortController !== controller) return;
+
+    const c = getCase(caseNo);
+    const counts = sourceStatusCounts(c);
+    const statusBySource = Object.fromEntries(SOURCES.map((s) => [s.key, c.sources[s.key]?.status || 'missing']));
+    addLog(caseNo, counts.error ? 'warn' : 'ok', `Background prefetch finish (${sourceStatusSummaryText(counts)})`, {
+      source: 'prefetch',
+      counts,
+      statusBySource,
+    });
+    runtime.fetching = false;
+    runtime.fetchLabel = 'Idle';
+    runtime.abortController = null;
+    runtime.fetchCaseNo = null;
+    flushNow();
+    scheduleRender();
+  }
+
   async function prefetchCase(caseNo, force = false) {
     const opts = options();
     if (!caseNo) return;
@@ -4059,36 +4177,20 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       return;
     }
 
-    cancelPrefetch();
-
-    const controller = new AbortController();
-    runtime.abortController = controller;
-    runtime.fetching = true;
-    runtime.fetchCaseNo = caseNo;
-    runtime.fetchLabel = 'Starting';
-
+    const controller = beginPrefetch(caseNo);
     addLog(caseNo, 'info', `Background prefetch start${force ? ' (forced)' : ''}`);
     scheduleRender();
 
     try {
-      const needed = SOURCES.filter((s) => {
-        if (force) return true;
-        const cached = getCase(caseNo).sources[s.key];
-        const fresh = isFresh(cached, opts.refreshHours, { allowEmpty: true, allowNotFound: true });
-        if (fresh) addLog(caseNo, 'info', `Skip fresh source ${s.key}`);
-        return !fresh;
-      });
-      const neededKeys = needed.map((s) => s.key);
-      const freshKeys = SOURCES.map((s) => s.key).filter((k) => !neededKeys.includes(k));
-
+      const plan = prefetchPlan(caseNo, force, opts.refreshHours);
       addLog(caseNo, 'info', 'Prefetch plan ready', {
         source: 'prefetch',
         force: !!force,
-        needed: neededKeys,
-        fresh: freshKeys,
+        needed: plan.neededKeys,
+        fresh: plan.freshKeys,
       });
 
-      if (!needed.length) {
+      if (!plan.needed.length) {
         addLog(caseNo, 'ok', 'Background prefetch complete (all fresh)');
         runtime.fetching = false;
         runtime.fetchLabel = 'Idle';
@@ -4096,82 +4198,14 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         return;
       }
 
-      let completed = 0;
-      await runPool(needed.map((src) => async () => {
-        if (controller.signal.aborted) return;
-
-        const url = sourceUrl(caseNo, src.slug);
-        runtime.fetchLabel = `${completed + 1}/${needed.length}`;
-        addLog(caseNo, 'info', `Request source ${src.key}`, { source: src.key, transport: 'fetch', url });
-        scheduleRender();
-
-        try {
-          const html = await fetchWithRetry(url, controller.signal);
-          if (controller.signal.aborted) return;
-
-          addLog(caseNo, 'ok', `Fetch success ${src.key}`, { source: src.key, sizeKb: +(html.length / 1024).toFixed(2), transport: 'fetch' });
-          const parsedDoc = parseHtml(html);
-          const parsed = parseSource(src.key, parsedDoc, caseNo);
-          const classified = classifyParsedSourceState(src.key, parsedDoc, parsed);
-          const parseMessage = classified.status === 'ok'
-            ? `Parse success ${src.key}`
-            : classified.status === 'notFound'
-              ? `Parse result not found ${src.key}`
-              : `Parse result empty ${src.key}`;
-          const parseLevel = classified.status === 'ok' ? 'ok' : classified.status === 'notFound' ? 'warn' : 'info';
-          addLog(caseNo, parseLevel, parseMessage, { transport: 'fetch', status: classified.status, reason: classified.reason, ...sourceDiagnostics(src.key, parsed) });
-
-          storeCaseSource(caseNo, src.key, {
-            title: src.title,
-            status: classified.status,
-            url,
-            transport: 'fetch',
-            data: parsed,
-          });
-          addLog(caseNo, 'info', `Cache write ${src.key}`, { source: src.key });
-        } catch (error) {
-          if (controller.signal.aborted) return;
-          addLog(caseNo, 'error', `Fetch/parse failure ${src.key}: ${error?.message || error}`, { source: src.key, transport: 'fetch' });
-          storeCaseSource(caseNo, src.key, {
-            title: src.title,
-            status: 'error',
-            url,
-            transport: 'fetch',
-            error: String(error?.message || error),
-          });
-        }
-
-        completed += 1;
-        if (runtime.appNo === caseNo) scheduleRender();
+      const progress = { completed: 0, total: plan.needed.length };
+      await runPool(plan.needed.map((src) => async () => {
+        await prefetchSource(caseNo, src, controller, progress);
       }), FETCH_CONCURRENCY);
     } finally {
       if (runtime.abortController === controller) {
-        try {
-          await refreshUpcRegistry(caseNo, controller.signal, force);
-        } catch {
-          // non-blocking
-        }
-
-        try {
-          await refreshPdfDeadlines(caseNo, controller.signal, force);
-        } catch {
-          // non-blocking
-        }
-
-        const c = getCase(caseNo);
-        const counts = sourceStatusCounts(c);
-        const statusBySource = Object.fromEntries(SOURCES.map((s) => [s.key, c.sources[s.key]?.status || 'missing']));
-        addLog(caseNo, counts.error ? 'warn' : 'ok', `Background prefetch finish (${sourceStatusSummaryText(counts)})`, {
-          source: 'prefetch',
-          counts,
-          statusBySource,
-        });
-        runtime.fetching = false;
-        runtime.fetchLabel = 'Idle';
-        runtime.abortController = null;
-        runtime.fetchCaseNo = null;
-        flushNow();
-        scheduleRender();
+        await refreshDerivedPrefetchSources(caseNo, controller.signal, force);
+        completePrefetch(caseNo, controller);
       }
     }
   }
@@ -4826,16 +4860,12 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         : mainSourceStatus === 'empty'
           ? 'Main tab returned no usable case data.'
           : (main.statusRaw || storedStatusRaw || '—').split('\n')[0],
-      statusSimple: mainSourceStatus === 'notfound' ? 'Not found' : (mainSourceStatus === 'empty' ? 'No main data' : (main.statusSimple || 'Unknown')),
-      statusLevel: mainSourceStatus === 'notfound' ? 'bad' : (mainSourceStatus === 'empty' ? 'warn' : (main.statusLevel || 'warn')),
       applicationType: mainUnavailable ? 'Unavailable' : (main.applicationType || parseApplicationType(main)),
       parentCase: mainUnavailable ? '' : (main.parentCase || ''),
       divisionalChildren: mainUnavailable ? [] : (main.divisionalChildren || []),
       latestEpo,
       latestApplicant,
       partialState,
-      latestEpoIsLossOfRights,
-      applicantAfterLatestEpo,
       waitingOn,
       waitingDays,
       recoveryOptions,
@@ -4851,7 +4881,6 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         invalidationDate: federated.invalidationDate || '',
         renewalFeesPaidUntil: federated.renewalFeesPaidUntil || '',
         recordUpdated: federated.recordUpdated || '',
-        applicantProprietor: federated.applicantProprietor || '',
         trackedStates: federatedStates.length,
         notableStates: federatedNotableStates.slice(0, 6),
       },
@@ -4860,7 +4889,6 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         phases: citationPhases,
       },
       upcUe: upcUePresentationModel(ue, upcRegistry, federated),
-      docs,
     };
 
     runtime.overviewCache = { key: cacheKey, model };
@@ -5684,16 +5712,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     restorePanelScroll(caseNo, activeView, scrollRestoreOverride);
   }
 
-  function init(force = false) {
-    if (!isCasePage()) {
-      cancelPrefetch();
-      resetRouteRuntime();
-      renderPanel();
-      return;
-    }
-
-    const previousCaseNo = runtime.appNo;
-    const caseNo = detectAppNo();
+  function prepareCaseInit(previousCaseNo, caseNo) {
     const changed = previousCaseNo !== caseNo;
     if (changed) {
       clearDerivedCaches();
@@ -5702,7 +5721,10 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     runtime.appNo = caseNo;
 
     if (changed && runtime.fetchCaseNo && runtime.fetchCaseNo !== caseNo) cancelPrefetch();
+    return changed;
+  }
 
+  function refreshLiveCaseView(caseNo) {
     captureLiveSource(caseNo);
     renderPanel();
     enhanceDoclistGrouping();
@@ -5715,8 +5737,9 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       renderPanel();
       enhanceDoclistGrouping();
     }, 1800);
+  }
 
-    const registerTab = tabSlug();
+  function prefetchGateState(caseNo, registerTab, changed) {
     const caseSession = getCaseSession(caseNo);
     if (caseSession.prefetchDoneAt) runtime.autoPrefetchDoneByCase[caseNo] = Number(caseSession.prefetchDoneAt) || Date.now();
     if (caseSession.lastRegisterTab) runtime.lastRegisterTabByCase[caseNo] = String(caseSession.lastRegisterTab);
@@ -5728,16 +5751,82 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     runtime.lastRegisterTabByCase[caseNo] = registerTab;
     patchCaseSession(caseNo, { lastRegisterTab: registerTab });
 
-    if (force) {
-      addLog(caseNo, 'info', 'Forced data reload for case', { source: 'prefetch', registerTab });
-      const gateTs = Date.now();
-      runtime.autoPrefetchDoneByCase[caseNo] = gateTs;
-      patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });
-      prefetchCase(caseNo, true);
+    return {
+      previousRegisterTab,
+      hasPreviousTab,
+      tabChangedWithinCase,
+      sameTabReloadWithinCase,
+    };
+  }
+
+  function markPrefetchGate(caseNo, registerTab) {
+    const gateTs = Date.now();
+    runtime.autoPrefetchDoneByCase[caseNo] = gateTs;
+    patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });
+    return gateTs;
+  }
+
+  function staleSourceKeys(caseNo, refreshHours = options().refreshHours) {
+    return SOURCES
+      .filter((s) => !isFresh(getCase(caseNo).sources[s.key], refreshHours, { allowEmpty: true, allowNotFound: true }))
+      .map((s) => s.key);
+  }
+
+  function logPrefetchGateActive(caseNo, { changed, previousRegisterTab, registerTab, tabChangedWithinCase, sameTabReloadWithinCase }) {
+    if (tabChangedWithinCase) {
+      addLog(caseNo, 'info', 'Same-case tab switch detected: prefetch gate active', {
+        source: 'prefetch',
+        fromTab: previousRegisterTab,
+        toTab: registerTab,
+      });
       return;
     }
 
-    const staleSources = SOURCES.filter((s) => !isFresh(getCase(caseNo).sources[s.key], options().refreshHours, { allowEmpty: true, allowNotFound: true })).map((s) => s.key);
+    if (sameTabReloadWithinCase) {
+      addLog(caseNo, 'info', 'Same-case page reload detected: prefetch gate active', {
+        source: 'prefetch',
+        registerTab,
+      });
+      return;
+    }
+
+    if (changed) {
+      addLog(caseNo, 'info', 'Case tab/page changed; auto prefetch skipped for this page session', {
+        source: 'prefetch',
+        registerTab,
+      });
+    }
+  }
+
+  function handleForcedCaseReload(caseNo, registerTab) {
+    addLog(caseNo, 'info', 'Forced data reload for case', { source: 'prefetch', registerTab });
+    markPrefetchGate(caseNo, registerTab);
+    prefetchCase(caseNo, true);
+  }
+
+  function init(force = false) {
+    if (!isCasePage()) {
+      cancelPrefetch();
+      resetRouteRuntime();
+      renderPanel();
+      return;
+    }
+
+    const previousCaseNo = runtime.appNo;
+    const caseNo = detectAppNo();
+    const changed = prepareCaseInit(previousCaseNo, caseNo);
+
+    refreshLiveCaseView(caseNo);
+
+    const registerTab = tabSlug();
+    const gateState = prefetchGateState(caseNo, registerTab, changed);
+
+    if (force) {
+      handleForcedCaseReload(caseNo, registerTab);
+      return;
+    }
+
+    const staleSources = staleSourceKeys(caseNo);
     const needsRefresh = staleSources.length > 0;
 
     if (runtime.autoPrefetchDoneByCase[caseNo]) {
@@ -5748,36 +5837,16 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           staleSources,
         });
 
-        const gateTs = Date.now();
-        runtime.autoPrefetchDoneByCase[caseNo] = gateTs;
-        patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });
+        markPrefetchGate(caseNo, registerTab);
         prefetchCase(caseNo, false);
         return;
       }
 
-      if (tabChangedWithinCase) {
-        addLog(caseNo, 'info', 'Same-case tab switch detected: prefetch gate active', {
-          source: 'prefetch',
-          fromTab: previousRegisterTab,
-          toTab: registerTab,
-        });
-      } else if (sameTabReloadWithinCase) {
-        addLog(caseNo, 'info', 'Same-case page reload detected: prefetch gate active', {
-          source: 'prefetch',
-          registerTab,
-        });
-      } else if (changed) {
-        addLog(caseNo, 'info', 'Case tab/page changed; auto prefetch skipped for this page session', {
-          source: 'prefetch',
-          registerTab,
-        });
-      }
+      logPrefetchGateActive(caseNo, { changed, registerTab, ...gateState });
       return;
     }
 
-    const gateTs = Date.now();
-    runtime.autoPrefetchDoneByCase[caseNo] = gateTs;
-    patchCaseSession(caseNo, { prefetchDoneAt: gateTs, lastRegisterTab: registerTab });
+    markPrefetchGate(caseNo, registerTab);
 
     if (needsRefresh) {
       addLog(caseNo, 'info', 'Initial case load: stale/missing sources detected; running auto prefetch', {

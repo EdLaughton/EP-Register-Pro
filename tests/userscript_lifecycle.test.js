@@ -38,7 +38,8 @@ hasText("for (const p of casePublications(c, { docs, includeFamily: false }))", 
 hasText("isFresh(cached, options().refreshHours, { allowEmpty: true, dependencyStamp })", 'UPC/PDF derived refresh should reuse fresh empty/ok cache only when dependency stamp matches');
 hasText("status: 'empty'", 'Derived-source refreshers should cache explicit empty states when appropriate');
 hasText('dependencyStamp,', 'Derived-source cache entries should persist dependency stamps');
-hasText("await refreshUpcRegistry(caseNo, controller.signal, force);", 'Prefetch pipeline should pass force flag through to UPC refresh');
+has(/function\s+refreshDerivedPrefetchSources\s*\(/, 'Prefetch pipeline should isolate derived-source refresh from base-source fetch orchestration');
+hasText("await refreshUpcRegistry(caseNo, signal, force);", 'Prefetch pipeline should pass force flag through to UPC refresh');
 hasText('let hadResponse = false;', 'UPC refresh should distinguish real empty results from complete request failure');
 hasText("status: 'error'", 'Derived-source refreshers should persist error states when all candidate requests fail');
 hasText('let failedCandidates = 0;', 'PDF refresh should track per-candidate failures instead of collapsing all-zero-hint outcomes into empty');
