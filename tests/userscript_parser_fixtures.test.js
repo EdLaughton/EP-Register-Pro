@@ -83,6 +83,25 @@ const euroPctTimelinePreview = hooks.timelineDocGroupingPreview(doclist.docs);
 assert(euroPctTimelinePreview.some((g) => g.title === 'International search / IPRP' && g.dateStr === '05.06.2025' && g.size === 5), 'Timeline doc grouping should reuse the shared PCT-aware label for the full IPRP/ISA packet');
 assert(euroPctTimelinePreview.some((g) => g.title === 'Partial international search' && g.dateStr === '15.04.2025' && g.size === 2), 'Timeline doc grouping should reuse the shared PCT-aware label for partial-ISR packets');
 
+const divisionalSearchPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP25203732', 'doclist.html'], 'https://register.epo.org/application?number=EP25203732&tab=doclist&lng=en'));
+assert(divisionalSearchPreview.some((g) => g.label === 'European search package' && g.dateStr === '25.11.2025' && g.size === 3), 'Doclist grouping should relabel standard ESR/EPO search packets with a European-specific label');
+
+const withdrawnSearchPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP19205846', 'doclist.html'], 'https://register.epo.org/application?number=EP19205846&tab=doclist&lng=en'));
+assert(withdrawnSearchPreview.some((g) => g.label === 'European search package' && g.dateStr === '04.05.2020' && g.size === 2), 'Doclist grouping should relabel even slim European-search packets with a European-specific label');
+
+const syntheticSupplementarySearchDoc = new JSDOM(`<!doctype html><html><body><table><thead><tr><th><input type="checkbox"></th><th>Date</th><th>Document type</th><th>Procedure</th><th>Number of pages</th></tr></thead><tbody>
+<tr><td><input type="checkbox"></td><td>04.03.2022</td><td><a>Communication regarding the transmission of the European search report</a></td><td>Search / examination</td><td>1</td></tr>
+<tr><td><input type="checkbox"></td><td>04.03.2022</td><td><a>European search opinion</a></td><td>Search / examination</td><td>9</td></tr>
+<tr><td><input type="checkbox"></td><td>04.03.2022</td><td><a>Information on Search Strategy</a></td><td>Search / examination</td><td>1</td></tr>
+<tr><td><input type="checkbox"></td><td>04.03.2022</td><td><a>Supplementary European search report</a></td><td>Search / examination</td><td>2</td></tr>
+</tbody></table></body></html>`, {
+  url: 'https://register.epo.org/application?number=EP00000000&tab=doclist&lng=en',
+}).window.document;
+const syntheticSupplementarySearchPreview = hooks.doclistGroupingPreview(syntheticSupplementarySearchDoc);
+assert(syntheticSupplementarySearchPreview.some((g) => g.label === 'Supplementary European search package' && g.dateStr === '04.03.2022' && g.size === 4), 'Doclist grouping should distinguish supplementary European search packets from standard ESR packets');
+const syntheticSupplementaryTimelinePreview = hooks.timelineDocGroupingPreview(hooks.parseDoclist(syntheticSupplementarySearchDoc).docs);
+assert(syntheticSupplementaryTimelinePreview.some((g) => g.title === 'Supplementary European search package' && g.dateStr === '04.03.2022' && g.size === 4), 'Timeline doc grouping should reuse the supplementary-European search label from the shared packet labeler');
+
 assert.strictEqual(hooks.panelScrollRestoreOverride('EP24837586', 'options', 1092.5, 'EP24837586', 'options'), 1093, 'Sidebar rerenders within the same case/view should preserve the current scroll position instead of falling back to stale stored state');
 assert.strictEqual(hooks.panelScrollRestoreOverride('EP24837586', 'options', 1092.5, 'EP24837586', 'overview'), null, 'Sidebar scroll override should not leak across view switches');
 assert.strictEqual(hooks.panelScrollRestoreOverride('EP24837586', 'options', 1092.5, 'EP25203732', 'options'), null, 'Sidebar scroll override should not leak across case switches');
@@ -97,6 +116,17 @@ const syntheticTransferDoc = new JSDOM(`<!doctype html><html><body><table><thead
 }).window.document;
 const syntheticTransferPreview = hooks.doclistGroupingPreview(syntheticTransferDoc);
 assert(syntheticTransferPreview.some((g) => g.label === 'Transfer / recordal filings' && g.dateStr === '06.12.2022' && g.size === 4), 'Doclist grouping should use a specific transfer/recordal packet label for same-day register-admin bundles');
+
+const syntheticFilingDeficiencyDoc = new JSDOM(`<!doctype html><html><body><table><thead><tr><th><input type="checkbox"></th><th>Date</th><th>Document type</th><th>Procedure</th><th>Number of pages</th></tr></thead><tbody>
+<tr><td><input type="checkbox"></td><td>19.08.2024</td><td><a>(Electronic) Receipt</a></td><td>Search / examination</td><td>1</td></tr>
+<tr><td><input type="checkbox"></td><td>19.08.2024</td><td><a>Reply to the invitation to remedy deficiencies</a></td><td>Search / examination</td><td>1</td></tr>
+</tbody></table></body></html>`, {
+  url: 'https://register.epo.org/application?number=EP00000000&tab=doclist&lng=en',
+}).window.document;
+const syntheticFilingDeficiencyPreview = hooks.doclistGroupingPreview(syntheticFilingDeficiencyDoc);
+assert(syntheticFilingDeficiencyPreview.some((g) => g.label === 'Filing-deficiency response' && g.dateStr === '19.08.2024' && g.size === 2), 'Doclist grouping should relabel applicant filing packets that answer an invitation to remedy deficiencies');
+const syntheticFilingDeficiencyTimelinePreview = hooks.timelineDocGroupingPreview(hooks.parseDoclist(syntheticFilingDeficiencyDoc).docs);
+assert(syntheticFilingDeficiencyTimelinePreview.some((g) => g.title === 'Filing-deficiency response' && g.dateStr === '19.08.2024' && g.size === 2), 'Timeline doc grouping should reuse the filing-deficiency response label from the shared packet labeler');
 
 const syntheticArt94Doc = new JSDOM(`<!doctype html><html><body><table><thead><tr><th><input type="checkbox"></th><th>Date</th><th>Document type</th><th>Procedure</th><th>Number of pages</th></tr></thead><tbody>
 <tr><td><input type="checkbox"></td><td>07.08.2023</td><td><a>Communication from the Examining Division pursuant to Article 94(3) EPC</a></td><td>Search / examination</td><td>5</td></tr>

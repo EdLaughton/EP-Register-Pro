@@ -1933,7 +1933,7 @@
     return '';
   }
 
-  function pctSearchRunLabel(run) {
+  function searchRunLabel(run) {
     const bundle = String(run?.bundle || run?.groupKind || 'Other');
     if (bundle !== 'Search package') return '';
 
@@ -1946,6 +1946,14 @@
 
     if (/international preliminary report on patentability|written opinion of the isa|isr: cited documents/.test(titles)) {
       return 'International search / IPRP';
+    }
+
+    if (/supplementary european search report/.test(titles)) {
+      return 'Supplementary European search package';
+    }
+
+    if (/communication regarding the transmission of the european search report|european search opinion|european search report|information on search strategy/.test(titles)) {
+      return 'European search package';
     }
 
     return '';
@@ -1961,10 +1969,11 @@
       if (/transfer of rights|registering a transfer/.test(titles)) return 'Transfer / recordal filings';
       if (/representative/.test(titles)) return 'Representative change filings';
       if (/client data request|consultation by telephone\/in person/.test(titles)) return 'Register admin filings';
+      if (/reply to the invitation to remedy deficiencies|invitation to remedy deficiencies/.test(titles)) return 'Filing-deficiency response';
       return base;
     }
 
-    return pdfCategoryBundleLabel(pdfCategory, bundle) || pctSearchRunLabel(run) || base;
+    return pdfCategoryBundleLabel(pdfCategory, bundle) || searchRunLabel(run) || base;
   }
 
   function doclistGroupingPreview(doc, pdfDeadlines = {}) {
