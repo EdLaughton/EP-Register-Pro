@@ -4194,25 +4194,16 @@
   function searchRunLabel(run) {
     const bundle = String(run?.bundle || run?.groupKind || 'Other');
     if (bundle !== 'Search package') return '';
-
-    for (const model of (run?.models || [])) {
-      const signal = normalizedDocSignal(model?.title || '', model?.procedure || '');
-      if (!signal || signal.family !== 'search') continue;
-      return signal.bundle;
-    }
-
-    return '';
+    const signal = normalizedPacketSignal(run?.models || []);
+    return signal?.family === 'search' ? signal.bundle : '';
   }
 
   function specialRunLabel(run) {
-    for (const model of (run?.models || [])) {
-      const signal = normalizedDocSignal(model?.title || '', model?.procedure || '');
-      if (!signal) continue;
-      if (['Further processing', 'Grant decision', 'Patent certificate', 'Extension of time limit', 'Euro-PCT non-entry failure', 'Grant-formalities failure', 'Fees / written-opinion failure', 'Written-opinion loss', 'Loss-of-rights communication', 'Opposition'].includes(signal.bundle)) {
-        return signal.bundle;
-      }
-    }
-    return '';
+    const signal = normalizedPacketSignal(run?.models || []);
+    if (!signal) return '';
+    return ['Further processing', 'Grant decision', 'Patent certificate', 'Extension of time limit', 'Euro-PCT non-entry failure', 'Grant-formalities failure', 'Fees / written-opinion failure', 'Written-opinion loss', 'Loss-of-rights communication', 'Opposition', 'Oral proceedings'].includes(signal.bundle)
+      ? signal.bundle
+      : '';
   }
 
   function doclistRunLabel(run, pdfDeadlines = {}) {
