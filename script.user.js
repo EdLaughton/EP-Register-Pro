@@ -97,6 +97,45 @@
     timelineLegalLevel: 'warn',
   };
 
+  const OPTION_SECTIONS = [
+    { key: 'layout', title: 'Layout', help: 'Panel placement and page-shift behaviour.' },
+    { key: 'data', title: 'Data loading', help: 'How aggressively the sidebar prefetches Register sources.' },
+    { key: 'overview', title: 'Overview panels', help: 'Show or hide overview cards.' },
+    { key: 'timeline', title: 'Timeline', help: 'Timeline density and which sources feed it.' },
+    { key: 'doclist', title: 'Doclist grouping', help: 'How grouped document packets behave on the doclist tab.' },
+  ];
+
+  const OPTION_DEFS = [
+    { section: 'layout', kind: 'checkbox', key: 'shiftBody', id: 'epoRP-opt-shift', title: 'Shift page body', help: 'Adds right padding so Register content is not hidden under panel.' },
+    { section: 'data', kind: 'checkbox', key: 'preloadAllTabs', id: 'epoRP-opt-preload', title: 'Preload all case tabs in background', help: 'Loads main/doclist/event/family/legal/federated/citations/ueMain in background and fills cache.' },
+    { section: 'overview', kind: 'checkbox', key: 'showRenewals', id: 'epoRP-opt-ren', title: 'Show renewals panel', help: 'Displays pre-/post-grant and UE-sensitive renewal explanation in Overview.' },
+    { section: 'overview', kind: 'checkbox', key: 'showUpcUe', id: 'epoRP-opt-upc', title: 'Show UPC/UE panel', help: 'Displays inferred UE + UPC opt-out state with notes.' },
+    { section: 'overview', kind: 'checkbox', key: 'showCitations', id: 'epoRP-opt-cit', title: 'Show citations panel', help: 'Displays a compact cited-art summary grouped by phase.' },
+    { section: 'timeline', kind: 'checkbox', key: 'showPublications', id: 'epoRP-opt-pubs', title: 'Show publications on timeline', help: 'Includes publication entries from main + family sources.' },
+    { section: 'timeline', kind: 'checkbox', key: 'showEventHistory', id: 'epoRP-opt-events', title: 'Show event-history rows', help: 'Includes EP Event history source rows in timeline.' },
+    { section: 'timeline', kind: 'checkbox', key: 'showLegalStatusRows', id: 'epoRP-opt-legal', title: 'Show legal-status rows', help: 'Includes EP Legal status rows in timeline.' },
+    { section: 'timeline', kind: 'select', key: 'timelineDensity', id: 'epoRP-opt-density', title: 'Timeline density', help: 'Compact / standard / verbose visual density.', choices: [
+      { value: 'compact', label: 'Compact' },
+      { value: 'standard', label: 'Standard' },
+      { value: 'verbose', label: 'Verbose' },
+    ] },
+    { section: 'timeline', kind: 'select', key: 'timelineEventLevel', id: 'epoRP-opt-event-level', title: 'Timeline event importance', help: 'Visual severity for event-history items.', choices: [
+      { value: 'info', label: 'Info' },
+      { value: 'warn', label: 'Warn' },
+      { value: 'bad', label: 'High' },
+      { value: 'ok', label: 'Low' },
+    ] },
+    { section: 'timeline', kind: 'select', key: 'timelineLegalLevel', id: 'epoRP-opt-legal-level', title: 'Timeline legal importance', help: 'Visual severity for legal-status items.', choices: [
+      { value: 'warn', label: 'Warn' },
+      { value: 'info', label: 'Info' },
+      { value: 'bad', label: 'High' },
+      { value: 'ok', label: 'Low' },
+    ] },
+    { section: 'doclist', kind: 'checkbox', key: 'doclistGroupsExpandedByDefault', id: 'epoRP-opt-docgrp-default-open', title: 'Expand doclist groups by default', help: 'When there is no saved per-group state yet, open groups automatically instead of starting collapsed.' },
+  ];
+
+  const OPTION_DEFS_BY_KEY = Object.fromEntries(OPTION_DEFS.map((def) => [def.key, def]));
+
   const runtime = {
     appNo: '',
     href: location.href,
@@ -444,10 +483,32 @@
     return safeInlineJson(value);
   }
 
+  function optionSnapshotKeys(optionState = options()) {
+    const knownKeys = OPTION_DEFS.map((def) => def.key);
+    const knownSet = new Set(knownKeys);
+    const extraKeys = Object.keys(optionState).filter((key) => !knownSet.has(key)).sort((a, b) => a.localeCompare(b));
+    return [...knownKeys, ...extraKeys];
+  }
+
   function renderOptionSnapshot() {
     const o = options();
-    const keys = Object.keys(o).sort((a, b) => a.localeCompare(b));
-    return keys.map((key) => `<div class="epoRP-optval-row"><div class="epoRP-optval-k">${esc(key)}</div><div class="epoRP-optval-v">${esc(optionValueText(o[key]))}</div></div>`).join('');
+    return optionSnapshotKeys(o).map((key) => `<div class="epoRP-optval-row"><div class="epoRP-optval-k">${esc(key)}</div><div class="epoRP-optval-v">${esc(optionValueText(o[key]))}</div></div>`).join('');
+  }
+
+  function renderOptionControl(def, optionState) {
+    const value = optionState[def.key];
+    if (def.kind === 'select') {
+      const inner = (def.choices || []).map((choice) => `<option value="${esc(choice.value)}" ${String(value) === String(choice.value) ? 'selected' : ''}>${esc(choice.label)}</option>`).join('');
+      return `<label class="epoRP-or"><div><div class="epoRP-ol">${esc(def.title)}</div><div class="epoRP-oh">${esc(def.help)}</div></div><select id="${def.id}" class="epoRP-in">${inner}</select></label>`;
+    }
+    return `<label class="epoRP-or"><div><div class="epoRP-ol">${esc(def.title)}</div><div class="epoRP-oh">${esc(def.help)}</div></div><input id="${def.id}" type="checkbox" ${value ? 'checked' : ''}></label>`;
+  }
+
+  function renderOptionSection(sectionKey, optionState) {
+    const section = OPTION_SECTIONS.find((entry) => entry.key === sectionKey);
+    if (!section) return '';
+    const body = OPTION_DEFS.filter((def) => def.section === sectionKey).map((def) => renderOptionControl(def, optionState)).join('');
+    return `<div class="epoRP-optsec"><div class="epoRP-optsec-h">${esc(section.title)}</div>${section.help ? `<div class="epoRP-optsec-m">${esc(section.help)}</div>` : ''}<div class="epoRP-optsec-b">${body}</div></div>`;
   }
 
   function parsedSourceHasContent(sourceKey, data = {}) {
@@ -716,8 +777,11 @@
   function normalizeOptions(raw) {
     const merged = { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
 
-    for (const key of Object.keys(DEFAULTS)) {
-      if (typeof DEFAULTS[key] === 'boolean') {
+    for (const def of OPTION_DEFS) {
+      const key = def.key;
+      if (!(key in merged)) continue;
+
+      if (def.kind === 'checkbox') {
         const value = merged[key];
         if (typeof value === 'string') {
           const lowered = value.trim().toLowerCase();
@@ -725,17 +789,15 @@
         } else {
           merged[key] = !!value;
         }
+        continue;
+      }
+
+      if (def.kind === 'select') {
+        const allowed = new Set((def.choices || []).map((choice) => String(choice.value || '').toLowerCase()));
+        const value = String(merged[key] || DEFAULTS[key] || '').toLowerCase();
+        merged[key] = allowed.has(value) ? value : DEFAULTS[key];
       }
     }
-
-    const density = String(merged.timelineDensity || DEFAULTS.timelineDensity).toLowerCase();
-    merged.timelineDensity = ['compact', 'standard', 'verbose'].includes(density) ? density : DEFAULTS.timelineDensity;
-
-    const eventLevel = String(merged.timelineEventLevel || DEFAULTS.timelineEventLevel).toLowerCase();
-    merged.timelineEventLevel = ['info', 'warn', 'bad', 'ok'].includes(eventLevel) ? eventLevel : DEFAULTS.timelineEventLevel;
-
-    const legalLevel = String(merged.timelineLegalLevel || DEFAULTS.timelineLegalLevel).toLowerCase();
-    merged.timelineLegalLevel = ['info', 'warn', 'bad', 'ok'].includes(legalLevel) ? legalLevel : DEFAULTS.timelineLegalLevel;
 
     return merged;
   }
@@ -1040,7 +1102,7 @@
 
   function parseApplicationField(raw) {
     const m = normalize(raw).match(/(\d{6,10}\.\d)[\s\S]{0,70}?(\d{2}\.\d{2}\.\d{4})\b/);
-    return { checksum: m?.[1] || '', filingDate: m?.[2] || '' };
+    return { filingDate: m?.[2] || '' };
   }
 
   function parseMainPublications(doc, role = 'EP (this file)') {
@@ -1458,14 +1520,12 @@
       applicant: pickApplicantLine(applicantField) || normalize(applicantField.split('\n').find(Boolean) || '') || fallbackApplicant,
       representative: normalize(representativeField.split('\n').find(Boolean) || ''),
       filingDate: appInfo.filingDate,
-      checksum: appInfo.checksum,
       priorities,
       priorityText: priorities.map((p) => `${p.no} · ${p.dateStr}`).join('\n'),
       statusRaw: normalize(statusField),
       statusSimple: status.simple,
       statusLevel: status.level,
       statusStage: inferStatusStage(statusField),
-      designatedStates: dedupeMultiline(fieldByLabel(doc, [/^Designated/i])),
       recentEvents: parseRecentEvents(recentEventField),
       publications: mainPublications.length ? mainPublications : parsePublications(publicationField, 'EP (this file)'),
       internationalAppNo,
@@ -1473,7 +1533,6 @@
       isDivisional: !!parentCase || divisionalMarker,
       parentCase,
       divisionalChildren: divisionalChildren.filter((ep) => ep !== caseNo),
-      hasDivisionals: divisionalChildren.some((ep) => ep !== caseNo),
     };
     result.applicationType = parseApplicationType(result);
     return result;
@@ -2414,7 +2473,7 @@
     }
   }
 
-  async function fetchWithTimeout(url, signal) {
+  async function fetchWithTimeout(url, signal, responseType = 'text') {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     const onAbort = () => controller.abort();
@@ -2422,22 +2481,9 @@
     try {
       const response = await fetch(url, { credentials: 'same-origin', signal: controller.signal });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.text();
-    } finally {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', onAbort);
-    }
-  }
-
-  async function fetchBinaryWithTimeout(url, signal) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    const onAbort = () => controller.abort();
-    signal?.addEventListener('abort', onAbort);
-    try {
-      const response = await fetch(url, { credentials: 'same-origin', signal: controller.signal });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.arrayBuffer();
+      return responseType === 'arrayBuffer'
+        ? await response.arrayBuffer()
+        : await response.text();
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
@@ -3673,7 +3719,7 @@
       }
     };
 
-    const binary = await fetchBinaryWithRetry(url, signal);
+    const binary = await fetchWithRetry(url, signal, 'arrayBuffer');
     if (isPdfBinaryData(binary)) {
       const text = normalize(await parsePdfBinaryToText(binary));
       if (text) {
@@ -3713,7 +3759,7 @@
 
     const linkedUrl = extractPdfLikeUrlFromHtml(htmlPayload, url);
     if (linkedUrl && linkedUrl !== url) {
-      const linkedBinary = await fetchBinaryWithRetry(linkedUrl, signal);
+      const linkedBinary = await fetchWithRetry(linkedUrl, signal, 'arrayBuffer');
       if (isPdfBinaryData(linkedBinary)) {
         const linkedText = normalize(await parsePdfBinaryToText(linkedBinary));
         if (linkedText) {
@@ -4007,31 +4053,14 @@
   }
 
 
-  async function fetchWithRetry(url, signal) {
+  async function fetchWithRetry(url, signal, responseType = 'text') {
     let lastError;
     for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
       if (signal?.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
       try {
-        return await fetchWithTimeout(url, signal);
-      } catch (error) {
-        lastError = error;
-        if (signal?.aborted || error?.name === 'AbortError') throw error;
-        if (attempt >= FETCH_RETRIES) throw error;
-      }
-    }
-    throw lastError;
-  }
-
-  async function fetchBinaryWithRetry(url, signal) {
-    let lastError;
-    for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
-      if (signal?.aborted) {
-        throw new DOMException('Aborted', 'AbortError');
-      }
-      try {
-        return await fetchBinaryWithTimeout(url, signal);
+        return await fetchWithTimeout(url, signal, responseType);
       } catch (error) {
         lastError = error;
         if (signal?.aborted || error?.name === 'AbortError') throw error;
@@ -4847,8 +4876,6 @@
       applicationType: mainUnavailable ? 'Unavailable' : (main.applicationType || parseApplicationType(main)),
       parentCase: mainUnavailable ? '' : (main.parentCase || ''),
       divisionalChildren: mainUnavailable ? [] : (main.divisionalChildren || []),
-      hasDivisionals: mainUnavailable ? false : !!main.hasDivisionals,
-      recentMainEvent: main.recentEvents?.[0] || (legal.events || [])[0] || null,
       latestEpo,
       latestApplicant,
       partialState,
@@ -5320,20 +5347,6 @@
     </div><div class="epoRP-m">${esc(m.renewal.explanatoryBasis)}</div><div class="epoRP-m">${confidenceBadge}${postureNote ? ` <span>${esc(postureNote)}</span>` : ''}</div></div>`;
   }
 
-  function renderOverviewFederatedCard(m) {
-    if (!(m.federated.status || m.federated.trackedStates || m.federated.upMemberStates)) return '';
-    const notableStates = m.federated.notableStates || [];
-    const upCount = normalize(m.federated.upMemberStates || '').split(/,\s*/).filter(Boolean).length;
-
-    return `<div class="epoRP-c"><h4>Federated / national</h4><div class="epoRP-g">
-      <div class="epoRP-l">Status</div><div class="epoRP-v">${esc(m.federated.status || '—')}</div>
-      <div class="epoRP-l">UP coverage</div><div class="epoRP-v">${m.federated.upMemberStates ? `${esc(m.federated.upMemberStates)} <span class="epoRP-bdg ok">${upCount} states</span>` : '—'}</div>
-      <div class="epoRP-l">Renewals paid to</div><div class="epoRP-v">${esc(m.federated.renewalFeesPaidUntil || '—')}</div>
-      <div class="epoRP-l">Invalidation date</div><div class="epoRP-v">${esc(m.federated.invalidationDate || '—')}</div>
-      <div class="epoRP-l">Tracked states</div><div class="epoRP-v">${esc(String(m.federated.trackedStates || 0))}${m.federated.recordUpdated ? `<div class="epoRP-m">Updated ${esc(m.federated.recordUpdated)}</div>` : ''}</div>
-    </div>${notableStates.length ? `<div class="epoRP-m">Notable states: ${esc(notableStates.map((s) => `${s.state}${s.notInForceSince ? ` (not in force since ${s.notInForceSince})` : ''}`).join(', '))}</div>` : ''}</div>`;
-  }
-
   function citationCategoryLevel(categories = []) {
     const joined = categories.join(' ');
     if (/\bX/.test(joined)) return 'bad';
@@ -5485,34 +5498,12 @@
 
   function renderOptions(caseNo) {
     const o = options();
-    const checkbox = (id, key, title, help) => `<label class="epoRP-or"><div><div class="epoRP-ol">${esc(title)}</div><div class="epoRP-oh">${esc(help)}</div></div><input id="${id}" type="checkbox" ${o[key] ? 'checked' : ''}></label>`;
-    const selectRow = (id, title, help, inner) => `<label class="epoRP-or"><div><div class="epoRP-ol">${esc(title)}</div><div class="epoRP-oh">${esc(help)}</div></div><select id="${id}" class="epoRP-in">${inner}</select></label>`;
-    const section = (title, help, body) => `<div class="epoRP-optsec"><div class="epoRP-optsec-h">${esc(title)}</div>${help ? `<div class="epoRP-optsec-m">${esc(help)}</div>` : ''}<div class="epoRP-optsec-b">${body}</div></div>`;
+    const optionSectionsHtml = OPTION_SECTIONS.map((section) => renderOptionSection(section.key, o)).join('');
+    const maintenanceSection = `<div class="epoRP-optsec"><div class="epoRP-optsec-h">Maintenance</div><div class="epoRP-optsec-m">Manual refresh and cache controls for this case.</div><div class="epoRP-optsec-b"><div class="epoRP-actions"><button class="epoRP-btn" id="epoRP-reload">Reload all background pages</button><button class="epoRP-btn" id="epoRP-clear">Clear this case cache</button><button class="epoRP-btn" id="epoRP-clear-logs">Clear operation console</button></div></div></div>`;
 
     return `<div class="epoRP-c"><h4>Options</h4>
-      ${section('Layout', 'Panel placement and page-shift behaviour.', [
-        checkbox('epoRP-opt-shift', 'shiftBody', 'Shift page body', 'Adds right padding so Register content is not hidden under panel.'),
-      ].join(''))}
-      ${section('Data loading', 'How aggressively the sidebar prefetches Register sources.', [
-        checkbox('epoRP-opt-preload', 'preloadAllTabs', 'Preload all case tabs in background', 'Loads main/doclist/event/family/legal/federated/citations/ueMain in background and fills cache.'),
-      ].join(''))}
-      ${section('Overview panels', 'Show or hide overview cards.', [
-        checkbox('epoRP-opt-ren', 'showRenewals', 'Show renewals panel', 'Displays pre-/post-grant and UE-sensitive renewal explanation in Overview.'),
-        checkbox('epoRP-opt-upc', 'showUpcUe', 'Show UPC/UE panel', 'Displays inferred UE + UPC opt-out state with notes.'),
-        checkbox('epoRP-opt-cit', 'showCitations', 'Show citations panel', 'Displays a compact cited-art summary grouped by phase.'),
-      ].join(''))}
-      ${section('Timeline', 'Timeline density and which sources feed it.', [
-        checkbox('epoRP-opt-pubs', 'showPublications', 'Show publications on timeline', 'Includes publication entries from main + family sources.'),
-        checkbox('epoRP-opt-events', 'showEventHistory', 'Show event-history rows', 'Includes EP Event history source rows in timeline.'),
-        checkbox('epoRP-opt-legal', 'showLegalStatusRows', 'Show legal-status rows', 'Includes EP Legal status rows in timeline.'),
-        selectRow('epoRP-opt-density', 'Timeline density', 'Compact / standard / verbose visual density.', `<option value="compact" ${o.timelineDensity === 'compact' ? 'selected' : ''}>Compact</option><option value="standard" ${o.timelineDensity === 'standard' ? 'selected' : ''}>Standard</option><option value="verbose" ${o.timelineDensity === 'verbose' ? 'selected' : ''}>Verbose</option>`),
-        selectRow('epoRP-opt-event-level', 'Timeline event importance', 'Visual severity for event-history items.', `<option value="info" ${o.timelineEventLevel === 'info' ? 'selected' : ''}>Info</option><option value="warn" ${o.timelineEventLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="bad" ${o.timelineEventLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${o.timelineEventLevel === 'ok' ? 'selected' : ''}>Low</option>`),
-        selectRow('epoRP-opt-legal-level', 'Timeline legal importance', 'Visual severity for legal-status items.', `<option value="warn" ${o.timelineLegalLevel === 'warn' ? 'selected' : ''}>Warn</option><option value="info" ${o.timelineLegalLevel === 'info' ? 'selected' : ''}>Info</option><option value="bad" ${o.timelineLegalLevel === 'bad' ? 'selected' : ''}>High</option><option value="ok" ${o.timelineLegalLevel === 'ok' ? 'selected' : ''}>Low</option>`),
-      ].join(''))}
-      ${section('Doclist grouping', 'How grouped document packets behave on the doclist tab.', [
-        checkbox('epoRP-opt-docgrp-default-open', 'doclistGroupsExpandedByDefault', 'Expand doclist groups by default', 'When there is no saved per-group state yet, open groups automatically instead of starting collapsed.'),
-      ].join(''))}
-      ${section('Maintenance', 'Manual refresh and cache controls for this case.', `<div class="epoRP-actions"><button class="epoRP-btn" id="epoRP-reload">Reload all background pages</button><button class="epoRP-btn" id="epoRP-clear">Clear this case cache</button><button class="epoRP-btn" id="epoRP-clear-logs">Clear operation console</button></div>`)}
+      ${optionSectionsHtml}
+      ${maintenanceSection}
       <div class="epoRP-console-wrap">
         <div class="epoRP-ol">Current option values</div>
         <div class="epoRP-oh">Effective values for all sidebar parameters.</div>
@@ -5610,52 +5601,38 @@
     restorePanelScroll(caseNo, view, top);
   }
 
+  function commitOptionValue(key, value) {
+    const def = OPTION_DEFS_BY_KEY[key] || null;
+    const current = options()[key];
+    const normalizedValue = def?.kind === 'checkbox' ? !!value : String(value || DEFAULTS[key] || '');
+    if (current === normalizedValue) return;
+    setOptions({ [key]: normalizedValue });
+    if (key === 'doclistGroupsExpandedByDefault') clearDoclistOpenGroups(runtime.appNo || '');
+    applyBodyShift();
+    rerenderPanelPreservingCurrentScroll();
+  }
+
   function wireOptions() {
     const b = runtime.body;
     if (!b) return;
 
-    const wireToggle = (id, key) => {
-      const el = b.querySelector(`#${id}`);
-      if (!el) return;
-      el.checked = !!options()[key];
+    for (const def of OPTION_DEFS) {
+      const el = b.querySelector(`#${def.id}`);
+      if (!el) continue;
 
-      const commit = () => {
-        const nextValue = !!el.checked;
-        if (!!options()[key] === nextValue) return;
-        setOptions({ [key]: nextValue });
-        if (key === 'doclistGroupsExpandedByDefault') clearDoclistOpenGroups(runtime.appNo || '');
-        applyBodyShift();
-        rerenderPanelPreservingCurrentScroll();
-      };
+      if (def.kind === 'select') {
+        el.value = String(options()[def.key] || DEFAULTS[def.key] || '');
+        el.addEventListener('change', (event) => {
+          commitOptionValue(def.key, event.target.value || DEFAULTS[def.key] || '');
+        });
+        continue;
+      }
 
+      el.checked = !!options()[def.key];
+      const commit = () => commitOptionValue(def.key, !!el.checked);
       el.addEventListener('change', commit);
       el.addEventListener('input', commit);
-    };
-
-    wireToggle('epoRP-opt-shift', 'shiftBody');
-    wireToggle('epoRP-opt-preload', 'preloadAllTabs');
-    wireToggle('epoRP-opt-pubs', 'showPublications');
-    wireToggle('epoRP-opt-events', 'showEventHistory');
-    wireToggle('epoRP-opt-legal', 'showLegalStatusRows');
-    wireToggle('epoRP-opt-ren', 'showRenewals');
-    wireToggle('epoRP-opt-upc', 'showUpcUe');
-    wireToggle('epoRP-opt-cit', 'showCitations');
-    wireToggle('epoRP-opt-docgrp-default-open', 'doclistGroupsExpandedByDefault');
-
-    b.querySelector('#epoRP-opt-density')?.addEventListener('change', (event) => {
-      setOptions({ timelineDensity: event.target.value || 'standard' });
-      rerenderPanelPreservingCurrentScroll();
-    });
-
-    b.querySelector('#epoRP-opt-event-level')?.addEventListener('change', (event) => {
-      setOptions({ timelineEventLevel: event.target.value || 'info' });
-      rerenderPanelPreservingCurrentScroll();
-    });
-
-    b.querySelector('#epoRP-opt-legal-level')?.addEventListener('change', (event) => {
-      setOptions({ timelineLegalLevel: event.target.value || 'warn' });
-      rerenderPanelPreservingCurrentScroll();
-    });
+    }
 
     b.querySelector('#epoRP-reload')?.addEventListener('click', () => {
       addLog(runtime.appNo, 'info', 'Manual reload all background pages');

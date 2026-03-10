@@ -61,7 +61,6 @@ hasText("if (runtime.overviewCache.key === cacheKey && runtime.overviewCache.mod
 has(/function\s+compactOverviewTitle\s*\(/, 'Overview renderer should centralize noisy document-title cleanup behind a compaction helper');
 has(/function\s+renderOverviewHeaderCard\s*\(/, 'Overview renderer should be split into maintainable sub-renderers');
 has(/function\s+renderOverviewActionableCard\s*\(/, 'Actionable-status overview card should be isolated from the top-level renderer');
-has(/function\s+renderOverviewFederatedCard\s*\(/, 'Federated-register summary should have a dedicated overview renderer');
 has(/function\s+renderOverviewCitationsCard\s*\(/, 'Compact citations section should have a dedicated overview renderer');
 hasText("termReferenceDate ? `20-year term ${termReferenceDate}` : ''", 'Overview header should show 20-year term date without extra years-remaining noise');
 hasText("showCitations: true,", 'Citations panel should be controllable via options');

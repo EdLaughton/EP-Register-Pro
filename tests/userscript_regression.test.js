@@ -141,10 +141,11 @@ notHas(/addEventListener\('focus',[\s\S]*prefetchCase\(/, 'Focus handler should 
 has(/inferProceduralDeadlines\(main,\s*docs,\s*eventHistory,\s*legal,\s*pdfDeadlines\)/, 'Overview deadline model should include PDF-derived hints');
 
 // Timeline controls (include/exclude + importance)
-has(/checkbox\('epoRP-opt-events'/, 'Timeline event include toggle missing from options');
-has(/checkbox\('epoRP-opt-legal'/, 'Timeline legal include toggle missing from options');
-has(/epoRP-opt-event-level/, 'Timeline event level selector missing from options');
-has(/epoRP-opt-legal-level/, 'Timeline legal level selector missing from options');
+has(/const\s+OPTION_DEFS\s*=\s*\[/, 'Options should be defined from a shared schema');
+has(/key:\s*'showEventHistory'[\s\S]*id:\s*'epoRP-opt-events'/, 'Timeline event include toggle missing from option schema');
+has(/key:\s*'showLegalStatusRows'[\s\S]*id:\s*'epoRP-opt-legal'/, 'Timeline legal include toggle missing from option schema');
+has(/key:\s*'timelineEventLevel'[\s\S]*id:\s*'epoRP-opt-event-level'/, 'Timeline event level selector missing from option schema');
+has(/key:\s*'timelineLegalLevel'[\s\S]*id:\s*'epoRP-opt-legal-level'/, 'Timeline legal level selector missing from option schema');
 
 // Options diagnostics console + effective key/value snapshot
 has(/function\s+renderLogConsole\s*\(caseNo\)/, 'Operation console renderer missing');
@@ -152,14 +153,18 @@ has(/function\s+formatLogClock\s*\(/, 'Operation console should include timestam
 has(/function\s+safeInlineJson\s*\(/, 'Operation console should include safe JSON serializer helper');
 has(/function\s+optionValueText\s*\(/, 'Option snapshot should include value-normalization helper');
 has(/function\s+renderOptions\s*\(caseNo\)/, 'Options renderer should accept caseNo to scope diagnostics to current case');
+has(/function\s+renderOptionControl\s*\(/, 'Options renderer should build controls from the shared schema');
+has(/function\s+renderOptionSection\s*\(/, 'Options renderer should build sections from the shared schema');
 has(/id="epoRP-log-console"/, 'Operation console container missing from options view');
 has(/id="epoRP-clear-logs"/, 'Clear operation console button missing from options view');
 has(/function\s+renderOptionSnapshot\s*\(/, 'Option snapshot renderer missing');
-has(/Object\.keys\(o\)\.sort\(/, 'Option snapshot should enumerate and sort all option keys');
+has(/function\s+optionSnapshotKeys\s*\(/, 'Option snapshot should centralize key ordering');
+has(/extraKeys\s*=\s*Object\.keys\(optionState\)\.filter\(/, 'Option snapshot should keep unknown option keys visible and sorted after known ones');
 has(/id="epoRP-optvals"/, 'Option key/value list container missing from options view');
 has(/renderOptionSnapshot\(\)/, 'Options view should render option key/value snapshot output');
 has(/renderLogConsole\(caseNo\)/, 'Options view should render operation console scoped to current case');
-has(/b\.querySelector\('#epoRP-clear-logs'\)\?\.addEventListener\('click',\s*\(\)\s*=>\s*\{[\s\S]*?c\.logs\s*=\s*\[\];[\s\S]*?renderPanel\(\);[\s\S]*?\}\);/, 'Clear operation console control should empty case logs and rerender options');
+has(/b\.querySelector\('#epoRP-clear-logs'\)\?\.addEventListener\('click',\s*\(\)\s*=>\s*\{[\s\S]*?c\.logs\s*=\s*\[\];[\s\S]*?rerenderPanelPreservingCurrentScroll\(\);[\s\S]*?\}\);/, 'Clear operation console control should empty case logs and rerender options without losing sidebar scroll');
+has(/function\s+commitOptionValue\s*\(/, 'Option changes should flow through a shared commit helper');
 hasText('Current option values', 'Options view should show a section listing effective option values');
 hasText('Expand doclist groups by default', 'Options view should expose a dedicated default expand/collapse toggle for doclist packet groups');
 hasText('class="epoRP-optsec"', 'Options view should organize settings into visually separated categories');
