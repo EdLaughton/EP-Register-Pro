@@ -4195,45 +4195,23 @@
     const bundle = String(run?.bundle || run?.groupKind || 'Other');
     if (bundle !== 'Search package') return '';
 
-    const titles = (run?.models || []).map((model) => normalize(model.title || '').toLowerCase()).filter(Boolean).join('\n');
-    if (!titles) return '';
-
-    if (/partial international search report|provisional opinion accompanying the partial search results/.test(titles)) {
-      return 'Partial international search';
-    }
-
-    if (/international preliminary report on patentability|written opinion of the isa|isr: cited documents/.test(titles)) {
-      return 'International search / IPRP';
-    }
-
-    if (/supplementary european search report/.test(titles)) {
-      return 'Supplementary European search package';
-    }
-
-    if (/extended european search report|document annexed to the extended european search report/.test(titles)) {
-      return 'Extended European search package';
-    }
-
-    if (/communication regarding the transmission of the european search report|european search opinion|european search report|information on search strategy/.test(titles)) {
-      return 'European search package';
+    for (const model of (run?.models || [])) {
+      const signal = normalizedDocSignal(model?.title || '', model?.procedure || '');
+      if (!signal || signal.family !== 'search') continue;
+      return signal.bundle;
     }
 
     return '';
   }
 
   function specialRunLabel(run) {
-    const titles = (run?.models || []).map((model) => normalize(model.title || '').toLowerCase()).filter(Boolean).join('\n');
-    if (!titles) return '';
-
-    if (/decision to grant a european patent/.test(titles)) return 'Grant decision';
-    if (/decision to allow further processing/.test(titles)) return 'Further processing';
-    if (/transmission of the certificate for a european patent pursuant to rule\s*74/.test(titles)) return 'Patent certificate';
-    if (/grant of extension of time limit/.test(titles)) return 'Extension of time limit';
-    if (/application deemed to be withdrawn.*non-entry into european phase/.test(titles)) return 'Euro-PCT non-entry failure';
-    if (/application deemed to be withdrawn.*translations of claims\/payment missing/.test(titles)) return 'Grant-formalities failure';
-    if (/application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(titles)) return 'Fees / written-opinion failure';
-    if (/application deemed to be withdrawn.*non-reply to written opinion/.test(titles)) return 'Written-opinion loss';
-    if (/loss of rights|rule\s*112\(1\)/.test(titles)) return 'Loss-of-rights communication';
+    for (const model of (run?.models || [])) {
+      const signal = normalizedDocSignal(model?.title || '', model?.procedure || '');
+      if (!signal) continue;
+      if (['Further processing', 'Grant decision', 'Patent certificate', 'Extension of time limit', 'Euro-PCT non-entry failure', 'Grant-formalities failure', 'Fees / written-opinion failure', 'Written-opinion loss', 'Loss-of-rights communication', 'Opposition'].includes(signal.bundle)) {
+        return signal.bundle;
+      }
+    }
     return '';
   }
 
@@ -6577,6 +6555,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   function buildDeadlineRecords(docs, eventHistory = {}, legal = {}) {
     const sortedDocs = [...(docs || [])].sort(compareDateDesc);
     const sortedEvents = dedupe([...(eventHistory.events || []), ...(legal.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}`).sort(compareDateDesc);
+    const sortedCodedEvents = dedupe([...(legal.codedEvents || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.originalCode}|${e.codexKey}`).sort(compareDateDesc);
     return dedupe([
       ...sortedDocs.map((d) => ({
         dateStr: d.dateStr,
@@ -6591,12 +6570,30 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         detail: e.detail || '',
         actor: /applicant|filed by applicant|by applicant/i.test(`${e.title || ''} ${e.detail || ''}`) ? 'Applicant' : 'EPO',
         source: 'Event',
+        codexKey: e.codexKey || '',
+        codexPhase: e.codexPhase || '',
+        codexClass: e.codexClass || '',
       })),
-    ], (r) => `${r.dateStr}|${r.title}|${r.detail}|${r.source}`).sort(compareDateDesc);
+      ...sortedCodedEvents.map((e) => ({
+        dateStr: e.dateStr,
+        title: e.title || '',
+        detail: e.detail || '',
+        actor: /applicant|filed by applicant|by applicant/i.test(`${e.title || ''} ${e.detail || ''}`) ? 'Applicant' : 'EPO',
+        source: 'Coded legal event',
+        codexKey: e.codexKey || '',
+        codexPhase: e.codexPhase || '',
+        codexClass: e.codexClass || '',
+      })),
+    ], (r) => `${r.dateStr}|${r.title}|${r.detail}|${r.source}|${r.codexKey || ''}`).sort(compareDateDesc);
   }
 
   function postureRecord(records = [], regex) {
     return (records || []).find((record) => regex.test(`${record.title || ''} ${record.detail || ''}`.toLowerCase())) || null;
+  }
+
+  function postureRecordByCodex(records = [], internalKeys = []) {
+    const keys = new Set((internalKeys || []).filter(Boolean));
+    return (records || []).find((record) => record.codexKey && keys.has(record.codexKey)) || null;
   }
 
   function postureRecordDate(record) {
@@ -6626,19 +6623,21 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const statusSummary = summarizeStatus(statusRaw);
     const statusLow = statusRaw.toLowerCase();
     const records = buildDeadlineRecords(docs, eventHistory, legal);
-    const codedEvents = Array.isArray(legal?.codedEvents) ? legal.codedEvents : [];
-    const latestCodedEvent = (internalKey) => codedEvents.find((event) => event.codexKey === internalKey) || null;
-    const latestLoss = postureRecord(records, /application deemed to be withdrawn|deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|withdrawn by applicant|application withdrawn/);
+    const latestLoss = postureRecordByCodex(records, ['LOSS_OF_RIGHTS_EVENT', 'APPLICATION_DEEMED_WITHDRAWN'])
+      || postureRecord(records, /application deemed to be withdrawn|deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|withdrawn by applicant|application withdrawn/);
     const detailedLoss = postureRecord(records, /non-entry into european phase|translations of claims\/payment missing|non-payment of examination fee\/designation fee\/non-reply to written opinion|non-reply to written opinion/);
     const effectiveLoss = detailedLoss || latestLoss;
-    const latestRecovery = postureRecord(records, /decision to allow further processing|further processing|request for further processing|re-establishment|rights re-established/);
-    const latestGrantDecision = postureRecord(records, /decision to grant a european patent|mention of grant|patent granted|the patent has been granted/);
-    const latestNoOpposition = latestCodedEvent('NO_OPPOSITION_FILED') || postureRecord(records, /no opposition filed within time limit/);
-    const latestR71 = latestCodedEvent('GRANT_R71_3_EVENT') || postureRecord(records, /grant of patent is intended|intention to grant|rule\s*71\(3\)|text intended for grant/);
-    const latestSearchPublication = latestCodedEvent('SEARCH_REPORT_PUBLICATION');
-    const latestLossCoded = latestCodedEvent('LOSS_OF_RIGHTS_EVENT');
+    const latestRecovery = postureRecordByCodex(records, ['FURTHER_PROCESSING_DECISION', 'FURTHER_PROCESSING_REQUEST'])
+      || postureRecord(records, /decision to allow further processing|further processing|request for further processing|re-establishment|rights re-established/);
+    const latestGrantDecision = postureRecordByCodex(records, ['EXPECTED_GRANT'])
+      || postureRecord(records, /decision to grant a european patent|mention of grant|patent granted|the patent has been granted/);
+    const latestNoOpposition = postureRecordByCodex(records, ['NO_OPPOSITION_FILED'])
+      || postureRecord(records, /no opposition filed within time limit/);
+    const latestR71 = postureRecordByCodex(records, ['GRANT_R71_3_EVENT'])
+      || postureRecord(records, /grant of patent is intended|intention to grant|rule\s*71\(3\)|text intended for grant/);
+    const latestSearchPublication = postureRecordByCodex(records, ['SEARCH_REPORT_PUBLICATION']);
 
-    const latestLossDate = postureRecordDate(latestLossCoded || latestLoss);
+    const latestLossDate = postureRecordDate(latestLoss);
     const latestRecoveryDate = postureRecordDate(latestRecovery);
     const latestGrantDecisionDate = postureRecordDate(latestGrantDecision);
     const recovered = !!(latestLossDate && latestRecoveryDate && latestRecoveryDate >= latestLossDate);
@@ -7404,15 +7403,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const bundle = String(model.groupKind || model.bundle || '');
     const pdfLabel = pdfCategoryBundleLabel(docModelPdfCategory(model, pdfDeadlines), bundle);
     if (pdfLabel) return pdfLabel;
-    if (/decision to grant a european patent/.test(title)) return 'Grant decision';
-    if (/decision to allow further processing/.test(title)) return 'Further processing';
-    if (/transmission of the certificate for a european patent pursuant to rule\s*74/.test(title)) return 'Patent certificate';
-    if (/grant of extension of time limit/.test(title)) return 'Extension of time limit';
-    if (/application deemed to be withdrawn.*non-entry into european phase/.test(title)) return 'Euro-PCT non-entry failure';
-    if (/application deemed to be withdrawn.*translations of claims\/payment missing/.test(title)) return 'Grant-formalities failure';
-    if (/application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(title)) return 'Fees / written-opinion failure';
-    if (/application deemed to be withdrawn.*non-reply to written opinion/.test(title)) return 'Written-opinion loss';
-    if (/deemed to be withdrawn|loss of rights|rule\s*112\(1\)/.test(title)) return 'Loss-of-rights communication';
+    const signal = normalizedDocSignal(model.title || '', model.procedure || '');
+    if (signal?.bundle) return signal.bundle;
     if (/examination started|examining division becomes responsible|request for examination filed/.test(title)) return 'Examination milestone';
     if (/notification of forthcoming publication|publication in section/i.test(title)) return 'Publication formalities';
     if (/communication to designated inventor/.test(title)) return 'Inventor notification';

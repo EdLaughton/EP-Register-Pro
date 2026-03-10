@@ -255,6 +255,7 @@ hasText("sourceUrl(fallbackCaseNo, 'doclist')", 'Doclist parser should avoid und
 hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use explicit R71(3) wording for grant package groups');
 hasText('Response to intention to grant', 'Doclist grouping should expose a dedicated label for applicant responses to R71(3) packets');
 hasText('Transfer / recordal filings', 'Doclist/timeline grouping should expose a more specific register-admin label for transfer/recordal packets');
+has(/function\s+normalizedDocSignal\s*\(/, 'Userscript runtime should mirror the normalized doc-signal core instead of duplicating ad hoc one-off labels');
 hasText('Extended European search package', 'Doclist/timeline grouping should surface extended-ESR packets with a more specific search label');
 hasText('Art. 94(3) communication', 'Timeline/doc labels should be able to upgrade examination packet names from OCR/PDF-derived Art. 94(3) evidence');
 hasText('No unitary effect record', 'UPC / UE presentation should avoid echoing overall withdrawn status as if it were a unitary-effect record');
