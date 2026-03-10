@@ -1,6 +1,9 @@
 const assert = require('assert');
-const { classifyDocSignal } = require('../lib/epo_v2_doc_signals');
+const { codexDescriptionRecord, docSignalFromCodexRecord, classifyDocSignal } = require('../lib/epo_v2_doc_signals');
 
+assert.strictEqual(codexDescriptionRecord('Request for further processing').internalKey, 'FURTHER_PROCESSING_REQUEST', 'doc-signal core should consult the generated codex description map');
+assert.strictEqual(docSignalFromCodexRecord({ internalKey: 'ORAL_PROCEEDINGS', phase: 'hearing', classification: 'hearing' }, 'Summons to oral proceedings').bundle, 'Oral proceedings', 'doc-signal core should provide a generic hearing-phase fallback for unseen codex events');
+assert.strictEqual(classifyDocSignal({ title: 'Request for further processing' }).bundle, 'Further processing', 'doc-signal core should normalize further-processing requests directly from codex descriptions');
 assert.strictEqual(classifyDocSignal({ title: 'Decision to allow further processing' }).bundle, 'Further processing', 'doc-signal core should normalize further-processing decisions');
 assert.strictEqual(classifyDocSignal({ title: 'Decision to grant a European patent' }).bundle, 'Grant decision', 'doc-signal core should normalize grant decisions');
 assert.strictEqual(classifyDocSignal({ title: 'Transmission of the certificate for a European patent pursuant to Rule 74 EPC' }).bundle, 'Patent certificate', 'doc-signal core should normalize rule-74 certificate transmissions');
