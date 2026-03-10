@@ -132,6 +132,7 @@ function caseDoc(caseNo, tab) {
   assert(preview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '09.03.2026' && g.size === 5), 'Grant-intended control should keep the post-R71 translations/receipt bundle together as the response-to-grant packet');
   assert(eventHistory.events.some((e) => /Communication of intention to grant/i.test(e.title)), 'Grant-intended control should retain the R71 communication event in event history');
   assert(deadlines.some((d) => d.label === 'R71(3) response period'), 'Grant-intended control should derive the R71 response deadline family from live docs/events');
+  assert((legal.codedEvents || []).some((e) => e.originalCode === 'EPIDOSNIGR1' && e.codexKey === 'GRANT_R71_3_EVENT'), 'Grant-intended control should expose coded legal-event mappings for Rule 71 events');
   assert(legal.renewals.some((r) => r.year === 9), 'Grant-intended control should retain later renewal-year history');
   assert(family.publications.some((p) => p.no === 'EP4397970' && p.kind === 'A3'), 'Grant-intended control should retain its own A3 publication in the family/publication parse');
 }
@@ -283,6 +284,7 @@ function caseDoc(caseNo, tab) {
   assert(preview.some((g) => g.label === 'Opposition' && g.dateStr === '10.03.2025' && g.size === 1), 'Clean no-opposition divisional control should surface the opposition-expiry communication as its own packet');
   assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '14.02.2024' && g.size === 6), 'Clean no-opposition divisional control should keep the R71 packet together');
   assert(eventHistory.events.some((e) => /No opposition filed within time limit/i.test(e.title)), 'Clean no-opposition divisional control should retain the no-opposition event-history entry');
+  assert((legal.codedEvents || []).some((e) => e.originalCode === '0009261' && e.codexKey === 'NO_OPPOSITION_FILED'), 'Clean no-opposition divisional control should expose coded legal-event mappings for the no-opposition status');
   assert(eventHistory.events.some((e) => /Lapse of the patent in a contracting state/i.test(e.title)), 'Clean no-opposition divisional control should retain post-grant lapse signals');
   assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Clean no-opposition divisional control should derive the opposition monitoring window');
   assert(deadlines.some((d) => d.label === 'Unitary effect request window'), 'Clean no-opposition divisional control should derive the post-grant unitary-effect window');

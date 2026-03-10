@@ -67,6 +67,14 @@
     logger: () => {},
   };
 
+  const LEGAL_EVENT_CODE_MAP = Object.freeze({
+    EPIDOSNIGR1: Object.freeze({ internalKey: 'GRANT_R71_3_EVENT', phase: 'grant', classification: 'deadline-bearing', label: 'Intention to grant' }),
+    '0009013': Object.freeze({ internalKey: 'SEARCH_REPORT_PUBLICATION', phase: 'search', classification: 'informational', label: 'Publication of search report' }),
+    '0009210': Object.freeze({ internalKey: 'EXPECTED_GRANT', phase: 'grant', classification: 'informational', label: 'Expected grant' }),
+    '0009261': Object.freeze({ internalKey: 'NO_OPPOSITION_FILED', phase: 'opposition_end', classification: 'status', label: 'No opposition filed' }),
+    '0009121': Object.freeze({ internalKey: 'LOSS_OF_RIGHTS_EVENT', phase: 'loss_of_rights', classification: 'consequence', label: 'Application deemed withdrawn' }),
+  });
+
   const SOURCES = [
     { key: 'main', slug: 'main', title: 'EP About this file' },
     { key: 'doclist', slug: 'doclist', title: 'EP All documents' },
@@ -2252,6 +2260,84 @@
     return dedupe(rows, (r) => `${r.dateStr}|${r.title}|${r.detail}`).sort(compareDateDesc);
   }
 
+  function legalCodeRecord(code) {
+    return code ? (LEGAL_EVENT_CODE_MAP[String(code).toUpperCase()] || null) : null;
+  }
+
+  function extractLegalEventBlocks(doc, url) {
+    const blocks = [];
+    let current = null;
+
+    const pushCurrent = () => {
+      if (!current) return;
+      if (current.dateStr || current.title || current.detail) blocks.push(current);
+      current = null;
+    };
+
+    for (const row of doc.querySelectorAll('tr')) {
+      const cells = [...row.querySelectorAll('th,td')].map(text).filter(Boolean);
+      if (!cells.length) continue;
+      const label = cells[0];
+      const value = normalize(cells.slice(1).join(' · '));
+
+      if (/^Event date:?$/i.test(label) && DATE_RE.test(value)) {
+        pushCurrent();
+        current = {
+          dateStr: value.match(DATE_RE)?.[1] || '',
+          title: '',
+          detail: '',
+          url,
+          freeFormatText: '',
+          effectiveDate: '',
+          originalCode: '',
+          codexKey: '',
+          codexPhase: '',
+          codexClass: '',
+        };
+        continue;
+      }
+
+      if (!current) continue;
+      if (/^Event description:?$/i.test(label)) {
+        current.title = value;
+        continue;
+      }
+      if (/^Free Format Text:?$/i.test(label)) {
+        current.freeFormatText = value;
+        current.detail = current.detail ? `${current.detail} · ${value}` : value;
+        const originalCode = normalize(value.match(/ORIGINAL CODE:\s*([A-Z0-9]+)/i)?.[1] || '').toUpperCase();
+        const record = legalCodeRecord(originalCode);
+        if (originalCode) current.originalCode = originalCode;
+        if (record) {
+          current.codexKey = record.internalKey;
+          current.codexPhase = record.phase;
+          current.codexClass = record.classification;
+        }
+        continue;
+      }
+      if (/^Effective DATE:?$/i.test(label)) {
+        current.effectiveDate = value;
+        current.detail = current.detail ? `${current.detail} · Effective DATE ${value}` : `Effective DATE ${value}`;
+        continue;
+      }
+      if (/^Event description:?$/i.test(label)) continue;
+      if (/^Original code:?$/i.test(label)) {
+        const originalCode = value.toUpperCase();
+        const record = legalCodeRecord(originalCode);
+        current.originalCode = originalCode;
+        if (record) {
+          current.codexKey = record.internalKey;
+          current.codexPhase = record.phase;
+          current.codexClass = record.classification;
+        }
+        continue;
+      }
+    }
+
+    pushCurrent();
+    return dedupe(blocks, (event) => `${event.dateStr}|${event.title}|${event.detail}|${event.originalCode}`).sort(compareDateDesc);
+  }
+
   function parseFamily(doc) {
     const publications = [];
     const rows = [...doc.querySelectorAll('tr')];
@@ -2285,6 +2371,7 @@
 
   function parseLegal(doc, caseNo) {
     const events = parseDatedRows(doc, sourceUrl(caseNo, 'legal'));
+    const codedEvents = extractLegalEventBlocks(doc, sourceUrl(caseNo, 'legal'));
     const renewals = [];
     for (const e of events) {
       const low = `${e.title} ${e.detail}`.toLowerCase();
@@ -2292,7 +2379,7 @@
       const ym = low.match(/year\s*(\d+)/i) || low.match(/(\d+)(?:st|nd|rd|th)\s*year/i);
       renewals.push({ dateStr: e.dateStr, title: e.title, detail: e.detail, year: ym ? +ym[1] : null });
     }
-    return { events, renewals: renewals.sort(compareDateDesc) };
+    return { events, codedEvents, renewals: renewals.sort(compareDateDesc) };
   }
 
   function parseEventHistory(doc, caseNo) {
@@ -4349,26 +4436,31 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   function proceduralPostureModel(main, docs, eventHistory = {}, legal = {}) {
     const statusRaw = dedupeMultiline(main?.statusRaw || '');
     const statusSummary = summarizeStatus(statusRaw);
+    const statusLow = statusRaw.toLowerCase();
     const records = buildDeadlineRecords(docs, eventHistory, legal);
+    const codedEvents = Array.isArray(legal?.codedEvents) ? legal.codedEvents : [];
+    const latestCodedEvent = (internalKey) => codedEvents.find((event) => event.codexKey === internalKey) || null;
     const latestLoss = postureRecord(records, /application deemed to be withdrawn|deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|withdrawn by applicant|application withdrawn/);
     const detailedLoss = postureRecord(records, /non-entry into european phase|translations of claims\/payment missing|non-payment of examination fee\/designation fee\/non-reply to written opinion|non-reply to written opinion/);
     const effectiveLoss = detailedLoss || latestLoss;
     const latestRecovery = postureRecord(records, /decision to allow further processing|further processing|request for further processing|re-establishment|rights re-established/);
     const latestGrantDecision = postureRecord(records, /decision to grant a european patent|mention of grant|patent granted|the patent has been granted/);
-    const latestNoOpposition = postureRecord(records, /no opposition filed within time limit/);
-    const latestR71 = postureRecord(records, /grant of patent is intended|intention to grant|rule\s*71\(3\)|text intended for grant/);
+    const latestNoOpposition = latestCodedEvent('NO_OPPOSITION_FILED') || postureRecord(records, /no opposition filed within time limit/);
+    const latestR71 = latestCodedEvent('GRANT_R71_3_EVENT') || postureRecord(records, /grant of patent is intended|intention to grant|rule\s*71\(3\)|text intended for grant/);
+    const latestSearchPublication = latestCodedEvent('SEARCH_REPORT_PUBLICATION');
+    const latestLossCoded = latestCodedEvent('LOSS_OF_RIGHTS_EVENT');
 
-    const latestLossDate = postureRecordDate(latestLoss);
+    const latestLossDate = postureRecordDate(latestLossCoded || latestLoss);
     const latestRecoveryDate = postureRecordDate(latestRecovery);
     const latestGrantDecisionDate = postureRecordDate(latestGrantDecision);
     const recovered = !!(latestLossDate && latestRecoveryDate && latestRecoveryDate >= latestLossDate);
     const recoveredBeforeGrant = !!(recovered && latestGrantDecisionDate && latestGrantDecisionDate >= latestRecoveryDate);
     const currentClosed = statusSummary.level === 'bad';
-    const currentNoOpposition = /granted \(no opposition\)/i.test(statusSummary.simple || '') || /no opposition filed within time limit/i.test(statusRaw.toLowerCase());
-    const currentGranted = currentNoOpposition || /^granted$/i.test(statusSummary.simple || '') || /patent has been granted|the patent has been granted/i.test(statusRaw.toLowerCase());
-    const currentGrantIntended = /grant intended/i.test(statusSummary.simple || '') || /grant of patent is intended|rule\s*71\(3\)|intention to grant/i.test(statusRaw.toLowerCase());
-    const currentExamination = /request for examination was made|examination/.test(statusRaw.toLowerCase()) && !currentClosed;
-    const currentSearch = /published|search/.test(statusRaw.toLowerCase()) && !currentClosed && !currentGrantIntended && !currentGranted;
+    const currentNoOpposition = /granted \(no opposition\)/i.test(statusSummary.simple || '') || /no opposition filed within time limit/i.test(statusLow) || !!latestNoOpposition;
+    const currentGranted = currentNoOpposition || /^granted$/i.test(statusSummary.simple || '') || /patent has been granted|the patent has been granted/i.test(statusLow) || !!latestGrantDecision;
+    const currentGrantIntended = /grant intended/i.test(statusSummary.simple || '') || /grant of patent is intended|rule\s*71\(3\)|intention to grant/i.test(statusLow) || !!latestR71;
+    const currentExamination = /request for examination was made|examination/.test(statusLow) && !currentClosed;
+    const currentSearch = (/published|search/.test(statusLow) || !!latestSearchPublication) && !currentClosed && !currentGrantIntended && !currentGranted;
 
     let note = '';
     if (recoveredBeforeGrant) {
