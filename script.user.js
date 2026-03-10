@@ -875,6 +875,18 @@
     return `${String(caseNo || '').toUpperCase()}|${String(view || 'overview').toLowerCase()}`;
   }
 
+  function normalizePanelScrollTop(scrollTop) {
+    const top = Math.max(0, Math.round(Number(scrollTop) || 0));
+    return Number.isFinite(top) ? top : 0;
+  }
+
+  function panelScrollRestoreOverride(previousCaseNo, previousView, previousScrollTop, nextCaseNo, nextView) {
+    if (!previousCaseNo || !nextCaseNo) return null;
+    if (String(previousCaseNo) !== String(nextCaseNo)) return null;
+    if (String(previousView || 'overview') !== String(nextView || 'overview')) return null;
+    return normalizePanelScrollTop(previousScrollTop);
+  }
+
   function getPanelScroll(caseNo, view) {
     const key = panelScrollKey(caseNo, view);
     const map = uiState().panelScrollByView || {};
@@ -887,7 +899,7 @@
     const key = panelScrollKey(caseNo, view);
     const state = uiState();
     const map = { ...(state.panelScrollByView || {}) };
-    const top = Math.max(0, Math.round(Number(scrollTop) || 0));
+    const top = normalizePanelScrollTop(scrollTop);
     if ((Number(map[key]) || 0) === top) return;
     map[key] = top;
 
@@ -914,10 +926,10 @@
     }, 120);
   }
 
-  function restorePanelScroll(caseNo, view) {
+  function restorePanelScroll(caseNo, view, overrideTop = null) {
     const b = runtime.body;
     if (!b) return;
-    const top = getPanelScroll(caseNo, view);
+    const top = overrideTop == null ? getPanelScroll(caseNo, view) : normalizePanelScrollTop(overrideTop);
     requestAnimationFrame(() => {
       if (runtime.body !== b) return;
       if (runtime.appNo !== caseNo) return;
@@ -5558,6 +5570,19 @@
     return panel;
   }
 
+  function rerenderPanelPreservingCurrentScroll() {
+    const caseNo = runtime.appNo;
+    const view = runtime.activeView || 'overview';
+    if (!runtime.body || runtime.collapsed || !caseNo) {
+      renderPanel();
+      return;
+    }
+    const top = normalizePanelScrollTop(runtime.body.scrollTop || 0);
+    setPanelScroll(caseNo, view, top);
+    renderPanel();
+    restorePanelScroll(caseNo, view, top);
+  }
+
   function wireOptions() {
     const b = runtime.body;
     if (!b) return;
@@ -5573,7 +5598,7 @@
         setOptions({ [key]: nextValue });
         if (key === 'doclistGroupsExpandedByDefault') clearDoclistOpenGroups(runtime.appNo || '');
         applyBodyShift();
-        renderPanel();
+        rerenderPanelPreservingCurrentScroll();
       };
 
       el.addEventListener('change', commit);
@@ -5592,22 +5617,22 @@
 
     b.querySelector('#epoRP-opt-density')?.addEventListener('change', (event) => {
       setOptions({ timelineDensity: event.target.value || 'standard' });
-      renderPanel();
+      rerenderPanelPreservingCurrentScroll();
     });
 
     b.querySelector('#epoRP-opt-event-level')?.addEventListener('change', (event) => {
       setOptions({ timelineEventLevel: event.target.value || 'info' });
-      renderPanel();
+      rerenderPanelPreservingCurrentScroll();
     });
 
     b.querySelector('#epoRP-opt-legal-level')?.addEventListener('change', (event) => {
       setOptions({ timelineLegalLevel: event.target.value || 'warn' });
-      renderPanel();
+      rerenderPanelPreservingCurrentScroll();
     });
 
     b.querySelector('#epoRP-reload')?.addEventListener('click', () => {
       addLog(runtime.appNo, 'info', 'Manual reload all background pages');
-      renderPanel();
+      rerenderPanelPreservingCurrentScroll();
       prefetchCase(runtime.appNo, true);
     });
 
@@ -5618,7 +5643,7 @@
       addLog(runtime.appNo, 'warn', 'Manual clear case cache');
       flushNow();
       captureLiveSource(runtime.appNo);
-      renderPanel();
+      rerenderPanelPreservingCurrentScroll();
       prefetchCase(runtime.appNo, true);
     });
 
@@ -5627,7 +5652,7 @@
         c.logs = [];
       });
       flushNow();
-      renderPanel();
+      rerenderPanelPreservingCurrentScroll();
     });
   }
 
@@ -5645,8 +5670,11 @@
 
     const previousCaseNo = runtime.appNo;
     const previousView = runtime.activeView || 'overview';
+    const previousScrollTop = runtime.body && previousCaseNo && !runtime.collapsed
+      ? normalizePanelScrollTop(runtime.body.scrollTop || 0)
+      : null;
     if (runtime.body && previousCaseNo && !runtime.collapsed) {
-      setPanelScroll(previousCaseNo, previousView, runtime.body.scrollTop || 0);
+      setPanelScroll(previousCaseNo, previousView, previousScrollTop);
     }
 
     const caseNo = detectAppNo();
@@ -5680,20 +5708,21 @@
     }
 
     const activeView = runtime.activeView || 'overview';
+    const scrollRestoreOverride = panelScrollRestoreOverride(previousCaseNo, previousView, previousScrollTop, caseNo, activeView);
     logViewContext(caseNo, activeView);
     if (activeView === 'timeline') {
       body.innerHTML = renderTimeline(caseNo);
-      restorePanelScroll(caseNo, activeView);
+      restorePanelScroll(caseNo, activeView, scrollRestoreOverride);
       return;
     }
     if (activeView === 'options') {
       body.innerHTML = renderOptions(caseNo);
       wireOptions();
-      restorePanelScroll(caseNo, activeView);
+      restorePanelScroll(caseNo, activeView, scrollRestoreOverride);
       return;
     }
     body.innerHTML = renderOverview(caseNo);
-    restorePanelScroll(caseNo, activeView);
+    restorePanelScroll(caseNo, activeView, scrollRestoreOverride);
   }
 
   function init(force = false) {

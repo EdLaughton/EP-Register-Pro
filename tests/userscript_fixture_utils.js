@@ -54,6 +54,7 @@ function loadUserscriptHooks() {
     'normalizeOptions',
     'refineDocumentClassification',
     'sourceStatusTooltip',
+    'panelScrollRestoreOverride',
   ];
 
   const instrumented = source.replace(/\}\)\(\);\s*$/, `window.__EPRP_TEST_HOOKS = { ${hookNames.join(', ')} };})();`);

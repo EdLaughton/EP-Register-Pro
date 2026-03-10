@@ -77,6 +77,10 @@ assert(euroPctPreview.some((g) => g.label === 'Response to search' && g.dateStr 
 assert(euroPctPreview.some((g) => g.label === 'Filing package' && g.dateStr === '26.06.2025' && g.size === 4), 'Doclist grouping should treat the Euro-PCT entry-day bundle as one filing package instead of splitting the ISR copy away');
 assert(euroPctPreview.some((g) => g.label === 'Filing package' && g.dateStr === '19.12.2024' && g.size === 8), 'Doclist grouping should consolidate the Euro-PCT filing-day packet into one filing package');
 
+assert.strictEqual(hooks.panelScrollRestoreOverride('EP24837586', 'options', 1092.5, 'EP24837586', 'options'), 1093, 'Sidebar rerenders within the same case/view should preserve the current scroll position instead of falling back to stale stored state');
+assert.strictEqual(hooks.panelScrollRestoreOverride('EP24837586', 'options', 1092.5, 'EP24837586', 'overview'), null, 'Sidebar scroll override should not leak across view switches');
+assert.strictEqual(hooks.panelScrollRestoreOverride('EP24837586', 'options', 1092.5, 'EP25203732', 'options'), null, 'Sidebar scroll override should not leak across case switches');
+
 const syntheticTransferDoc = new JSDOM(`<!doctype html><html><body><table><thead><tr><th><input type="checkbox"></th><th>Date</th><th>Document type</th><th>Procedure</th><th>Number of pages</th></tr></thead><tbody>
 <tr><td><input type="checkbox"></td><td>06.12.2022</td><td><a>(Electronic) Receipt</a></td><td>Search / examination</td><td>1</td></tr>
 <tr><td><input type="checkbox"></td><td>06.12.2022</td><td><a>Annexes in respect of a client data request</a></td><td>Search / examination</td><td>3</td></tr>
