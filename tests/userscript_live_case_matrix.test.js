@@ -105,6 +105,7 @@ function caseDoc(caseNo, tab) {
 
   assert.strictEqual(main.applicationType, 'E/PCT regional phase', 'Euro-PCT non-entry control should remain classified as Euro-PCT regional phase');
   assert(/deemed to be withdrawn/i.test(main.statusRaw || ''), 'Euro-PCT non-entry control should preserve deemed-withdrawn wording in the main status');
+  assert(eventHistory.events.some((e) => e.codexKey && /LOSS_OF_RIGHTS/i.test(e.codexKey)), 'Euro-PCT non-entry control should normalize its event-history loss-of-rights row into a codex key even without a visible legal ORIGINAL CODE');
   assert(preview.some((g) => g.label === 'International search / IPRP' && g.dateStr === '18.04.2023' && g.size === 4), 'Euro-PCT non-entry control should keep the full ISA/IPRP packet together under the PCT-aware search label');
   assert(preview.some((g) => g.label === 'Partial international search' && g.dateStr === '21.02.2023' && g.size === 2), 'Euro-PCT non-entry control should keep the partial-ISR packet together under the partial-search label');
   assert(eventHistory.events.some((e) => /Application deemed to be withdrawn/i.test(e.title)), 'Euro-PCT non-entry control should retain the deemed-withdrawn event-history entry');
@@ -131,6 +132,7 @@ function caseDoc(caseNo, tab) {
   assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '07.11.2025' && g.size === 6), 'Grant-intended control should keep the full R71 packet together under the intention-to-grant label');
   assert(preview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '09.03.2026' && g.size === 5), 'Grant-intended control should keep the post-R71 translations/receipt bundle together as the response-to-grant packet');
   assert(eventHistory.events.some((e) => /Communication of intention to grant/i.test(e.title)), 'Grant-intended control should retain the R71 communication event in event history');
+  assert(eventHistory.events.some((e) => e.codexKey === 'GRANT_R71_3_EVENT'), 'Grant-intended control should normalize event-history R71 rows through description fallback as well as legal codes');
   assert(deadlines.some((d) => d.label === 'R71(3) response period'), 'Grant-intended control should derive the R71 response deadline family from live docs/events');
   assert((legal.codedEvents || []).some((e) => e.originalCode === 'EPIDOSNIGR1' && e.codexKey === 'GRANT_R71_3_EVENT'), 'Grant-intended control should expose coded legal-event mappings for Rule 71 events');
   assert(legal.renewals.some((r) => r.year === 9), 'Grant-intended control should retain later renewal-year history');
@@ -284,6 +286,7 @@ function caseDoc(caseNo, tab) {
   assert(preview.some((g) => g.label === 'Opposition' && g.dateStr === '10.03.2025' && g.size === 1), 'Clean no-opposition divisional control should surface the opposition-expiry communication as its own packet');
   assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '14.02.2024' && g.size === 6), 'Clean no-opposition divisional control should keep the R71 packet together');
   assert(eventHistory.events.some((e) => /No opposition filed within time limit/i.test(e.title)), 'Clean no-opposition divisional control should retain the no-opposition event-history entry');
+  assert(eventHistory.events.some((e) => e.codexKey === 'NO_OPPOSITION_FILED'), 'Clean no-opposition divisional control should normalize event-history no-opposition rows through description fallback');
   assert((legal.codedEvents || []).some((e) => e.originalCode === '0009261' && e.codexKey === 'NO_OPPOSITION_FILED'), 'Clean no-opposition divisional control should expose coded legal-event mappings for the no-opposition status');
   assert(eventHistory.events.some((e) => /Lapse of the patent in a contracting state/i.test(e.title)), 'Clean no-opposition divisional control should retain post-grant lapse signals');
   assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Clean no-opposition divisional control should derive the opposition monitoring window');

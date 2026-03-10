@@ -1,6 +1,8 @@
 const assert = require('assert');
 const {
-  LEGAL_EVENT_CODE_MAP,
+  EPO_CODEX_DATA,
+  legalCodeRecord,
+  codexDescriptionRecord,
   extractLegalEventBlocksFromHtml,
   deriveCurrentPosture,
 } = require('../lib/epo_v2_normalized');
@@ -8,8 +10,11 @@ const { loadFixtureDocument, loadFixtureText, loadUserscriptHooks } = require('.
 
 const hooks = loadUserscriptHooks();
 
-assert.strictEqual(LEGAL_EVENT_CODE_MAP.EPIDOSNIGR1.internalKey, 'GRANT_R71_3_EVENT', 'v2 normalized core should vendor the R71 code map');
-assert.strictEqual(LEGAL_EVENT_CODE_MAP['0009261'].internalKey, 'NO_OPPOSITION_FILED', 'v2 normalized core should vendor the no-opposition code map');
+assert(EPO_CODEX_DATA.byCode.EPIDOSNIGR1, 'v2 normalized core should vendor the full generated codex map');
+assert.strictEqual(legalCodeRecord('EPIDOSNIGR1').internalKey, 'GRANT_R71_3_EVENT', 'v2 normalized core should vendor the R71 code map');
+assert.strictEqual(legalCodeRecord('0009261').internalKey, 'NO_OPPOSITION_FILED', 'v2 normalized core should vendor the no-opposition code map');
+assert.strictEqual(legalCodeRecord('RFPR').internalKey, 'FURTHER_PROCESSING_REQUEST', 'v2 normalized core should include procedural-step mappings that are not yet surfaced as visible legal-event codes');
+assert.strictEqual(codexDescriptionRecord('Request for further processing').internalKey, 'FURTHER_PROCESSING_REQUEST', 'v2 normalized core should support description-based fallback for mapped procedural descriptions from the codex data');
 
 const legalBlocks = extractLegalEventBlocksFromHtml(loadFixtureText('cases', 'EP24163939', 'legal.html'));
 assert(legalBlocks.some((event) => event.originalCode === 'EPIDOSNIGR1' && event.codexKey === 'GRANT_R71_3_EVENT'), 'v2 normalized core should extract and map legal ORIGINAL CODE markers from raw legal HTML');

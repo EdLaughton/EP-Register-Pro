@@ -67,13 +67,2160 @@
     logger: () => {},
   };
 
-  const LEGAL_EVENT_CODE_MAP = Object.freeze({
-    EPIDOSNIGR1: Object.freeze({ internalKey: 'GRANT_R71_3_EVENT', phase: 'grant', classification: 'deadline-bearing', label: 'Intention to grant' }),
-    '0009013': Object.freeze({ internalKey: 'SEARCH_REPORT_PUBLICATION', phase: 'search', classification: 'informational', label: 'Publication of search report' }),
-    '0009210': Object.freeze({ internalKey: 'EXPECTED_GRANT', phase: 'grant', classification: 'informational', label: 'Expected grant' }),
-    '0009261': Object.freeze({ internalKey: 'NO_OPPOSITION_FILED', phase: 'opposition_end', classification: 'status', label: 'No opposition filed' }),
-    '0009121': Object.freeze({ internalKey: 'LOSS_OF_RIGHTS_EVENT', phase: 'loss_of_rights', classification: 'consequence', label: 'Application deemed withdrawn' }),
-  });
+  const EPO_CODEX_DATA = Object.freeze({
+  "byCode": {
+    "ABEX": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ABEX",
+      "sourceDescription": "Amendments",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "examination",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "ADWI": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ADWI",
+      "sourceDescription": "Application deemed to be withdrawn",
+      "internalKey": "LOSS_OF_RIGHTS_R112",
+      "procedureFamily": "ALL_EP",
+      "phase": "loss_of_rights",
+      "classification": "consequence",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Link to underlying missed act using STEP_DESCRIPTION_NAME",
+      "parserNote": "Reason strings include missed examination reply, EESR reply, prior-art info, fees, etc."
+    },
+    "DOBS": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "DOBS",
+      "sourceDescription": "Communication of observations of proprietor",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "opposition",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "time-limit in record",
+      "parserNote": ""
+    },
+    "EXRE": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "EXRE",
+      "sourceDescription": "Invitation to indicate the basis for amendments",
+      "internalKey": "AMENDMENT_BASIS_INVITATION",
+      "procedureFamily": "ALL_EP",
+      "phase": "examination",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+      "parserNote": "Good structured marker for Rule 137(4)-type issue."
+    },
+    "FFEE": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "FFEE",
+      "sourceDescription": "Payment of national basic fee",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "entry-regional-phase",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "IDOP": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "IDOP",
+      "sourceDescription": "Interlocutory decision in opposition",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "opposition",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "decision",
+      "parserNote": ""
+    },
+    "IGRA": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "IGRA",
+      "sourceDescription": "Intention to grant the patent",
+      "internalKey": "GRANT_R71_3",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create 4-month candidate from DATE_OF_DISPATCH; prefer actual document despatch/date",
+      "parserNote": "Also stores grant fee / print fee / translation dates."
+    },
+    "IGRE": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "IGRE",
+      "sourceDescription": "Disapproval of the communication of intention to grant the patent",
+      "internalKey": "GRANT_R71_6_DISAPPROVAL",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "incoming-response",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use as applicant action affecting grant branch",
+      "parserNote": "May lead to fresh Rule 71(3) or resumed examination."
+    },
+    "ISAT": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ISAT",
+      "sourceDescription": "International searching authority",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "entry-regional-phase",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "LIRE": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "LIRE",
+      "sourceDescription": "Communication from the examining division in a limitation procedure",
+      "internalKey": "LIMITATION_COMMUNICATION",
+      "procedureFamily": "LIMITATION_REVOCATION",
+      "phase": "limitation",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+      "parserNote": "Limitation-specific communication family."
+    },
+    "ORAL": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ORAL",
+      "sourceDescription": "Oral proceedings",
+      "internalKey": "ORAL_PROCEEDINGS_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "examination/opposition/appeal",
+      "classification": "hearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Store OP date(s); parse annex separately for Rule 116 final date",
+      "parserNote": "The event itself is not enough for final-date logic."
+    },
+    "OREX": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "OREX",
+      "sourceDescription": "Communication from the opposition division",
+      "internalKey": "OPPOSITION_DIVISION_COMMUNICATION",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+      "parserNote": "Strong structured marker for opposition communications."
+    },
+    "PART": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PART",
+      "sourceDescription": "Invitation to provide information on prior art",
+      "internalKey": "PRIOR_ART_INFORMATION_INVITATION",
+      "procedureFamily": "ALL_EP",
+      "phase": "examination",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create deadline from DATE_OF_DISPATCH + available time-limit/manual review",
+      "parserNote": "Often relevant to later ADWI / RFPR routing."
+    },
+    "PFEE": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PFEE",
+      "sourceDescription": "Penalty fee / additional fee",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "examination",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "time-limit in record",
+      "parserNote": ""
+    },
+    "PMAP": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PMAP",
+      "sourceDescription": "Preparation for maintenance of the patent in an amended form",
+      "internalKey": "OPPOSITION_R82_BRANCH",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_endgame",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use DATE_OF_DISPATCH as Rule 82 branch anchor and track payment",
+      "parserNote": "Maps well to Rule 82(1)/(2) maintenance logic."
+    },
+    "PREX": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PREX",
+      "sourceDescription": "Preliminary examination - PCT II",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "international-examination",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "PROL": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PROL",
+      "sourceDescription": "Language of the procedure",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "all",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "RAEX": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "RAEX",
+      "sourceDescription": "Request for accelerated examination",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "examination",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "REJR": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "REJR",
+      "sourceDescription": "Rejection of the request for revocation of the patent",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "revocation",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "decision",
+      "parserNote": ""
+    },
+    "RFEE": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "RFEE",
+      "sourceDescription": "Renewal fee payment",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "all",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "RFPR": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "RFPR",
+      "sourceDescription": "Request for further processing",
+      "internalKey": "FURTHER_PROCESSING_REQUEST",
+      "procedureFamily": "ALL_EP",
+      "phase": "remedial",
+      "classification": "remedial",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Attach to missed act using STEP_DESCRIPTION_NAME and record result",
+      "parserNote": "Central remedial branch for many missed deadlines."
+    },
+    "SFEE": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "SFEE",
+      "sourceDescription": "Fee for a supplementary search",
+      "internalKey": "SUPPLEMENTARY_SEARCH_FEE_PAYMENT",
+      "procedureFamily": "EURO_PCT",
+      "phase": "regional_phase_entry",
+      "classification": "payment",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use as Euro-PCT entry/compliance signal, not communication deadline",
+      "parserNote": "One of the regional-phase acts."
+    },
+    "TRAN": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "TRAN",
+      "sourceDescription": "Translation of the application",
+      "internalKey": "EURO_PCT_TRANSLATION_RECEIVED",
+      "procedureFamily": "EURO_PCT",
+      "phase": "regional_phase_entry",
+      "classification": "filing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use as Euro-PCT entry/compliance signal",
+      "parserNote": "One of the regional-phase acts."
+    },
+    "DDIV": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "DDIV",
+      "sourceDescription": "First communication from the examining division",
+      "internalKey": "FIRST_EXAM_COMM_DIVISIONAL_MARKER",
+      "procedureFamily": "ALL_EP",
+      "phase": "examination",
+      "classification": "marker",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use for divisional-window logic and examination chronology",
+      "parserNote": "Not necessarily the full text of the communication."
+    },
+    "WINT": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "WINT",
+      "sourceDescription": "Withdrawal during international phase - procedure closed",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "entry-regional-phase",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "procedure closed",
+      "parserNote": ""
+    },
+    "ACOR": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ACOR",
+      "sourceDescription": "Despatch of invitation to pay additional claims fees",
+      "internalKey": "ADDITIONAL_CLAIMS_FEE_INVITATION_AFTER_ALLOWED_AMENDMENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create fee deadline from DATE_OF_DISPATCH + time-limit in record",
+      "parserNote": "Grant-stage edge case after allowed amendment/correction."
+    },
+    "CDEC": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "CDEC",
+      "sourceDescription": "Request for correction of the decision to grant filed",
+      "internalKey": "CORRECTION_REQUEST_AFTER_GRANT_DECISION",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "incoming-request",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Store as branch affecting post-grant decision correction",
+      "parserNote": "Do not confuse with Rule 71(3) amendment branch."
+    },
+    "0009012": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009012",
+      "sourceDescription": "Publication in section I.1 EP Bulletin",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009199EPPU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199EPPU",
+      "sourceDescription": "Change or deletion - publication of A document",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0008199SEPU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0008199SEPU",
+      "sourceDescription": "Change - publication of search report",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009013": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009013",
+      "sourceDescription": "Publication of search report",
+      "internalKey": "SEARCH_REPORT_PUBLICATION",
+      "procedureFamily": "EP_DIRECT",
+      "phase": "search",
+      "classification": "informational",
+      "preferredSurface": "event_history/all_documents",
+      "codexAction": "No standalone deadline; pair with Rule 70/70a path",
+      "parserNote": "Use publication event as anchor for search-stage awareness, not reply deadline."
+    },
+    "0009015": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009015",
+      "sourceDescription": "Publication of international search report",
+      "internalKey": "ISR_PUBLICATION",
+      "procedureFamily": "EURO_PCT",
+      "phase": "pre-regional-phase",
+      "classification": "informational",
+      "preferredSurface": "event_history/all_documents",
+      "codexAction": "No EP reply deadline from this event alone",
+      "parserNote": "Useful for PCT chronology only."
+    },
+    "0009016": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009016",
+      "sourceDescription": "Supplementary search report",
+      "internalKey": "SUPPLEMENTARY_SEARCH_REPORT_PUBLICATION",
+      "procedureFamily": "EURO_PCT",
+      "phase": "search",
+      "classification": "informational",
+      "preferredSurface": "event_history/all_documents",
+      "codexAction": "No standalone deadline; pair with downstream communication",
+      "parserNote": "Useful for Euro-PCT search chronology."
+    },
+    "0009199SEPU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199SEPU",
+      "sourceDescription": "Change or deletion - publication of search report",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009210": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009210",
+      "sourceDescription": "(Expected) grant",
+      "internalKey": "EXPECTED_GRANT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "expected B1 publication"
+    },
+    "0009299EPPU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299EPPU",
+      "sourceDescription": "Change or deletion - publication of B1 document",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009272": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009272",
+      "sourceDescription": "Patent maintained (B2 publication)",
+      "internalKey": "OPPOSITION_B2_PUBLICATION",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_endgame",
+      "classification": "publication",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Close Rule 82 branch once publication confirmed",
+      "parserNote": "Publication, not the underlying communication itself."
+    },
+    "0009299PMAP": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299PMAP",
+      "sourceDescription": "Change - publication of B2 document",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009399EPPU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009399EPPU",
+      "sourceDescription": "Change or deletion - publication of B2 document",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009410": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009410",
+      "sourceDescription": "(Expected) limited patent specification",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009499EPPU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009499EPPU",
+      "sourceDescription": "Change or deletion - publication of limited patent specification",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0008199WDRA": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0008199WDRA",
+      "sourceDescription": "Change - withdrawal",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009182": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009182",
+      "sourceDescription": "Withdrawal of application",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009199WDRA": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199WDRA",
+      "sourceDescription": "Change - withdrawal",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009299WDRA": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299WDRA",
+      "sourceDescription": "Change - withdrawal",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0008199ADWI": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0008199ADWI",
+      "sourceDescription": "Change or deletion - application deemed withdrawn",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009121": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009121",
+      "sourceDescription": "Application deemed to be withdrawn",
+      "internalKey": "LOSS_OF_RIGHTS_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "loss_of_rights",
+      "classification": "consequence",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "No new response deadline by default; route to remedies",
+      "parserNote": "Look for underlying missed act and possible further processing/re-establishment."
+    },
+    "0009183": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009183",
+      "sourceDescription": "Application deemed to be withdrawn",
+      "internalKey": "APPLICATION_DEEMED_WITHDRAWN",
+      "procedureFamily": "ALL_EP",
+      "phase": "loss_of_rights",
+      "classification": "consequence",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "loss-of-rights published"
+    },
+    "0009199ADWI": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199ADWI",
+      "sourceDescription": "Change or deletion - application deemed withdrawn",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009299ADWI": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299ADWI",
+      "sourceDescription": "Change or deletion - application deemed withdrawn",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0008199REFU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0008199REFU",
+      "sourceDescription": "Change - refusal",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009181": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009181",
+      "sourceDescription": "Refusal of application",
+      "internalKey": "REFUSAL_DECISION_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "decision",
+      "classification": "decision",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Route to appeal branch",
+      "parserNote": "Do not treat as ordinary office action."
+    },
+    "0009199REFU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199REFU",
+      "sourceDescription": "Change - refusal",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009299REFU": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299REFU",
+      "sourceDescription": "Change - refusal",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "EPIDOSNIGR1": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSNIGR1",
+      "sourceDescription": "New entry: Communication of intention to grant a patent",
+      "internalKey": "GRANT_R71_3_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "deadline-bearing",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Create 4-month candidate, but confirm exact despatch/date from document",
+      "parserNote": "Use all_documents for legal date and supersession logic."
+    },
+    "EPIDOSCIGR1": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSCIGR1",
+      "sourceDescription": "Change: Communication of intention to grant a patent",
+      "internalKey": "GRANT_R71_3_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "deadline-bearing",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Refresh 4-month candidate, but confirm exact despatch/date from document",
+      "parserNote": "Treat as update to Rule 71(3) state."
+    },
+    "EPIDOSDIGR1": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSDIGR1",
+      "sourceDescription": "Deletion: Communication of intention to grant a patent",
+      "internalKey": "GRANT_R71_3_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "deleted Rule 71(3) event"
+    },
+    "0009261": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009261",
+      "sourceDescription": "No opposition filed within time limit",
+      "internalKey": "NO_OPPOSITION_FILED",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_end",
+      "classification": "status",
+      "preferredSurface": "event_history/about_this_file",
+      "codexAction": "Close opposition watch for the patent",
+      "parserNote": "Post-grant status update."
+    },
+    "0009299DELT": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299DELT",
+      "sourceDescription": "Change - no opposition filed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0008299OPPO": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0008299OPPO",
+      "sourceDescription": "Change - opposition filed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009260": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009260",
+      "sourceDescription": "Opposition filed",
+      "internalKey": "OPPOSITION_FILED",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition",
+      "classification": "status",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Create opposition case state; next real deadline usually from Rule 79/OREX/DOBS",
+      "parserNote": "Not itself the proprietor reply communication."
+    },
+    "0009264": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009264",
+      "sourceDescription": "Opposition withdrawn",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009274": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009274",
+      "sourceDescription": "Opposition deemed not to have been filed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009299OPPB": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299OPPB",
+      "sourceDescription": "Opposition deemed not to have been filed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009299OPPO": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299OPPO",
+      "sourceDescription": "Change - opposition data/opponent's data or that of the opponent's representative",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009273": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009273",
+      "sourceDescription": "Opposition rejected",
+      "internalKey": "OPPOSITION_REJECTED",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_decision",
+      "classification": "decision",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Route to appeal branch",
+      "parserNote": "Decision event."
+    },
+    "0009299REJO": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299REJO",
+      "sourceDescription": "Change - rejection of opposition",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009275": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009275",
+      "sourceDescription": "Opposition inadmissible",
+      "internalKey": "OPPOSITION_INADMISSIBLE",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_decision",
+      "classification": "decision",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "opposition inadmissible"
+    },
+    "0009299OPPA": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299OPPA",
+      "sourceDescription": "Opposition inadmissible",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009271": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009271",
+      "sourceDescription": "Revocation of patent",
+      "internalKey": "OPPOSITION_REVOCATION",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_decision",
+      "classification": "decision",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "revocation in opposition"
+    },
+    "0009299REVO": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299REVO",
+      "sourceDescription": "Change - revocation of patent",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009220": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009220",
+      "sourceDescription": "Patent revoked on request of proprietor",
+      "internalKey": "PROPRIETOR_REVOCATION",
+      "procedureFamily": "LIMITATION_REVOCATION",
+      "phase": "revocation_request",
+      "classification": "decision",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "proprietor revocation"
+    },
+    "0009276": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009276",
+      "sourceDescription": "Opposition procedure terminated - date of legal effect published",
+      "internalKey": "OPPOSITION_TERMINATED",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_closed",
+      "classification": "status",
+      "preferredSurface": "event_history/about_this_file",
+      "codexAction": "Close opposition case state",
+      "parserNote": "Termination marker."
+    },
+    "0009299OPPC": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299OPPC",
+      "sourceDescription": "Change - opposition procedure terminated",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "EPIDOSNRFE2": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSNRFE2",
+      "sourceDescription": "New entry: Renewal fee paid",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "EPIDOSCRFE2": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSCRFE2",
+      "sourceDescription": "Change: Renewal fee paid",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "EPIDOSDRFE2": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSDRFE2",
+      "sourceDescription": "Deletion: Renewal fee paid",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009250": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009250",
+      "sourceDescription": "Lapse of the patent in a contracting state",
+      "internalKey": "NATIONAL_LAPSE",
+      "procedureFamily": "POST_GRANT_NATIONAL",
+      "phase": "post_grant_national",
+      "classification": "status",
+      "preferredSurface": "event_history/about_this_file/federated register",
+      "codexAction": "Update national status only",
+      "parserNote": "National post-grant layer, not central EP procedure."
+    },
+    "0009299LAPS": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299LAPS",
+      "sourceDescription": "Change - lapse in a contracting state",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0008199LREG": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0008199LREG",
+      "sourceDescription": "Change - licence",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009199LREG": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199LREG",
+      "sourceDescription": "Change - licence",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009341": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009341",
+      "sourceDescription": "Licence",
+      "internalKey": "LICENCE_EVENT",
+      "procedureFamily": "POST_GRANT_NATIONAL",
+      "phase": "post_grant_national",
+      "classification": "status",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "licence data"
+    },
+    "0009702UREQ10": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009702UREQ10",
+      "sourceDescription": "Request for unitary effect withdrawn",
+      "internalKey": "UP_REQUEST_WITHDRAWN",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_request",
+      "classification": "status",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "request for unitary effect withdrawn"
+    },
+    "0009799UREQ10": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UREQ10",
+      "sourceDescription": "Change or deletion – Date of withdrawal of request for unitary effect",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009701UREQ02": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009701UREQ02",
+      "sourceDescription": "Decision on the request for unitary effect",
+      "internalKey": "UP_REQUEST_DECISION",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_request",
+      "classification": "decision",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "decision on unitary effect request"
+    },
+    "0009799UREQ02": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UREQ02",
+      "sourceDescription": "Change or deletion – Date of decision on the request for unitary effect",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009700UREQ01": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009700UREQ01",
+      "sourceDescription": "Filing of request for unitary effect",
+      "internalKey": "UP_REQUEST_FILED",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_request",
+      "classification": "status",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "unitary effect request filed"
+    },
+    "0009799UREQ01": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UREQ01",
+      "sourceDescription": "Change: Date of filing of request for unitary request",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009705LAPS22": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009705LAPS22",
+      "sourceDescription": "Unitary effect lapsed",
+      "internalKey": "UP_LAPSE",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_post_registration",
+      "classification": "consequence",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "unitary effect lapsed"
+    },
+    "0009799LAPS22": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799LAPS22",
+      "sourceDescription": "Change or deletion: unitary effect lapse date",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009706REES22": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009706REES22",
+      "sourceDescription": "Request for re-establishment of rights filed",
+      "internalKey": "UP_REESTABLISHMENT_REQUEST",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_post_registration",
+      "classification": "remedial branch",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "re-establishment request filed"
+    },
+    "0009799REES22": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799REES22",
+      "sourceDescription": "Change or deletion: Date of request for re-establishment of rights",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009704UDLA02": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009704UDLA02",
+      "sourceDescription": "Renewal fees not paid: Unitary Patent Protection lapsed",
+      "internalKey": "UP_LAPSE_RENEWAL",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_post_registration",
+      "classification": "consequence",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "UP lapse for unpaid renewal fee"
+    },
+    "0009799UDLA02": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UDLA02",
+      "sourceDescription": "Change: Renewal fees not paid: Unitary Patent Protection lapsed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "0009799UREG01": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UREG01",
+      "sourceDescription": "Change or deletion – Date of registration of Unitary Patent Protection",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    }
+  },
+  "byDescription": {
+    "amendments": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ABEX",
+      "sourceDescription": "Amendments",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "examination",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "application deemed to be withdrawn": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ADWI",
+      "sourceDescription": "Application deemed to be withdrawn",
+      "internalKey": "LOSS_OF_RIGHTS_R112",
+      "procedureFamily": "ALL_EP",
+      "phase": "loss_of_rights",
+      "classification": "consequence",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Link to underlying missed act using STEP_DESCRIPTION_NAME",
+      "parserNote": "Reason strings include missed examination reply, EESR reply, prior-art info, fees, etc."
+    },
+    "communication of observations of proprietor": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "DOBS",
+      "sourceDescription": "Communication of observations of proprietor",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "opposition",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "time-limit in record",
+      "parserNote": ""
+    },
+    "invitation to indicate the basis for amendments": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "EXRE",
+      "sourceDescription": "Invitation to indicate the basis for amendments",
+      "internalKey": "AMENDMENT_BASIS_INVITATION",
+      "procedureFamily": "ALL_EP",
+      "phase": "examination",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+      "parserNote": "Good structured marker for Rule 137(4)-type issue."
+    },
+    "payment of national basic fee": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "FFEE",
+      "sourceDescription": "Payment of national basic fee",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "entry-regional-phase",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "interlocutory decision in opposition": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "IDOP",
+      "sourceDescription": "Interlocutory decision in opposition",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "opposition",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "decision",
+      "parserNote": ""
+    },
+    "intention to grant the patent": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "IGRA",
+      "sourceDescription": "Intention to grant the patent",
+      "internalKey": "GRANT_R71_3",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create 4-month candidate from DATE_OF_DISPATCH; prefer actual document despatch/date",
+      "parserNote": "Also stores grant fee / print fee / translation dates."
+    },
+    "disapproval of the communication of intention to grant the patent": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "IGRE",
+      "sourceDescription": "Disapproval of the communication of intention to grant the patent",
+      "internalKey": "GRANT_R71_6_DISAPPROVAL",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "incoming-response",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use as applicant action affecting grant branch",
+      "parserNote": "May lead to fresh Rule 71(3) or resumed examination."
+    },
+    "international searching authority": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ISAT",
+      "sourceDescription": "International searching authority",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "entry-regional-phase",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "communication from the examining division in a limitation procedure": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "LIRE",
+      "sourceDescription": "Communication from the examining division in a limitation procedure",
+      "internalKey": "LIMITATION_COMMUNICATION",
+      "procedureFamily": "LIMITATION_REVOCATION",
+      "phase": "limitation",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+      "parserNote": "Limitation-specific communication family."
+    },
+    "oral proceedings": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ORAL",
+      "sourceDescription": "Oral proceedings",
+      "internalKey": "ORAL_PROCEEDINGS_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "examination/opposition/appeal",
+      "classification": "hearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Store OP date(s); parse annex separately for Rule 116 final date",
+      "parserNote": "The event itself is not enough for final-date logic."
+    },
+    "communication from the opposition division": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "OREX",
+      "sourceDescription": "Communication from the opposition division",
+      "internalKey": "OPPOSITION_DIVISION_COMMUNICATION",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+      "parserNote": "Strong structured marker for opposition communications."
+    },
+    "invitation to provide information on prior art": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PART",
+      "sourceDescription": "Invitation to provide information on prior art",
+      "internalKey": "PRIOR_ART_INFORMATION_INVITATION",
+      "procedureFamily": "ALL_EP",
+      "phase": "examination",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create deadline from DATE_OF_DISPATCH + available time-limit/manual review",
+      "parserNote": "Often relevant to later ADWI / RFPR routing."
+    },
+    "penalty fee / additional fee": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PFEE",
+      "sourceDescription": "Penalty fee / additional fee",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "examination",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "time-limit in record",
+      "parserNote": ""
+    },
+    "preparation for maintenance of the patent in an amended form": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PMAP",
+      "sourceDescription": "Preparation for maintenance of the patent in an amended form",
+      "internalKey": "OPPOSITION_R82_BRANCH",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_endgame",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use DATE_OF_DISPATCH as Rule 82 branch anchor and track payment",
+      "parserNote": "Maps well to Rule 82(1)/(2) maintenance logic."
+    },
+    "preliminary examination - pct ii": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PREX",
+      "sourceDescription": "Preliminary examination - PCT II",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "international-examination",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "language of the procedure": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "PROL",
+      "sourceDescription": "Language of the procedure",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "all",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "request for accelerated examination": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "RAEX",
+      "sourceDescription": "Request for accelerated examination",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "examination",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "rejection of the request for revocation of the patent": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "REJR",
+      "sourceDescription": "Rejection of the request for revocation of the patent",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "revocation",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "decision",
+      "parserNote": ""
+    },
+    "renewal fee payment": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "RFEE",
+      "sourceDescription": "Renewal fee payment",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "all",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "none",
+      "parserNote": ""
+    },
+    "request for further processing": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "RFPR",
+      "sourceDescription": "Request for further processing",
+      "internalKey": "FURTHER_PROCESSING_REQUEST",
+      "procedureFamily": "ALL_EP",
+      "phase": "remedial",
+      "classification": "remedial",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Attach to missed act using STEP_DESCRIPTION_NAME and record result",
+      "parserNote": "Central remedial branch for many missed deadlines."
+    },
+    "fee for a supplementary search": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "SFEE",
+      "sourceDescription": "Fee for a supplementary search",
+      "internalKey": "SUPPLEMENTARY_SEARCH_FEE_PAYMENT",
+      "procedureFamily": "EURO_PCT",
+      "phase": "regional_phase_entry",
+      "classification": "payment",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use as Euro-PCT entry/compliance signal, not communication deadline",
+      "parserNote": "One of the regional-phase acts."
+    },
+    "translation of the application": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "TRAN",
+      "sourceDescription": "Translation of the application",
+      "internalKey": "EURO_PCT_TRANSLATION_RECEIVED",
+      "procedureFamily": "EURO_PCT",
+      "phase": "regional_phase_entry",
+      "classification": "filing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use as Euro-PCT entry/compliance signal",
+      "parserNote": "One of the regional-phase acts."
+    },
+    "first communication from the examining division": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "DDIV",
+      "sourceDescription": "First communication from the examining division",
+      "internalKey": "FIRST_EXAM_COMM_DIVISIONAL_MARKER",
+      "procedureFamily": "ALL_EP",
+      "phase": "examination",
+      "classification": "marker",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Use for divisional-window logic and examination chronology",
+      "parserNote": "Not necessarily the full text of the communication."
+    },
+    "withdrawal during international phase - procedure closed": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "WINT",
+      "sourceDescription": "Withdrawal during international phase - procedure closed",
+      "internalKey": "",
+      "procedureFamily": "",
+      "phase": "entry-regional-phase",
+      "classification": "",
+      "preferredSurface": "st36/all_documents",
+      "codexAction": "procedure closed",
+      "parserNote": ""
+    },
+    "despatch of invitation to pay additional claims fees": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "ACOR",
+      "sourceDescription": "Despatch of invitation to pay additional claims fees",
+      "internalKey": "ADDITIONAL_CLAIMS_FEE_INVITATION_AFTER_ALLOWED_AMENDMENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "deadline-bearing",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Create fee deadline from DATE_OF_DISPATCH + time-limit in record",
+      "parserNote": "Grant-stage edge case after allowed amendment/correction."
+    },
+    "request for correction of the decision to grant filed": {
+      "codeNamespace": "procedural_step",
+      "sourceCode": "CDEC",
+      "sourceDescription": "Request for correction of the decision to grant filed",
+      "internalKey": "CORRECTION_REQUEST_AFTER_GRANT_DECISION",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "incoming-request",
+      "preferredSurface": "all_documents/ST36 procedural-data",
+      "codexAction": "Store as branch affecting post-grant decision correction",
+      "parserNote": "Do not confuse with Rule 71(3) amendment branch."
+    },
+    "publication in section i.1 ep bulletin": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009012",
+      "sourceDescription": "Publication in section I.1 EP Bulletin",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change or deletion - publication of a document": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199EPPU",
+      "sourceDescription": "Change or deletion - publication of A document",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change - publication of search report": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0008199SEPU",
+      "sourceDescription": "Change - publication of search report",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "publication of search report": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009013",
+      "sourceDescription": "Publication of search report",
+      "internalKey": "SEARCH_REPORT_PUBLICATION",
+      "procedureFamily": "EP_DIRECT",
+      "phase": "search",
+      "classification": "informational",
+      "preferredSurface": "event_history/all_documents",
+      "codexAction": "No standalone deadline; pair with Rule 70/70a path",
+      "parserNote": "Use publication event as anchor for search-stage awareness, not reply deadline."
+    },
+    "publication of international search report": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009015",
+      "sourceDescription": "Publication of international search report",
+      "internalKey": "ISR_PUBLICATION",
+      "procedureFamily": "EURO_PCT",
+      "phase": "pre-regional-phase",
+      "classification": "informational",
+      "preferredSurface": "event_history/all_documents",
+      "codexAction": "No EP reply deadline from this event alone",
+      "parserNote": "Useful for PCT chronology only."
+    },
+    "supplementary search report": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009016",
+      "sourceDescription": "Supplementary search report",
+      "internalKey": "SUPPLEMENTARY_SEARCH_REPORT_PUBLICATION",
+      "procedureFamily": "EURO_PCT",
+      "phase": "search",
+      "classification": "informational",
+      "preferredSurface": "event_history/all_documents",
+      "codexAction": "No standalone deadline; pair with downstream communication",
+      "parserNote": "Useful for Euro-PCT search chronology."
+    },
+    "change or deletion - publication of search report": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199SEPU",
+      "sourceDescription": "Change or deletion - publication of search report",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "(expected) grant": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009210",
+      "sourceDescription": "(Expected) grant",
+      "internalKey": "EXPECTED_GRANT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "expected B1 publication"
+    },
+    "change or deletion - publication of b1 document": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299EPPU",
+      "sourceDescription": "Change or deletion - publication of B1 document",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "patent maintained (b2 publication)": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009272",
+      "sourceDescription": "Patent maintained (B2 publication)",
+      "internalKey": "OPPOSITION_B2_PUBLICATION",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_endgame",
+      "classification": "publication",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Close Rule 82 branch once publication confirmed",
+      "parserNote": "Publication, not the underlying communication itself."
+    },
+    "change - publication of b2 document": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299PMAP",
+      "sourceDescription": "Change - publication of B2 document",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change or deletion - publication of b2 document": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009399EPPU",
+      "sourceDescription": "Change or deletion - publication of B2 document",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "(expected) limited patent specification": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009410",
+      "sourceDescription": "(Expected) limited patent specification",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change or deletion - publication of limited patent specification": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009499EPPU",
+      "sourceDescription": "Change or deletion - publication of limited patent specification",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change - withdrawal": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299WDRA",
+      "sourceDescription": "Change - withdrawal",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "withdrawal of application": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009182",
+      "sourceDescription": "Withdrawal of application",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change or deletion - application deemed withdrawn": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299ADWI",
+      "sourceDescription": "Change or deletion - application deemed withdrawn",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change - refusal": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299REFU",
+      "sourceDescription": "Change - refusal",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "refusal of application": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009181",
+      "sourceDescription": "Refusal of application",
+      "internalKey": "REFUSAL_DECISION_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "decision",
+      "classification": "decision",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Route to appeal branch",
+      "parserNote": "Do not treat as ordinary office action."
+    },
+    "new entry: communication of intention to grant a patent": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSNIGR1",
+      "sourceDescription": "New entry: Communication of intention to grant a patent",
+      "internalKey": "GRANT_R71_3_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "deadline-bearing",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Create 4-month candidate, but confirm exact despatch/date from document",
+      "parserNote": "Use all_documents for legal date and supersession logic."
+    },
+    "change: communication of intention to grant a patent": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSCIGR1",
+      "sourceDescription": "Change: Communication of intention to grant a patent",
+      "internalKey": "GRANT_R71_3_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "deadline-bearing",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Refresh 4-month candidate, but confirm exact despatch/date from document",
+      "parserNote": "Treat as update to Rule 71(3) state."
+    },
+    "deletion: communication of intention to grant a patent": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSDIGR1",
+      "sourceDescription": "Deletion: Communication of intention to grant a patent",
+      "internalKey": "GRANT_R71_3_EVENT",
+      "procedureFamily": "ALL_EP",
+      "phase": "grant",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "deleted Rule 71(3) event"
+    },
+    "no opposition filed within time limit": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009261",
+      "sourceDescription": "No opposition filed within time limit",
+      "internalKey": "NO_OPPOSITION_FILED",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_end",
+      "classification": "status",
+      "preferredSurface": "event_history/about_this_file",
+      "codexAction": "Close opposition watch for the patent",
+      "parserNote": "Post-grant status update."
+    },
+    "change - no opposition filed": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299DELT",
+      "sourceDescription": "Change - no opposition filed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change - opposition filed": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0008299OPPO",
+      "sourceDescription": "Change - opposition filed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "opposition filed": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009260",
+      "sourceDescription": "Opposition filed",
+      "internalKey": "OPPOSITION_FILED",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition",
+      "classification": "status",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Create opposition case state; next real deadline usually from Rule 79/OREX/DOBS",
+      "parserNote": "Not itself the proprietor reply communication."
+    },
+    "opposition withdrawn": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009264",
+      "sourceDescription": "Opposition withdrawn",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "opposition deemed not to have been filed": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299OPPB",
+      "sourceDescription": "Opposition deemed not to have been filed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change - opposition data/opponent's data or that of the opponent's representative": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299OPPO",
+      "sourceDescription": "Change - opposition data/opponent's data or that of the opponent's representative",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "opposition rejected": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009273",
+      "sourceDescription": "Opposition rejected",
+      "internalKey": "OPPOSITION_REJECTED",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_decision",
+      "classification": "decision",
+      "preferredSurface": "event_history/about_this_file/all_documents",
+      "codexAction": "Route to appeal branch",
+      "parserNote": "Decision event."
+    },
+    "change - rejection of opposition": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299REJO",
+      "sourceDescription": "Change - rejection of opposition",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "opposition inadmissible": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299OPPA",
+      "sourceDescription": "Opposition inadmissible",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "revocation of patent": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009271",
+      "sourceDescription": "Revocation of patent",
+      "internalKey": "OPPOSITION_REVOCATION",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_decision",
+      "classification": "decision",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "revocation in opposition"
+    },
+    "change - revocation of patent": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299REVO",
+      "sourceDescription": "Change - revocation of patent",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "patent revoked on request of proprietor": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009220",
+      "sourceDescription": "Patent revoked on request of proprietor",
+      "internalKey": "PROPRIETOR_REVOCATION",
+      "procedureFamily": "LIMITATION_REVOCATION",
+      "phase": "revocation_request",
+      "classification": "decision",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "proprietor revocation"
+    },
+    "opposition procedure terminated - date of legal effect published": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009276",
+      "sourceDescription": "Opposition procedure terminated - date of legal effect published",
+      "internalKey": "OPPOSITION_TERMINATED",
+      "procedureFamily": "POST_GRANT_OPPOSITION",
+      "phase": "opposition_closed",
+      "classification": "status",
+      "preferredSurface": "event_history/about_this_file",
+      "codexAction": "Close opposition case state",
+      "parserNote": "Termination marker."
+    },
+    "change - opposition procedure terminated": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299OPPC",
+      "sourceDescription": "Change - opposition procedure terminated",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "new entry: renewal fee paid": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSNRFE2",
+      "sourceDescription": "New entry: Renewal fee paid",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change: renewal fee paid": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSCRFE2",
+      "sourceDescription": "Change: Renewal fee paid",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "deletion: renewal fee paid": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "EPIDOSDRFE2",
+      "sourceDescription": "Deletion: Renewal fee paid",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "lapse of the patent in a contracting state": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009250",
+      "sourceDescription": "Lapse of the patent in a contracting state",
+      "internalKey": "NATIONAL_LAPSE",
+      "procedureFamily": "POST_GRANT_NATIONAL",
+      "phase": "post_grant_national",
+      "classification": "status",
+      "preferredSurface": "event_history/about_this_file/federated register",
+      "codexAction": "Update national status only",
+      "parserNote": "National post-grant layer, not central EP procedure."
+    },
+    "change - lapse in a contracting state": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009299LAPS",
+      "sourceDescription": "Change - lapse in a contracting state",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change - licence": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009199LREG",
+      "sourceDescription": "Change - licence",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "licence": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009341",
+      "sourceDescription": "Licence",
+      "internalKey": "LICENCE_EVENT",
+      "procedureFamily": "POST_GRANT_NATIONAL",
+      "phase": "post_grant_national",
+      "classification": "status",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "licence data"
+    },
+    "request for unitary effect withdrawn": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009702UREQ10",
+      "sourceDescription": "Request for unitary effect withdrawn",
+      "internalKey": "UP_REQUEST_WITHDRAWN",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_request",
+      "classification": "status",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "request for unitary effect withdrawn"
+    },
+    "change or deletion – date of withdrawal of request for unitary effect": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UREQ10",
+      "sourceDescription": "Change or deletion – Date of withdrawal of request for unitary effect",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "decision on the request for unitary effect": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009701UREQ02",
+      "sourceDescription": "Decision on the request for unitary effect",
+      "internalKey": "UP_REQUEST_DECISION",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_request",
+      "classification": "decision",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "decision on unitary effect request"
+    },
+    "change or deletion – date of decision on the request for unitary effect": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UREQ02",
+      "sourceDescription": "Change or deletion – Date of decision on the request for unitary effect",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "filing of request for unitary effect": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009700UREQ01",
+      "sourceDescription": "Filing of request for unitary effect",
+      "internalKey": "UP_REQUEST_FILED",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_request",
+      "classification": "status",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "unitary effect request filed"
+    },
+    "change: date of filing of request for unitary request": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UREQ01",
+      "sourceDescription": "Change: Date of filing of request for unitary request",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "unitary effect lapsed": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009705LAPS22",
+      "sourceDescription": "Unitary effect lapsed",
+      "internalKey": "UP_LAPSE",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_post_registration",
+      "classification": "consequence",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "unitary effect lapsed"
+    },
+    "change or deletion: unitary effect lapse date": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799LAPS22",
+      "sourceDescription": "Change or deletion: unitary effect lapse date",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "request for re-establishment of rights filed": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009706REES22",
+      "sourceDescription": "Request for re-establishment of rights filed",
+      "internalKey": "UP_REESTABLISHMENT_REQUEST",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_post_registration",
+      "classification": "remedial branch",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "re-establishment request filed"
+    },
+    "change or deletion: date of request for re-establishment of rights": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799REES22",
+      "sourceDescription": "Change or deletion: Date of request for re-establishment of rights",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "renewal fees not paid: unitary patent protection lapsed": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009704UDLA02",
+      "sourceDescription": "Renewal fees not paid: Unitary Patent Protection lapsed",
+      "internalKey": "UP_LAPSE_RENEWAL",
+      "procedureFamily": "UNITARY_PATENT",
+      "phase": "up_post_registration",
+      "classification": "consequence",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "branch to consequence/decision logic",
+      "parserNote": "UP lapse for unpaid renewal fee"
+    },
+    "change: renewal fees not paid: unitary patent protection lapsed": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UDLA02",
+      "sourceDescription": "Change: Renewal fees not paid: Unitary Patent Protection lapsed",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    },
+    "change or deletion – date of registration of unitary patent protection": {
+      "codeNamespace": "register_main_event",
+      "sourceCode": "0009799UREG01",
+      "sourceDescription": "Change or deletion – Date of registration of Unitary Patent Protection",
+      "internalKey": "UNMAPPED_MAIN_EVENT",
+      "procedureFamily": "UNKNOWN",
+      "phase": "unknown",
+      "classification": "informational",
+      "preferredSurface": "event_history + about_this_file + all_documents",
+      "codexAction": "monitor",
+      "parserNote": "map in your own taxonomy"
+    }
+  }
+});
 
   const SOURCES = [
     { key: 'main', slug: 'main', title: 'EP About this file' },
@@ -2260,8 +4407,27 @@
     return dedupe(rows, (r) => `${r.dateStr}|${r.title}|${r.detail}`).sort(compareDateDesc);
   }
 
+  function normalizeCodexDescription(value = '') {
+    return normalize(value).toLowerCase();
+  }
+
   function legalCodeRecord(code) {
-    return code ? (LEGAL_EVENT_CODE_MAP[String(code).toUpperCase()] || null) : null;
+    return code ? (EPO_CODEX_DATA.byCode[String(code).toUpperCase()] || null) : null;
+  }
+
+  function codexDescriptionRecord(description) {
+    const key = normalizeCodexDescription(description);
+    return key ? (EPO_CODEX_DATA.byDescription[key] || null) : null;
+  }
+
+  function normalizeCodexSignal(raw = {}) {
+    const sourceCode = normalize(raw.sourceCode || '').toUpperCase();
+    const sourceDescription = normalize(raw.sourceDescription || '');
+    const exact = legalCodeRecord(sourceCode);
+    if (exact) return { ...raw, matchStrategy: 'exact-code', codexRecord: exact };
+    const fallback = codexDescriptionRecord(sourceDescription);
+    if (fallback) return { ...raw, matchStrategy: 'description-fallback', codexRecord: fallback };
+    return { ...raw, matchStrategy: 'unmapped', codexRecord: null };
   }
 
   function extractLegalEventBlocks(doc, url) {
@@ -2270,6 +4436,15 @@
 
     const pushCurrent = () => {
       if (!current) return;
+      if (!current.codexKey && current.title) {
+        const matched = normalizeCodexSignal({ sourceDescription: current.title });
+        current.matchStrategy = current.matchStrategy || matched.matchStrategy;
+        if (matched.codexRecord) {
+          current.codexKey = matched.codexRecord.internalKey;
+          current.codexPhase = matched.codexRecord.phase;
+          current.codexClass = matched.codexRecord.classification;
+        }
+      }
       if (current.dateStr || current.title || current.detail) blocks.push(current);
       current = null;
     };
@@ -2306,12 +4481,13 @@
         current.freeFormatText = value;
         current.detail = current.detail ? `${current.detail} · ${value}` : value;
         const originalCode = normalize(value.match(/ORIGINAL CODE:\s*([A-Z0-9]+)/i)?.[1] || '').toUpperCase();
-        const record = legalCodeRecord(originalCode);
+        const matched = normalizeCodexSignal({ sourceCode: originalCode, sourceDescription: current.title || value });
         if (originalCode) current.originalCode = originalCode;
-        if (record) {
-          current.codexKey = record.internalKey;
-          current.codexPhase = record.phase;
-          current.codexClass = record.classification;
+        current.matchStrategy = matched.matchStrategy;
+        if (matched.codexRecord) {
+          current.codexKey = matched.codexRecord.internalKey;
+          current.codexPhase = matched.codexRecord.phase;
+          current.codexClass = matched.codexRecord.classification;
         }
         continue;
       }
@@ -2323,12 +4499,13 @@
       if (/^Event description:?$/i.test(label)) continue;
       if (/^Original code:?$/i.test(label)) {
         const originalCode = value.toUpperCase();
-        const record = legalCodeRecord(originalCode);
+        const matched = normalizeCodexSignal({ sourceCode: originalCode, sourceDescription: current.title || current.detail || value });
         current.originalCode = originalCode;
-        if (record) {
-          current.codexKey = record.internalKey;
-          current.codexPhase = record.phase;
-          current.codexClass = record.classification;
+        current.matchStrategy = matched.matchStrategy;
+        if (matched.codexRecord) {
+          current.codexKey = matched.codexRecord.internalKey;
+          current.codexPhase = matched.codexRecord.phase;
+          current.codexClass = matched.codexRecord.classification;
         }
         continue;
       }
@@ -2383,7 +4560,18 @@
   }
 
   function parseEventHistory(doc, caseNo) {
-    return { events: parseDatedRows(doc, sourceUrl(caseNo, 'event')) };
+    const events = parseDatedRows(doc, sourceUrl(caseNo, 'event')).map((event) => {
+      const matched = normalizeCodexSignal({ sourceDescription: event.title || '' });
+      if (!matched.codexRecord) return event;
+      return {
+        ...event,
+        codexKey: matched.codexRecord.internalKey,
+        codexPhase: matched.codexRecord.phase,
+        codexClass: matched.codexRecord.classification,
+        matchStrategy: matched.matchStrategy,
+      };
+    });
+    return { events };
   }
 
   function parseUe(doc) {
