@@ -7,9 +7,14 @@ This file is intentionally opinionated. Not every item below is a bug, but each 
 ## New real-world controls added alongside this backlog
 
 - `EP22809254` — Euro-PCT non-entry withdrawal + partial/final international-search packet mix
+- `EP22812869` — second Euro-PCT non-entry withdrawal control
 - `EP24163939` — divisional R71 / grant-intended control
 - `EP23182542` — granted divisional with withdrawal/further-processing conflict history
 - `EP25193159` — divisional search-stage control with extended-ESR annex
+- `EP23758527` / `EP23758526` / `EP23758524` / `EP23721286` — Oxford Nanopore Euro-PCT deemed-withdrawn → further-processing recovery family
+- `EP22153706` — divisional deemed-withdrawn with explicit non-payment / non-reply reason coding
+- `EP22209859` — clean divisional no-opposition / post-grant control
+- `EP20816706` — clean Euro-PCT no-opposition / post-grant control
 
 ## Priority 1 — posture accuracy and precedence
 
@@ -229,12 +234,11 @@ For users who do not live inside EPO procedure every day, compact packet labels 
 
 ## Next-tier fixture candidates (not yet captured here)
 
-These looked worthwhile during the same sweeps and would be good future additions if more real coverage is wanted:
+These still looked worthwhile during the same sweeps, but are **not** yet captured in this batch:
 
-- `EP22153706` — direct-EP deemed-withdrawn with explicit non-payment / non-reply reason coding
-- `EP20816706` — clean direct-EP no-opposition / post-grant baseline from Toro
-- `EP22812869` — second non-entry Euro-PCT deemed-withdrawn control
-- `EP23758527` / `EP23758526` / `EP23758524` — Oxford family of non-reply-to-written-opinion deemed-withdrawn controls
+- `EP22812869` counterpart family members beyond the two captured non-entry controls, if we want a broader non-entry cluster later
+- additional Toro granted/post-grant comparators beyond `EP22209859` and `EP20816706`, if we want a wider sample of no-opposition / lapse combinations
+- more Oxford sibling filings around the newly captured cluster, if we later want to stress-test sibling/family-role summarisation even harder
 
 ## Short version
 

@@ -1,0 +1,639 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+  <meta http-equiv="Content-Script-Type" content="text/javascript" />
+  <meta http-equiv="Content-Style-Type" content="text/css"/>
+
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon"/>
+  <title> EP Legal status - European Patent Register</title>
+  <link rel="stylesheet" href="/theme/cssPrint.css"  media="print" type="text/css"/>
+  
+  <link rel="stylesheet" href="/theme/cssPrintLayout.css"  media="print" type="text/css"/>
+
+  <link rel="stylesheet" href="/theme/rplusPrint.css" media="print" type="text/css"/>
+  
+  <link rel="stylesheet" href="/theme/common.css"  media="screen" type="text/css"/>
+
+  <!--[if IE 8]>
+		<link rel="stylesheet" href="/theme/css_IE8.css" type="text/css"/>
+		<link rel="stylesheet" href="/theme/rplus_IE8.css" type="text/css"/>
+		<link rel="stylesheet" href="/theme/css_ie8_print.css" type="text/css"/>
+  <![endif]-->
+  <!--[if IE 7]>
+		<link rel="stylesheet" href="/theme/css_IE7.css" type="text/css"/>
+		<link rel="stylesheet" href="/theme/rplus_IE7.css" type="text/css"/>
+  <![endif]-->
+  <!--[if IE 6]>
+		<link rel="stylesheet" href="/theme/css_IE6.css" type="text/css"/>
+		<link rel="stylesheet" href="/theme/rplus_IE6.css" type="text/css"/>
+  <![endif]-->
+  <!--[if Opera]>
+		<link rel="stylesheet" href="/theme/rplus_opera.css" type="text/css"/>
+	<![endif]-->
+	
+  <link rel="stylesheet" href="/theme/rplus.css" type="text/css"/>
+  
+  <link rel="stylesheet" href="/theme/cssJQuery.css" type="text/css"/>
+
+<!--c:set var="jsStatic" value="/" scope="application" /--> <!-- AMF -->
+
+<script language="javascript" type="text/javascript" src = "/scripts/jquery-1.7.2.min.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/jquery.combobox.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/iutil.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/accordion.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/jquery.tools.min.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/jquery.expandableinput.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/jquery.session.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/main.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/alert.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/rplus.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/jquery.blockUI.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/federated.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/jquery.jsonp-2.4.0.min.js"></script>
+<script type='text/javascript' src='/dwr/engine.js'></script>
+<script type='text/javascript' src='/dwr/util.js'></script>
+<script type='text/javascript' src='/dwr/interface/MonitoredList.js'></script>
+<script type='text/javascript' src='/statusMap.js'></script>
+<script type='text/javascript' src='/txtMessages.js'></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/bot.js"></script>
+<!-- Matomo Tag Manager -->
+
+<script>
+
+var container_ID = 'K4s1az21', env = '-i';
+var currentUrl = document.location.href;
+if (currentUrl.includes('register.epo.org')) {
+  env = '';
+  container_ID = '6yl2jF3T';
+}
+var _mtm = window._mtm = window._mtm || [];
+_mtm.push({'mtm.startTime': (new Date().getTime()), 'event': 'mtm.Start'});
+var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+g.async=true; g.src='https://matomo' + env + '.epo.org/js/container_' + container_ID + '.js'; s.parentNode.insertBefore(g,s);
+
+</script>
+
+<!-- End Matomo Tag Manager -->
+</head>
+
+<body lang="en" class="present">
+<script language="javascript" type="text/javascript">
+   $(document).ready(function() {
+          $('.hoverable').hover(
+             function() {
+                $(this).addClass('hovered');
+             }, function() {
+                $(this).removeClass('hovered');
+             }
+          );
+          var path = '';
+          var param = {clnrefer : ""}
+          if (path == '/regviewer') {
+        	  $('#smartSearchForm textarea[name="query"]').val('');
+          } else if (path == '/advancedSearch' && param.clnrefer == 'yes') {
+        	  $('#searchForm textarea[class="expandable"]').each(function() {
+        		  $(this).val('');
+        		  removeSessionAttr(getPage() + $(this).attr("name"));
+	      	  });
+          }
+
+       });
+</script>
+<div class="printGrid">
+	<div class="printIt">
+		<div class="printLogo">
+			<img alt="logo" src="/images/header/logo.gif" />
+		</div>
+	</div>
+	<div id="page" class="pageWrap">
+	<a name="toplink"></a>
+	<div class="epoHeader">
+	<div id="epoHeader" class="clearfix">
+	<a id="epoLogo" href="http://www.epo.org" name="epoLogo"><img alt="logo missing" src="/images/header/logo.gif"/></a>
+	
+	<div id="epoHeaderCenter"><img alt="logo center" src="/images/header/logo_patent_register_en.gif"/></div>
+	<div id="epoHeaderMetaNav">
+		<ul class="modLanguageNavi clearfix">
+			<li>
+				<a href="?lng=de&amp;number=EP22153706&amp;tab=legal">
+   Deutsch</a>
+
+<a href="?lng=en&amp;number=EP22153706&amp;tab=legal">
+   English</a>
+
+<a href="?lng=fr&amp;number=EP22153706&amp;tab=legal">
+   Français</a>
+
+</li>
+		</ul>
+		<ul class="modServiceNavi clearfix">
+			<li class="navElem contact">
+				<a href="http://www.epo.org/service-support/contact-us.html" target="_blank">Contact</a>
+			</li>
+		</ul>
+	</div>
+	</div>
+</div><div class="modAppFlyoutNavi noPrint">
+		<div class="lvl1ul clearfix">
+			<ul class="primary">
+				<li class="lvl1li"><a class="leftArrow" href="https://www.epo.org/searching-for-patents/legal/register.html">About European Patent Register</a></li>
+				
+				<li class="lvl1li">
+					<a class="hasSubMenu sel" href="#">Other EPO online services</a>
+					<div class="lvl2ul epoMenu" style="opacity: 1; visibility: hidden; display: none;">
+						<ul class="epoGrpList epoGrpLeft">
+							
+   
+    
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="http://worldwide.espacenet.com">Espacenet
+            </a>
+</li>
+        
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="https://register.epo.org/login">Register Alert
+            </a>
+</li>
+        
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="https://data.epo.org/publication-server/?hp=stages">European Publication Server
+            </a>
+</li>
+        
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="http://www.epo.org/searching/subscription/gpi.html">Global Patent Index
+            </a>
+</li>
+        
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="http://www.epo.org/searching/free/bulletin.html">European Patent Bulletin
+            </a>
+</li>
+        
+    
+</ul>
+					</div>
+				</li>
+            </ul>
+			<ul class="secondary">
+				<li><a class="tooltipHeader registerAlertLogin" title="Subscribe to this email alert service to monitor patent applications throughout the EP grant procedure." href="authenticate">Register Alert (email alerts)</a></li>
+					</ul>
+		</div>			
+	</div>
+	<div id="content"></div>
+      <script language="JavaScript" type="text/javascript">
+
+<!--
+	var status = "false";
+	$(document).ready(function(){
+	$("div.pageWrap").addClass("screenWide");
+	$('a[href="#"]').click(function(e) { e.preventDefault ? e.preventDefault() : e.returnValue = false; });
+	$('<p class="tooltipForRSSApnsEmail"></p>').appendTo('body');
+	 
+	// email valid format
+	var pattern = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+	//disable submit button
+	$("#okSubmit").attr('disabled', true);
+	$("#okSubmit").css("color","#C0C0C0");
+	$("#okSubmit").css("cursor","default");
+	
+	$("#alertSubscribeId").on('mouseover',function() {
+    var textarea_value = $("#emailadresse").val();
+	var valid = pattern.test(textarea_value);
+    if(textarea_value != '' && valid ) {
+		//enable submit button
+        $("#okSubmit").attr('disabled' , false);
+		$("#okSubmit").css("color","#000000");
+		$("#okSubmit").css("cursor","pointer");
+    }else{
+		//disable submit button
+        $("#okSubmit").attr('disabled' , true);
+		$("#okSubmit").css("color","#C0C0C0");
+		$("#okSubmit").css("cursor","default");
+    }
+	});
+	
+	}); 
+	 //To open the dialog box of RSS subscription alert
+	 function openAlert(){	 
+		var dialog = document.getElementById('alertSubscribeId');
+		var email = document.getElementById("emailId");
+		dialog.style.display = "block";
+		window.onclick = function(event) {
+		if (event.target == dialog) {
+        dialog.style.display = "none";
+			}
+		} 
+		 
+	 }
+	//To close the dialog box of RSS subscription alert
+	function closeAlert(){	 
+		var dialog = document.getElementById('alertSubscribeId');
+		var cancel = document.getElementById("cancel");
+        dialog.style.display = "none";
+	 }
+	 
+	 
+	function showDetails() {
+		if (status === "false") {
+			$("#historyButton").text('Hide history');
+            $("#historyButton").removeClass('showHist');
+            $("#historyButton").addClass('hideHist');
+            $(".former").show();
+			status = "true";
+		} else {
+			$("#historyButton").text('Show history');
+            $("#historyButton").removeClass('hideHist');
+            $("#historyButton").addClass('showHist');
+            $(".former").hide();
+			status = "false";
+		}
+	}
+
+	function downloadXML(href, message) {
+		if(message.length > 0){
+			alert(message);
+		}
+        window.open(href,"DownloadXML");     // Open in a new window
+         //window.open(href); self.focus();   // Background window
+         //window.location = href;            // Open in the current window
+	}
+
+	function refineSearch() {
+		window.location.href="application?lastSearch=advanced";
+	}
+
+	function filterDocs(number, lng) {
+		var filter = $("select").val();
+		window.location.href="application?lng="+lng+"&tab=doclist&number="+number+"&filter="+encodeURIComponent(filter);
+	}
+	function filterueDocs(number, lng) {
+		var filter = $("select").val();
+		window.location.href="application?lng="+lng+"&tab=ueDoclist&number="+number+"&filter="+encodeURIComponent(filter);
+	}
+-->
+
+
+</script>
+
+<div id="epoNavigation" class="epoNavigation">
+		<script type="text/javascript">
+$(document).ready(function(){
+   if (false) {
+      if ($("#").hasClass("bendr")) {
+         $("#").removeClass("bendr").addClass("bendractive");
+      }
+      if ($("#").hasClass("bendl")) {
+         $("#").removeClass("bendl").addClass("bendlactive");
+      }
+   }
+});
+</script>
+
+<spring:url var="rootCont" value="/"/>
+
+  <div class="modAppNav noScript">
+      <ul>
+		<li id="smartSearch" class="bendr"><a href="regviewer?lng=en">Smart search</a></li>
+        <li id="advancedSearch" class="bendr"><a href="advancedSearch?lng=en&amp;clnrefer=yes">Advanced search</a></li>
+        <li class="spacer"></li>
+        <li id="help" class="bendl last"><a href="help?topic=index&amp;lng=en">Help</a></li>
+        </ul>
+   </div>
+</div>
+
+	<div id="epoContentLeft" class="noPrint" >
+			<ul class="epoContentNav">
+				<span class="sel" style="padding-left: 6px;">EP4008170</span>
+				<span class="sel" style="padding-left: 16px;">European procedure</span>
+				<ul>
+					<li>
+						<a href="/application?number=EP22153706&amp;lng=en&amp;tab=main">EP About this file</a>
+								</li>
+					<li>
+						<a class="sel lastActiveElement" href='/application?number=EP22153706&amp;lng=en&amp;tab=legal'>EP Legal status</a>
+							</li>
+					<li>
+						<span class="disabled">EP Federated register</span>
+								</li>
+					<li>
+						<a href="/application?number=EP22153706&amp;lng=en&amp;tab=event">EP Event history</a>
+								</li>
+					<li>
+						<a href="/application?number=EP22153706&amp;lng=en&amp;tab=citations">EP Citations</a>
+								</li>
+					<li>
+						<a href="/application?number=EP22153706&amp;lng=en&amp;tab=family">EP Patent family</a>
+								</li>
+					<li>
+						<a href="/application?number=EP22153706&amp;lng=en&amp;tab=doclist">EP All documents</a>
+								</li>
+					</ul>
+				</ul>
+			<div style="clear: right;">&nbsp;</div>
+
+			<!-- only context menu for results page -->
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+<script>
+$(document).ready(function() {
+  $('.dijitAccordionTitle').click(function() {
+    var accordionContainer = $('.epoAccordionContainer');
+    var contentContainer = $('.dijitContainer.dijitAccordionContainer.dijitLayoutContainer');
+    accordionContainer.css('height', 'auto');
+    contentContainer.css('height', 'auto');
+  });
+});
+</script>
+
+   <div class="epoAccordionContainer" style="height: auto;">
+       <div class="dijitContainer dijitAccordionContainer dijitLayoutContainer" style="overflow: hidden; height: auto;" >
+			
+            
+               
+            
+
+            
+            
+
+            
+               <div class="dijitAccordionTitle">
+                  <span class="dijitInline dijitAccordionArrow"></span>
+                  <img style="vertical-align: middle;" alt="blank" src="/images/blank.gif"/>
+                  <span class="dijitAccordionText">Quick help</span>
+               </div>
+               <div class="dijitContentPane dijitAccordionContainer-child dijitAccordionContainer-dijitContentPane">
+                           <ul>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=legal.1&amp;lng=en" title="&lt;h4&gt;What happens if I click on the &#034;XML&#034; or &#034;ST36&#034; buttons?&lt;/h4&gt;&lt;p&gt;You will be able to download the information from the &amp;#034;About this file&amp;#034; screen either as an XML or &amp;#034;Standard 36&amp;#034; file.&lt;/p&gt;">What happens if I click on the "XML" or "ST36" buttons?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=legal.2&amp;lng=en" title="&lt;h4&gt;What does &#034;legal status&#034; mean?&lt;/h4&gt;&lt;p&gt;The legal status of a patent or patent application refers to the entries and procedural steps occurring during the patent grant procedure and the subsequent life of a patent. These are normally published in the patent gazette of the patent-granting country or organisation concerned.&lt;/p&gt;">What does "legal status" mean?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=legal.3&amp;lng=en" title="&lt;h4&gt;What is meant by &#034;entry into the European phase&#034;?&lt;/h4&gt;&lt;p&gt;The term &amp;#034;entry into the European phase&amp;#034; is not an act in itself but may be described as a series of steps to be taken or as a bundle of requirements to be fulfilled within 31 months from the international filing date or, where applicable, the earliest priority date claimed for the international application. Which steps must be taken within the 31-month time limit depends to a certain extent on the individual case. See the Guide for applicants, Part 2, Section E, chapter II.&lt;/p&gt;">What is meant by "entry into the European phase"?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=legal.4&amp;lng=en" title="&lt;h4&gt;What are validation states?&lt;/h4&gt;&lt;p&gt;Validation states are countries that are non-member states which have validation agreements with the EPO, allowing applicants to request the validation of a European patent to these countries.&lt;/p&gt;">What are validation states?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=legal.5&amp;lng=en" title="&lt;h4&gt;What are extension states?&lt;/h4&gt;&lt;p&gt;Extension states are countries that are non-- member states  which have extension agreements with the EPO, allowing applicants to request the extension of a European patent or patent application to these countries.&lt;/p&gt;">What are extension states?</a>
+                                 </li>
+                              
+                           </ul>
+                </div>
+            
+      
+		
+		
+		<div class="dijitAccordionTitle">
+			<span class="dijitInline dijitAccordionArrow"></span>
+			<img style="vertical-align: middle;" alt="blank" src="/images/blank.gif"/>
+			<span class="dijitAccordionText">Maintenance news</span>
+		</div>
+			 
+		<div class="dijitContentPane dijitAccordionContainer-child dijitAccordionContainer-dijitContentPane">
+			
+				
+				
+                 
+				
+				
+				
+				
+				 
+                <p>
+<b>Scheduled maintenance</b>
+<span style="float:right;">
+<a title="Maintenance news" href="maintenance?lng=en">
+<img src="images/rss.gif"/>
+</a>
+</span>
+</p><p>Regular maintenance outages:<br/>
+between 05.00 and 05.15 hrs CET (Monday to Sunday).<br/>
+<br/>
+<b>Other outages</b>
+<br/>
+<a href="https://www.epo.org/service-support/availability-of-online-services.htmlhttps://www.epo.org/service-support/availability-of-online-services.htmlhttps://www.epo.org/service-support/availability-of-online-services.html" target="_blank">Availability</a>
+<br/>
+</p><p>2022.02.11</p>
+
+
+				<a class="int" href="news?type=NEWS_MAINTENANCE&amp;lng=en">More...</a>
+			
+
+			
+		</div>
+
+		
+		
+		<div class="dijitAccordionTitle">
+			<span class="dijitInline dijitAccordionArrow"></span>
+			<img style="vertical-align: middle;" alt="blank" src="/images/blank.gif"/>
+			<span class="dijitAccordionText">News flashes</span>
+		</div>
+		<div class="dijitContentPane dijitAccordionContainer-child dijitAccordionContainer-dijitContentPane">
+			
+				
+				
+                 
+				
+				
+				
+				
+                 
+				<p>
+<b>Italy joins the Federated Register</b>
+<span style="float:right;">
+<a title="News flashes" href="flashnews?lng=en">
+<img src="images/rss.gif"/>
+</a>
+</span>
+</p><p>Click <a href="https://register.epo.org/help?lng=en&amp;topic=federated" target="_blank">here</a> for more information on the Federated Register.</p><p>2025-06-12</p>
+
+				<a class="int" href="news?type=NEWSFLASH&amp;lng=en">More...</a>
+			
+
+			
+		</div>
+
+
+          <div class="dijitAccordionTitle">
+                  <span class="dijitInline dijitAccordionArrow"></span>
+                  <img style="vertical-align: middle;" alt="blank" src="/images/blank.gif"/>
+                  <span class="dijitAccordionText">Related links</span>
+          </div>
+          <div class="dijitContentPane dijitAccordionContainer-child dijitAccordionContainer-dijitContentPane">
+           
+		        
+		        
+		
+		        
+    <p xmlns:editorial="http://espacenet.com/maintenance/editorial">
+        
+            <a href="https://www.epo.org/searching-for-patents/legal/register/archive.html" target="_blank" class="ext">Release notes
+            </a>
+        <br/>
+        
+            <a href="https://e-courses.epo.org/wbts/europeanpatentregisterassistant/index.html" target="_blank" class="ext">European Patent Register Assistant
+            </a>
+        <br/>
+        
+            <a href="https://link.epo.org/web/legal/register/en-european-patent-register-user-manual.pdf" target="_blank" class="ext">European Patent Register User Manual
+            </a>
+        <br/>
+        
+            <a href="http://documents.epo.org/projects/babylon/eponet.nsf/0/61E49C570C2441DDC12581AF00494F04/$File/european_patent_register-pocket_guide_en.pdf" target="_blank" class="ext">European Patent Register – pocket guide
+            </a>
+        <br/>
+        
+            <a href="http://www.epo.org/searching-for-patents/legal/register/faq.html" target="_blank" class="ext">FAQ - European Patent Register
+            </a>
+        <br/>
+        
+            <a href="http://documents.epo.org/projects/babylon/eponet.nsf/0/B7C67A1394E42810C1257EC300537D68/$File/federated_register_flyer_en.pdf" target="_blank" class="ext">Federated Register (Flyer)
+            </a>
+        <br/>
+        
+            <a href="http://documents.epo.org/projects/babylon/eponet.nsf/0/9D94DCA14F468A24C1257EC300536856/$File/global_dossier_flyer2016_en.pdf" target="_blank" class="ext">Global Dossier (Flyer)
+            </a>
+        <br/>
+        
+            <a href="http://www.epo.org/searching-for-patents/legal/register/documentation/events.html" target="_blank" class="ext">Register events
+            </a>
+        <br/>
+        
+            <a href="http://www.epo.org/searching-for-patents/legal/register/documentation/data-coverage.html" target="_blank" class="ext">Deep link coverage
+            </a>
+        <br/>
+        
+            <a href="https://www.epo.org/searching-for-patents/legal/register/documentation/federated-register.html" target="_blank" class="ext">Federated Register content
+            </a>
+        <br/>
+        
+            <a href="https://e-courses.epo.org/wbts/PI_Tour/" target="_blank" class="ext">The Patent Information Tour
+            </a>
+        <br/>
+        
+            <a href="http://www.epo.org/service-support/ordering/fair-use.html" target="_blank" class="ext">Fair use charter
+            </a>
+        <br/>
+    </p>
+
+		   
+		   
+          </div>
+      </div>
+
+    </div></div>
+    <div class="epoContentWrap clearfix">
+		<div id="pagebody" >
+			<a name="Content"></a>
+			
+			<div class="printTitle printIt">
+			<h3>Extract from the Register of European Patents</h3>
+			</div>
+			<h1>
+				EP Legal status: EP4008170</h1>
+			<div id="body" class="clearfix">
+					<div class="epoToolBar firstChildToolbar">
+						<ul class="clearfix">
+							<li class="separator separatorFirst"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="rfnLst" title="Refine search" href="simpleSearch?lng=en">Refine search</a></li>
+							
+							<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+									<li style="padding-right: 0.4em;"><a class="download" title="Download ST36 data" href='javascript:downloadXML("/download?number=EP22153706&amp;tab=legal&amp;xml=st36", "")'>ST36</a></li>
+								<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="ext" title="Open in Espacenet" href="https://worldwide.espacenet.com/patent/search?q=pn%3DEP4008170&called_by=EuropeanRegister" target="_blank">Espacenet</a></li>
+								<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="thirdParty" title="Third Party Observation" href="https://tpo.apps.epo.org/tpo/ui/prod/?subject.publicationNumber=EP4008170" target="_blank">Submit observations</a></li>
+								<li style="padding-right: 0.4em;"class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="reportErr" title="Send us your questions or feedback" href="http://www.epo.org/service-support/contact-us/contact2-form.html?number=EP22153706&subject=EPRegister" target="_blank">Report error</a></li>
+							
+							<li style="padding-right: 0.4em;" class="floatRight prt line"><a href="javascript:window.print();" class="prt" title="Print">Print</a></li>
+							<li style="padding-right: 0.4em;" class="floatRight separator"><span class="firstFollow">|</span></li>
+						</ul>
+					</div>
+					<table class="tableType3"><td class="th" rowspan="38">Designated contracting states   <b><span title="Any indication in this section of a date of lapse – including for Unitary Patents – relates only to lapses that occurred during proceedings before the EPO. Lapses that occur during the national patent phase after proceedings before the EPO are <u>not</u> displayed in this section." class="tooltipActuator noPrint">Tooltip</span></b></td><td class="t2">AL</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">AT</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">BE</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">BG</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">CH</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">CY</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">CZ</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">DE</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">DK</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">EE</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">ES</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">FI</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">FR</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">GB</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">GR</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">HR</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">HU</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">IE</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">IS</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">IT</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">LI</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">LT</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">LU</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">LV</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">MC</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">MK</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">MT</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">NL</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">NO</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">PL</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">PT</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">RO</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">RS</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">SE</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">SI</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">SK</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">SM</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="t2">TR</td><td class="t3" colspan="2">&nbsp;</td></tr><td class="th">Examination procedure</td><td class="t2">05.01.2023</td><td class="t3" colspan="2">Despatch of communication that the application is deemed to be withdrawn, reason: examination fee not paid in time&nbsp;
+			[2023/21]</td></tr><td class="th" rowspan="3">Fees paid</td><td class="th" colspan="3">Renewal fee</td></tr><td class="t2">27.01.2022</td><td class="t3" colspan="2">Renewal fee&nbsp;patent year&nbsp;03</td></tr><td class="t2">18.05.2022</td><td class="t3" colspan="2">Renewal fee&nbsp;patent year&nbsp;04</td></tr><td class="th" rowspan="28">INPADOC data&nbsp;&nbsp;&nbsp;<b><span title="Information on events during the lifetime of an EP patent application generated during both the EPO patent grant procedure and the post-grant phase." class="tooltipActuator noPrint">Tooltip</span></b></td><td class="t2" colspan="3">The EPO does not accept any responsibility for the accuracy of legal status data relating to the post-grant phase, including but not limited to their completeness and fitness for specific purposes, nor can it guarantee that such data are up to date. For authoritative information, please refer to the relevant national patent authority.</td></tr><td class="th">Event date:</td><td class="t2">08.06.2022</td><td class="t2">&nbsp;</td></tr><td class="th">Event description:</td><td class="t2" colspan="2">DIVISIONAL APPLICATION: REFERENCE TO EARLIER APPLICATION</td></tr><td class="th">Ref Document Number:</td><td class="t2" colspan="2">3800978</td></tr><td class="th">Country of Ref Document:</td><td class="t2" colspan="2">EP</td></tr><td class="th">Kind Code of Ref Document:</td><td class="t2" colspan="2">P</td></tr><td class="t2" colspan="3">&nbsp;</td></tr><td class="th">Event date:</td><td class="t2">08.06.2022</td><td class="t2">&nbsp;</td></tr><td class="th">Event description:</td><td class="t2" colspan="2">DESIGNATED CONTRACTING STATES</td></tr><td class="th">Kind Code of Ref Document:</td><td class="t2" colspan="2">A1</td></tr><td class="th">Designated State(s):</td><td class="t2" colspan="2">AL AT BE BG CH CY CZ DE DK EE ES FI FR GB GR HR HU IE IS IT LI LT LU LV MC MK MT NL NO PL PT RO RS SE SI SK SM TR</td></tr><td class="t2" colspan="3">&nbsp;</td></tr><td class="th">Event date:</td><td class="t2">06.05.2022</td><td class="t2">&nbsp;</td></tr><td class="th">Event description:</td><td class="t2" colspan="2">PUBLIC REFERENCE MADE UNDER ARTICLE 153(3) EPC TO A PUBLISHED INTERNATIONAL APPLICATION THAT HAS ENTERED THE EUROPEAN PHASE</td></tr><td class="th">Free Format Text:</td><td class="t2" colspan="2">ORIGINAL CODE: 0009012</td></tr><td class="t2" colspan="3">&nbsp;</td></tr><td class="th">Event date:</td><td class="t2">06.05.2022</td><td class="t2">&nbsp;</td></tr><td class="th">Event description:</td><td class="t2" colspan="2">INFORMATION ON THE STATUS OF AN EP PATENT APPLICATION OR GRANTED EP PATENT</td></tr><td class="th">Free Format Text:</td><td class="t2" colspan="2">STATUS: THE APPLICATION HAS BEEN PUBLISHED</td></tr><td class="t2" colspan="3">&nbsp;</td></tr><td class="th">Event date:</td><td class="t2">21.04.2023</td><td class="t2">&nbsp;</td></tr><td class="th">Event description:</td><td class="t2" colspan="2">INFORMATION ON THE STATUS OF AN EP PATENT APPLICATION OR GRANTED EP PATENT</td></tr><td class="th">Free Format Text:</td><td class="t2" colspan="2">STATUS: THE APPLICATION IS DEEMED TO BE WITHDRAWN</td></tr><td class="t2" colspan="3">&nbsp;</td></tr><td class="th">Event date:</td><td class="t2">24.05.2023</td><td class="t2">&nbsp;</td></tr><td class="th">Event description:</td><td class="t2" colspan="2">APPLICATION DEEMED TO BE WITHDRAWN</td></tr><td class="th">Effective DATE:</td><td class="t2" colspan="2">20221209</td></tr><td class="t2" colspan="3">&nbsp;</td></tr></table></div>
+			</div>
+	</div>
+<div id="epoFooter" class="noPrint">
+				<ul>
+				<li>
+					<a href="https://www.epo.org/footer/legal-notice.html" target="_blank">Legal notice</a></li>
+					<li>
+					<a href="https://www.epo.org/footer/terms.html" target="_blank">Terms of use</a></li>
+					<li>24.3.42; 39p</li>
+					</ul>
+			</div>
+		</div>
+</div>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9da4f29e5f80fba0',t:'MTc3MzE3MzI2OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

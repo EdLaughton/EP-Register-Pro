@@ -181,6 +181,135 @@ function caseDoc(caseNo, tab) {
   assert(family.publications.some((p) => p.no === 'EP4168798' && p.kind === 'B1'), 'Extended-ESR control should retain the parent-family grant publication reference');
 }
 
+// Oxford Nanopore family — Euro-PCT deemed-withdrawn / further-processing cluster after non-reply to Written Opinion
+{
+  const familyCases = [
+    { caseNo: 'EP23758527', title: 'DE NOVO PORES', epPublication: 'EP4569331', woPublication: 'WO2024033447' },
+    { caseNo: 'EP23758526', title: 'NOVEL PORE MONOMERS AND PORES', epPublication: 'EP4569330', woPublication: 'WO2024033443' },
+    { caseNo: 'EP23758524', title: 'NOVEL PORE MONOMERS AND PORES', epPublication: 'EP4569328', woPublication: 'WO2024033421' },
+    { caseNo: 'EP23721286', title: 'NOVEL MODIFIED PROTEIN PORES AND ENZYMES', epPublication: 'EP4508203', woPublication: 'WO2023198911' },
+  ];
+
+  for (const fixture of familyCases) {
+    const main = hooks.parseMain(caseDoc(fixture.caseNo, 'main'), fixture.caseNo);
+    const doclistDoc = caseDoc(fixture.caseNo, 'doclist');
+    const doclist = hooks.parseDoclist(doclistDoc);
+    const eventHistory = hooks.parseEventHistory(caseDoc(fixture.caseNo, 'event'), fixture.caseNo);
+    const legal = hooks.parseLegal(caseDoc(fixture.caseNo, 'legal'), fixture.caseNo);
+    const family = hooks.parseFamily(caseDoc(fixture.caseNo, 'family'));
+    const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
+    const preview = hooks.doclistGroupingPreview(doclistDoc);
+
+    assert.strictEqual(main.title, fixture.title, `${fixture.caseNo} should retain its live English title`);
+    assert.strictEqual(main.applicationType, 'E/PCT regional phase', `${fixture.caseNo} should remain classified as Euro-PCT regional phase`);
+    assert(/Request for examination was made/i.test(main.statusRaw || ''), `${fixture.caseNo} should preserve the current revived/request-for-exam status after further processing`);
+    assert(doclist.docs.some((d) => /Application deemed to be withdrawn \(non-reply to Written Opinion\)/i.test(d.title)), `${fixture.caseNo} should retain the deemed-withdrawn non-reply document in the doclist parse`);
+    assert(preview.some((g) => g.dateStr === '06.10.2025' || g.dateStr === '06.06.2025'), `${fixture.caseNo} should keep the deemed-withdrawn event visible as its own packet`);
+    assert(doclist.docs.some((d) => /Decision to allow further processing/i.test(d.title)), `${fixture.caseNo} should retain the further-processing decision in the doclist parse`);
+    assert(eventHistory.events.some((e) => /Decision on request for further processing/i.test(e.title)), `${fixture.caseNo} should retain the further-processing event-history entry`);
+    assert(eventHistory.events.some((e) => /Application deemed to be withdrawn/i.test(e.title)), `${fixture.caseNo} should retain the deemed-withdrawn event-history entry`);
+    assert(deadlines.some((d) => d.label === 'Euro-PCT entry acts (31-month stop)'), `${fixture.caseNo} should keep Euro-PCT entry-stop guidance in the deadline model`);
+    assert(deadlines.some((d) => d.label === 'Appeal notice + fee'), `${fixture.caseNo} should preserve appeal-window derivation after the loss-of-rights posture`);
+    assert(legal.renewals.some((r) => r.year === 3), `${fixture.caseNo} should retain renewal-fee history through year 3`);
+    assert(family.publications.some((p) => p.no === fixture.epPublication), `${fixture.caseNo} should retain its EP publication in the family/publication parse`);
+    assert(family.publications.some((p) => p.no === fixture.woPublication), `${fixture.caseNo} should retain its WO publication in the family/publication parse`);
+  }
+}
+
+// EP22812869 — second Euro-PCT non-entry withdrawal control
+{
+  const caseNo = 'EP22812869';
+  const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
+  const doclistDoc = caseDoc(caseNo, 'doclist');
+  const doclist = hooks.parseDoclist(doclistDoc);
+  const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
+  const preview = hooks.doclistGroupingPreview(doclistDoc);
+
+  assert.strictEqual(main.applicationType, 'E/PCT regional phase', 'Second Euro-PCT non-entry control should remain classified as Euro-PCT regional phase');
+  assert(/deemed to be withdrawn/i.test(main.statusRaw || ''), 'Second Euro-PCT non-entry control should preserve deemed-withdrawn wording in the main status');
+  assert(preview.some((g) => g.label === 'International search / IPRP' && g.dateStr === '21.05.2024' && g.size === 1), 'Second Euro-PCT non-entry control should relabel singleton IPRP copies with the PCT-aware search label');
+  assert(doclist.docs.some((d) => /Application deemed to be withdrawn \(non-entry into European phase\)/i.test(d.title)), 'Second Euro-PCT non-entry control should retain the non-entry loss document in the doclist parse');
+  assert(eventHistory.events.some((e) => /Application deemed to be withdrawn/i.test(e.title)), 'Second Euro-PCT non-entry control should retain the deemed-withdrawn event-history entry');
+  assert(deadlines.some((d) => d.label === 'Euro-PCT entry acts (31-month stop)'), 'Second Euro-PCT non-entry control should keep Euro-PCT entry-stop guidance in the deadline model');
+  assert(family.publications.some((p) => p.no === 'WO2023081016' && p.kind === 'A1'), 'Second Euro-PCT non-entry control should retain the WO publication reference in the family/publication parse');
+}
+
+// EP22153706 — divisional deemed-withdrawn control with explicit non-payment / non-reply reason coding
+{
+  const caseNo = 'EP22153706';
+  const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
+  const doclistDoc = caseDoc(caseNo, 'doclist');
+  const doclist = hooks.parseDoclist(doclistDoc);
+  const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  const preview = hooks.doclistGroupingPreview(doclistDoc);
+
+  assert.strictEqual(main.applicationType, 'Divisional', 'Reason-coded withdrawn control should remain classified as divisional');
+  assert.strictEqual(main.parentCase, 'EP3800978', 'Reason-coded withdrawn control should expose its parent case number');
+  assert(/deemed to be withdrawn/i.test(main.statusRaw || ''), 'Reason-coded withdrawn control should preserve deemed-withdrawn wording in the main status');
+  assert(doclist.docs.some((d) => /non-payment of examination fee\/designation fee\/non-reply to Written Opinion/i.test(d.title)), 'Reason-coded withdrawn control should retain the explicit non-payment/non-reply loss document');
+  assert(preview.some((g) => g.label === 'European search package' && g.dateStr === '20.04.2022' && g.size === 4), 'Reason-coded withdrawn control should keep the ESR packet together under the European-search label');
+  assert(eventHistory.events.some((e) => /Application deemed to be withdrawn/i.test(e.title)), 'Reason-coded withdrawn control should retain the deemed-withdrawn event-history entry');
+  assert(legal.renewals.some((r) => r.year === 4), 'Reason-coded withdrawn control should retain renewal-fee history through year 4');
+  assert(family.publications.some((p) => p.no === 'EP3800978' && p.kind === 'B1'), 'Reason-coded withdrawn control should retain the parent-family grant publication');
+  assert(family.publications.some((p) => p.no === 'EP4008170' && p.kind === 'A1'), 'Reason-coded withdrawn control should retain its own EP publication');
+}
+
+// EP22209859 — clean divisional no-opposition / post-grant control
+{
+  const caseNo = 'EP22209859';
+  const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
+  const doclistDoc = caseDoc(caseNo, 'doclist');
+  const doclist = hooks.parseDoclist(doclistDoc);
+  const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
+  const preview = hooks.doclistGroupingPreview(doclistDoc);
+
+  assert.strictEqual(main.applicationType, 'Divisional', 'Clean no-opposition divisional control should remain classified as divisional');
+  assert.strictEqual(main.parentCase, 'EP3942381', 'Clean no-opposition divisional control should expose its parent case number');
+  assert(/No opposition filed within time limit/i.test(main.statusRaw || ''), 'Clean no-opposition divisional control should preserve the post-grant no-opposition status');
+  assert(preview.some((g) => g.label === 'Opposition' && g.dateStr === '10.03.2025' && g.size === 1), 'Clean no-opposition divisional control should surface the opposition-expiry communication as its own packet');
+  assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '14.02.2024' && g.size === 6), 'Clean no-opposition divisional control should keep the R71 packet together');
+  assert(eventHistory.events.some((e) => /No opposition filed within time limit/i.test(e.title)), 'Clean no-opposition divisional control should retain the no-opposition event-history entry');
+  assert(eventHistory.events.some((e) => /Lapse of the patent in a contracting state/i.test(e.title)), 'Clean no-opposition divisional control should retain post-grant lapse signals');
+  assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Clean no-opposition divisional control should derive the opposition monitoring window');
+  assert(deadlines.some((d) => d.label === 'Unitary effect request window'), 'Clean no-opposition divisional control should derive the post-grant unitary-effect window');
+  assert(legal.renewals.some((r) => r.year === 5), 'Clean no-opposition divisional control should retain renewal-fee history through year 5');
+  assert(family.publications.some((p) => p.no === 'EP3942381' && p.kind === 'B1'), 'Clean no-opposition divisional control should retain the parent-family grant publication');
+  assert(family.publications.some((p) => p.no === 'EP4163756' && p.kind === 'B1'), 'Clean no-opposition divisional control should retain its own B1 publication');
+}
+
+// EP20816706 — clean Euro-PCT no-opposition / post-grant control
+{
+  const caseNo = 'EP20816706';
+  const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
+  const doclistDoc = caseDoc(caseNo, 'doclist');
+  const doclist = hooks.parseDoclist(doclistDoc);
+  const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
+  const preview = hooks.doclistGroupingPreview(doclistDoc);
+
+  assert.strictEqual(main.applicationType, 'E/PCT regional phase', 'Clean Euro-PCT no-opposition control should remain classified as Euro-PCT regional phase');
+  assert(/No opposition filed within time limit/i.test(main.statusRaw || ''), 'Clean Euro-PCT no-opposition control should preserve the post-grant no-opposition status');
+  assert(preview.some((g) => g.label === 'Opposition' && g.dateStr === '06.02.2026' && g.size === 1), 'Clean Euro-PCT no-opposition control should surface the opposition-expiry communication as its own packet');
+  assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '06.12.2024' && g.size === 6), 'Clean Euro-PCT no-opposition control should keep the R71 packet together');
+  assert(eventHistory.events.some((e) => /No opposition filed within time limit/i.test(e.title)), 'Clean Euro-PCT no-opposition control should retain the no-opposition event-history entry');
+  assert(eventHistory.events.some((e) => /Lapse of the patent in a contracting state/i.test(e.title)), 'Clean Euro-PCT no-opposition control should retain post-grant lapse signals');
+  assert(deadlines.some((d) => d.label === 'Euro-PCT entry acts (31-month stop)'), 'Clean Euro-PCT no-opposition control should preserve its Euro-PCT entry-stop reference in the deadline model');
+  assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Clean Euro-PCT no-opposition control should derive the opposition monitoring window');
+  assert(legal.renewals.some((r) => r.year === 5), 'Clean Euro-PCT no-opposition control should retain renewal-fee history through year 5');
+  assert(family.publications.some((p) => p.no === 'WO2021091972' && p.kind === 'A1'), 'Clean Euro-PCT no-opposition control should retain the WO publication');
+  assert(family.publications.some((p) => p.no === 'EP4054309' && p.kind === 'B1'), 'Clean Euro-PCT no-opposition control should retain its own B1 publication');
+}
+
 // Live UPC registry positive / negative controls
 {
   const negative = hooks.parseUpcOptOutResult(loadFixtureText('upc', 'EP3816364.html'), 'EP3816364');

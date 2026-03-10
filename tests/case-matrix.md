@@ -19,6 +19,14 @@ Per-tab live capture status is tracked separately in `tests/live-fixture-tracker
 | `EP24163939` | Divisional R71 / grant-intended control | Parent-link parsing, intention-to-grant packet grouping, response-to-intention packet grouping, R71 deadline family, later renewal-year carry-through before grant | `EP4397970` |
 | `EP23182542` | Granted divisional with withdrawal/further-processing conflict history | Tests precedence-sensitive posture: deemed-withdrawn after R71, later further processing, then grant; also preserves parent/child family publications and post-grant deadline windows | `EP4270008` |
 | `EP25193159` | Divisional search-stage control with extended-ESR annex | Search-stage divisional with `Document annexed to the Extended European Search Report`; useful for packet-grouping nuance and parent-family publication carry-through | `EP4682536` |
+| `EP23758527` | Euro-PCT deemed-withdrawn / further-processing recovery control | Non-reply-to-written-opinion loss, later further processing, and revived request-for-examination posture in one real case | `EP4569331` |
+| `EP23758526` | Euro-PCT deemed-withdrawn / further-processing recovery sibling | Same Oxford Nanopore family pattern as `EP23758527`, but with duplicated further-processing decisions and slightly different doc packet shape | `EP4569330` |
+| `EP23758524` | Euro-PCT deemed-withdrawn / further-processing recovery sibling | Third Oxford Nanopore sibling for the same non-reply/further-processing pattern; useful against overfitted one-off heuristics | `EP4569328` |
+| `EP23721286` | Euro-PCT deemed-withdrawn / further-processing recovery variant | Similar non-reply/further-processing recovery pattern, but with an IPRP copy in the search packet | `EP4508203` |
+| `EP22812869` | Second Euro-PCT non-entry withdrawal control | Sibling to `EP22809254`; useful for testing non-entry posture without the partial-ISR packet and with a slimmer IPRP copy set | `WO2023081016` |
+| `EP22153706` | Divisional deemed-withdrawn with explicit reason coding | Good real case for non-payment / designation-fee / non-reply reason wording and parent-link carry-through | `EP4008170` |
+| `EP22209859` | Clean divisional no-opposition / post-grant control | Strong direct comparison against messier grant/post-grant cases; includes R71, grant, no-opposition, and lapse signals | `EP4163756` |
+| `EP20816706` | Clean Euro-PCT no-opposition / post-grant control | Euro-PCT baseline with R71, grant, no-opposition, lapse signals, and WO→EP publication carry-through | `EP4054309` |
 
 ## Queued high-value additions
 
