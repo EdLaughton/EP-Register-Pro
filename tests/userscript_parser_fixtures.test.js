@@ -75,7 +75,13 @@ assert(repeatedGrantControlPreview.some((g) => g.label === 'Intention to grant (
 const euroPctPreview = hooks.doclistGroupingPreview(loadFixtureDocument(['cases', 'EP24837586', 'doclist.html'], 'https://register.epo.org/application?number=EP24837586&tab=doclist&lng=en'));
 assert(euroPctPreview.some((g) => g.label === 'Response to search' && g.dateStr === '09.09.2025' && g.size === 5), 'Doclist grouping should keep same-day search-response packets together, including the receipt');
 assert(euroPctPreview.some((g) => g.label === 'Filing package' && g.dateStr === '26.06.2025' && g.size === 4), 'Doclist grouping should treat the Euro-PCT entry-day bundle as one filing package instead of splitting the ISR copy away');
+assert(euroPctPreview.some((g) => g.label === 'International search / IPRP' && g.dateStr === '05.06.2025' && g.size === 5), 'Doclist grouping should relabel the full IPRP/ISA packet with a PCT-aware label instead of the generic search-package wording');
+assert(euroPctPreview.some((g) => g.label === 'Partial international search' && g.dateStr === '15.04.2025' && g.size === 2), 'Doclist grouping should relabel partial-ISR packets with a PCT-aware label instead of the generic search-package wording');
 assert(euroPctPreview.some((g) => g.label === 'Filing package' && g.dateStr === '19.12.2024' && g.size === 8), 'Doclist grouping should consolidate the Euro-PCT filing-day packet into one filing package');
+
+const euroPctTimelinePreview = hooks.timelineDocGroupingPreview(doclist.docs);
+assert(euroPctTimelinePreview.some((g) => g.title === 'International search / IPRP' && g.dateStr === '05.06.2025' && g.size === 5), 'Timeline doc grouping should reuse the shared PCT-aware label for the full IPRP/ISA packet');
+assert(euroPctTimelinePreview.some((g) => g.title === 'Partial international search' && g.dateStr === '15.04.2025' && g.size === 2), 'Timeline doc grouping should reuse the shared PCT-aware label for partial-ISR packets');
 
 assert.strictEqual(hooks.panelScrollRestoreOverride('EP24837586', 'options', 1092.5, 'EP24837586', 'options'), 1093, 'Sidebar rerenders within the same case/view should preserve the current scroll position instead of falling back to stale stored state');
 assert.strictEqual(hooks.panelScrollRestoreOverride('EP24837586', 'options', 1092.5, 'EP24837586', 'overview'), null, 'Sidebar scroll override should not leak across view switches');

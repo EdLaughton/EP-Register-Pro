@@ -1933,6 +1933,24 @@
     return '';
   }
 
+  function pctSearchRunLabel(run) {
+    const bundle = String(run?.bundle || run?.groupKind || 'Other');
+    if (bundle !== 'Search package') return '';
+
+    const titles = (run?.models || []).map((model) => normalize(model.title || '').toLowerCase()).filter(Boolean).join('\n');
+    if (!titles) return '';
+
+    if (/partial international search report|provisional opinion accompanying the partial search results/.test(titles)) {
+      return 'Partial international search';
+    }
+
+    if (/international preliminary report on patentability|written opinion of the isa|isr: cited documents/.test(titles)) {
+      return 'International search / IPRP';
+    }
+
+    return '';
+  }
+
   function doclistRunLabel(run, pdfDeadlines = {}) {
     const bundle = String(run?.bundle || run?.groupKind || 'Other');
     const base = doclistBundleLabel(bundle);
@@ -1946,7 +1964,7 @@
       return base;
     }
 
-    return pdfCategoryBundleLabel(pdfCategory, bundle) || base;
+    return pdfCategoryBundleLabel(pdfCategory, bundle) || pctSearchRunLabel(run) || base;
   }
 
   function doclistGroupingPreview(doc, pdfDeadlines = {}) {
