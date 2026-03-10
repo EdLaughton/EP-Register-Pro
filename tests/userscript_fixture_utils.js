@@ -40,8 +40,13 @@ function loadUserscriptHooks() {
     'inferProceduralDeadlines',
     'classifyDocument',
     'classifyParsedSourceState',
-    'doclistGroupingPreview',
-    'timelineDocGroupingPreview',
+    'bestTable',
+    'doclistRowModels',
+    'normalizeGrantPackageRowModels',
+    'normalizeDoclistGroupKinds',
+    'doclistRuns',
+    'doclistRunLabel',
+    'timelineDocItemsFromDocs',
     'upcRegistryNoteText',
     'selectNextDeadline',
     'activeDeadlineNoteText',
@@ -82,7 +87,29 @@ function loadUserscriptHooks() {
     throw new Error('Failed to expose userscript test hooks');
   }
 
-  cachedHooks = window.__EPRP_TEST_HOOKS;
+  const hooks = window.__EPRP_TEST_HOOKS;
+  hooks.doclistGroupingPreview = (doc, pdfDeadlines = {}) => {
+    const table = hooks.bestTable(doc, ['date', 'document']) || hooks.bestTable(doc, ['document type']);
+    if (!table) return [];
+    const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
+    return hooks.doclistRuns(hooks.normalizeDoclistGroupKinds(hooks.normalizeGrantPackageRowModels(hooks.doclistRowModels(rows)))).map((run) => ({
+      bundle: run.bundle,
+      label: hooks.doclistRunLabel(run, pdfDeadlines),
+      dateStr: run.dateStr,
+      size: run.rows.length,
+      titles: run.models.map((model) => model.title),
+    }));
+  };
+  hooks.timelineDocGroupingPreview = (docs = [], pdfDeadlines = {}) => hooks.timelineDocItemsFromDocs('', docs, pdfDeadlines)
+    .filter((item) => item.type === 'group')
+    .map((item) => ({
+      dateStr: item.dateStr,
+      title: item.title,
+      size: (item.items || []).length,
+      actor: item.actor,
+    }));
+
+  cachedHooks = hooks;
   return cachedHooks;
 }
 

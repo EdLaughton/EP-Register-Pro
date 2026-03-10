@@ -2035,19 +2035,6 @@
     return pdfCategoryBundleLabel(pdfCategory, bundle) || searchRunLabel(run) || base;
   }
 
-  function doclistGroupingPreview(doc, pdfDeadlines = {}) {
-    const table = bestTable(doc, ['date', 'document']) || bestTable(doc, ['document type']);
-    if (!table) return [];
-    const rows = [...table.querySelectorAll('tr')].filter((row) => row.querySelector("input[type='checkbox']"));
-    return doclistRuns(normalizeDoclistGroupKinds(normalizeGrantPackageRowModels(doclistRowModels(rows)))).map((run) => ({
-      bundle: run.bundle,
-      label: doclistRunLabel(run, pdfDeadlines),
-      dateStr: run.dateStr,
-      size: run.rows.length,
-      titles: run.models.map((model) => model.title),
-    }));
-  }
-
   function doclistPageTotal(run) {
     return (run?.models || []).reduce((sum, model) => sum + (Number(String(model?.pages || '').match(/\d+/)?.[0] || 0) || 0), 0);
   }
@@ -5055,15 +5042,6 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     }
 
     return out;
-  }
-
-  function timelineDocGroupingPreview(docs = [], pdfDeadlines = {}) {
-    return timelineDocItemsFromDocs('', docs, pdfDeadlines).filter((item) => item.type === 'group').map((item) => ({
-      dateStr: item.dateStr,
-      title: item.title,
-      size: (item.items || []).length,
-      actor: item.actor,
-    }));
   }
 
   function upcRegistryNoteText(upcRegistry, ue = {}) {
