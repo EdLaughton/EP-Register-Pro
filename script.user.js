@@ -2109,12 +2109,12 @@
     return `${visibleCount} of ${totalCount} items`;
   }
 
-  function doclistGroupSummaryHtml(run, visibleCount = null) {
+  function doclistGroupSummaryHtml(run, visibleCount = null, explanation = '') {
     const totalCount = Number(run?.rows?.length || 0);
     const totalPages = doclistPageTotal(run);
     const countText = doclistGroupCountText(visibleCount, totalCount);
     const pagesText = totalPages > 0 ? `${totalPages} page${totalPages === 1 ? '' : 's'}` : '';
-    return `<span class="epoRP-docgrp-meta"><span class="epoRP-docgrp-count">${esc(countText)}</span>${pagesText ? `<span class="epoRP-docgrp-sep">·</span><span class="epoRP-docgrp-pages">${esc(pagesText)}</span>` : ''}</span>`;
+    return `<span class="epoRP-docgrp-meta"${explanation ? ` title="${esc(explanation)}"` : ''}><span class="epoRP-docgrp-count">${esc(countText)}</span>${pagesText ? `<span class="epoRP-docgrp-sep">·</span><span class="epoRP-docgrp-pages">${esc(pagesText)}</span>` : ''}</span>`;
   }
 
   function attachDoclistGroupRun(caseNo, run, gid, openGroups, hasSavedOpenState, pdfDeadlines = {}) {
@@ -2134,7 +2134,7 @@
     td.colSpan = Math.max(1, cells.length);
     const bundleLabel = doclistRunLabel(run, pdfDeadlines);
     const bundleExplanation = docPacketExplanation(bundleLabel);
-    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all items in this group" aria-label="Select all items in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}" ${bundleExplanation ? `title="${esc(bundleExplanation)}"` : ''}><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
+    td.innerHTML = `<div class="epoRP-docgrp-head"><label class="epoRP-docgrp-sel" title="Select all items in this group" aria-label="Select all items in this group"><input type="checkbox" class="epoRP-docgrp-check" data-group="${groupId}" data-group-key="${esc(groupKey)}"></label><button type="button" class="epoRP-docgrp-btn" data-group="${groupId}" data-group-key="${esc(groupKey)}" aria-expanded="${isOpen ? 'true' : 'false'}" ${bundleExplanation ? `title="${esc(bundleExplanation)}"` : ''}><span class="epoRP-docgrp-main"><span class="epoRP-docgrp-label" data-bundle="${esc(bundleLabel)}">${esc(bundleLabel)}</span>${doclistGroupSummaryHtml(run, null, bundleExplanation)}</span><span class="epoRP-docgrp-arrow">▸</span></button></div>`;
     headerRow.appendChild(td);
     firstRow.parentElement?.insertBefore(headerRow, firstRow);
 

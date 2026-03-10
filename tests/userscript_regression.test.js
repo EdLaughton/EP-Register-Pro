@@ -210,7 +210,7 @@ has(/function\s+getDoclistOpenGroups\s*\(/, 'All-documents open-state persistenc
 has(/epoRP-docgrp-check/, 'All-documents group header should include a select-all checkbox');
 notHas(/>Select<|>All</, 'All-documents group header should keep the checkbox-only control without extra header text');
 hasText('epoRP-docgrp-meta', 'All-documents group header should render item-count/page-total metadata');
-hasText('doclistGroupSummaryHtml(run)', 'All-documents group header should render centralized item-count/page-total summary text');
+hasText('doclistGroupSummaryHtml(run, null, bundleExplanation)', 'All-documents group header should render centralized item-count/page-total summary text and reuse packet explanations for hover help');
 has(/dispatchEvent\(new Event\('change',\s*\{ bubbles: true \}\)\)/, 'Group select-all should emit row checkbox change events');
 has(/epoRP-docgrp-item\.epoRP-docgrp-last\.epoRP-docgrp-open td\{border-bottom:2px solid #bfdbfe\}/, 'All-documents grouped rows should draw a bottom boundary line when expanded');
 has(/appearance:none\s*!important;-webkit-appearance:none\s*!important/, 'All-documents group header control should suppress native button chrome');
