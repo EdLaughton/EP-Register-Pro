@@ -56,12 +56,13 @@ has(/const\s+PDF_JS_CANDIDATES\s*=\s*\[/, 'PDF parser should define multi-CDN lo
 has(/const\s+OCR_TESSERACT_CANDIDATES\s*=\s*\[/, 'PDF OCR parser should define tesseract loader candidates');
 has(/function\s+getUnsafeWindow\s*\(/, 'PDF parser should expose unsafeWindow bridge helper');
 has(/function\s+getPdfJsGlobal\s*\(/, 'PDF parser should resolve pdf.js globals across sandbox/page scopes');
-has(/function\s+clearPdfJsGlobals\s*\(/, 'PDF parser should clear stale pdf.js globals before retries');
-has(/function\s+registerPdfJsGlobal\s*\(/, 'PDF parser should normalize discovered pdf.js globals back into known scope');
+has(/function\s+clearInvalidNamedGlobals\s*\(/, 'PDF parser should clear stale library globals before retries');
+has(/function\s+registerNamedGlobal\s*\(/, 'PDF parser should normalize discovered library globals back into known scopes');
+has(/function\s+ensureNamedLibrary\s*\(/, 'External library loader helper missing');
 has(/function\s+ensurePdfJs\s*\(/, 'PDF parser loader helper missing');
 has(/function\s+ensureTesseract\s*\(/, 'PDF OCR parser loader helper missing');
 has(/function\s+loadExternalScriptTag\s*\(/, 'PDF parser should support script-tag fallback loading');
-has(/function\s+evaluateExternalScriptCode\s*\(/, 'PDF parser should support multi-strategy script evaluation fallback');
+has(/function\s+evaluateNamedLibraryCode\s*\(/, 'PDF parser should support multi-strategy library script evaluation fallback');
 has(/function\s+refreshPdfDeadlines\s*\(/, 'PDF deadline refresh pipeline missing');
 has(/async function extractPdfText\(url, signal, pdfjsInstance = null\)/, 'PDF extraction should accept preloaded pdf.js engine instance');
 has(/async function extractTextFromPdfViaOcr\(binary, pdfjs, signal\)/, 'PDF extraction should include OCR fallback for image-only PDFs');

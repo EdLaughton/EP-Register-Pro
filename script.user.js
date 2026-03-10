@@ -2568,60 +2568,60 @@
     }
   }
 
-  function getPdfJsGlobal() {
+  function libraryGlobalHolders() {
     const uw = getUnsafeWindow();
-    const candidates = [
-      window?.pdfjsLib,
-      globalThis?.pdfjsLib,
-      window?.['pdfjs-dist/build/pdf'],
-      globalThis?.['pdfjs-dist/build/pdf'],
-      uw?.pdfjsLib,
-      uw?.['pdfjs-dist/build/pdf'],
-    ];
-    return candidates.find((lib) => lib && typeof lib.getDocument === 'function') || null;
+    return [window, globalThis, uw].filter(Boolean);
   }
 
-  function clearPdfJsGlobals() {
-    const uw = getUnsafeWindow();
-    const holders = [window, globalThis, uw].filter(Boolean);
-    for (const holder of holders) {
-      if (holder.pdfjsLib && typeof holder.pdfjsLib.getDocument !== 'function') {
-        try { delete holder.pdfjsLib; } catch { holder.pdfjsLib = undefined; }
+  function normalizeLibraryGlobalNames(names) {
+    return Array.isArray(names) ? names.filter(Boolean) : [names].filter(Boolean);
+  }
+
+  function getNamedGlobal(names, validator) {
+    for (const holder of libraryGlobalHolders()) {
+      for (const name of normalizeLibraryGlobalNames(names)) {
+        const lib = holder?.[name];
+        if (validator(lib)) return lib;
       }
-      if (holder['pdfjs-dist/build/pdf'] && typeof holder['pdfjs-dist/build/pdf'].getDocument !== 'function') {
-        try { delete holder['pdfjs-dist/build/pdf']; } catch { holder['pdfjs-dist/build/pdf'] = undefined; }
+    }
+    return null;
+  }
+
+  function clearInvalidNamedGlobals(names, validator) {
+    for (const holder of libraryGlobalHolders()) {
+      for (const name of normalizeLibraryGlobalNames(names)) {
+        const lib = holder?.[name];
+        if (!lib || validator(lib)) continue;
+        try { delete holder[name]; } catch { holder[name] = undefined; }
       }
     }
   }
 
-  function registerPdfJsGlobal(lib) {
-    if (!lib || typeof lib.getDocument !== 'function') return null;
-    const uw = getUnsafeWindow();
-    try { window.pdfjsLib = lib; } catch {}
-    try { globalThis.pdfjsLib = lib; } catch {}
-    if (uw) {
-      try { uw.pdfjsLib = lib; } catch {}
+  function registerNamedGlobal(names, lib, validator) {
+    if (!validator(lib)) return null;
+    for (const holder of libraryGlobalHolders()) {
+      for (const name of normalizeLibraryGlobalNames(names)) {
+        try { holder[name] = lib; } catch {}
+      }
     }
     return lib;
   }
 
-  function evaluateExternalScriptCode(code, label = 'external-script') {
-    const source = `${String(code || '')}\n//# sourceURL=${label}.js`;
+  function evaluateNamedLibraryCode(code, label, { names, validator, moduleResolver, globalLabel = 'library' } = {}) {
+    const source = `${String(code || '')}
+//# sourceURL=${label}.js`;
     let lastError = null;
 
-    const existing = getPdfJsGlobal();
+    const existing = getNamedGlobal(names, validator);
     if (existing) return existing;
 
     try {
       // eslint-disable-next-line no-new-func
-      const commonJsRunner = new Function('window', 'globalThis', 'self', `${source}\nreturn (typeof module !== 'undefined' && module && module.exports) ? module.exports : null;`);
+      const commonJsRunner = new Function('window', 'globalThis', 'self', `${source}
+return (typeof module !== 'undefined' && module && module.exports) ? module.exports : null;`);
       const mod = commonJsRunner(window, globalThis, self);
-      const lib = mod && typeof mod.getDocument === 'function'
-        ? mod
-        : (mod?.pdfjsLib && typeof mod.pdfjsLib.getDocument === 'function')
-          ? mod.pdfjsLib
-          : null;
-      if (lib) return registerPdfJsGlobal(lib);
+      const lib = moduleResolver?.(mod) || (validator(mod) ? mod : null);
+      if (validator(lib)) return registerNamedGlobal(names, lib, validator);
     } catch (error) {
       lastError = error;
     }
@@ -2633,8 +2633,8 @@
       lastError = error;
     }
 
-    const afterFunction = getPdfJsGlobal();
-    if (afterFunction) return registerPdfJsGlobal(afterFunction);
+    const afterFunction = getNamedGlobal(names, validator);
+    if (afterFunction) return registerNamedGlobal(names, afterFunction, validator);
 
     try {
       // eslint-disable-next-line no-eval
@@ -2643,8 +2643,8 @@
       lastError = error;
     }
 
-    const afterEval = getPdfJsGlobal();
-    if (afterEval) return registerPdfJsGlobal(afterEval);
+    const afterEval = getNamedGlobal(names, validator);
+    if (afterEval) return registerNamedGlobal(names, afterEval, validator);
 
     try {
       const root = document.head || document.documentElement || document.body;
@@ -2657,173 +2657,128 @@
       lastError = error;
     }
 
-    const afterInlineScript = getPdfJsGlobal();
-    if (afterInlineScript) return registerPdfJsGlobal(afterInlineScript);
+    const afterInlineScript = getNamedGlobal(names, validator);
+    if (afterInlineScript) return registerNamedGlobal(names, afterInlineScript, validator);
     if (lastError) throw lastError;
-    throw new Error('Script evaluated but pdf.js global/module was not exposed');
+    throw new Error(`Script evaluated but ${globalLabel} global/module was not exposed`);
+  }
+
+  async function ensureNamedLibrary(signal, {
+    promiseKey,
+    candidates,
+    names,
+    validator,
+    moduleResolver,
+    minLength = 0,
+    labelPrefix = 'external-library',
+    displayName = 'library',
+    onReady = null,
+  } = {}) {
+    const existing = getNamedGlobal(names, validator);
+    if (existing) return existing;
+    if (runtime[promiseKey]) return runtime[promiseKey];
+
+    runtime[promiseKey] = (async () => {
+      const errors = [];
+
+      for (const candidate of candidates || []) {
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+        clearInvalidNamedGlobals(names, validator);
+
+        try {
+          const code = await loadExternalScriptText(candidate.lib, signal);
+          const head = String(code || '').slice(0, 400);
+          if (!code || code.length < minLength || /<html|<!doctype/i.test(head)) {
+            throw new Error('non-script payload received');
+          }
+          const lib = evaluateNamedLibraryCode(code, `${labelPrefix}-${candidate.id}-text`, { names, validator, moduleResolver, globalLabel: displayName });
+          if (!validator(lib)) throw new Error(`${displayName} global not available after text load/eval`);
+          if (typeof onReady === 'function') onReady(lib, candidate);
+          return registerNamedGlobal(names, lib, validator);
+        } catch (error) {
+          errors.push(`${candidate.id}/text: ${error?.message || error}`);
+        }
+
+        try {
+          await loadExternalScriptTag(candidate.lib, signal);
+          const lib = getNamedGlobal(names, validator);
+          if (!validator(lib)) throw new Error(`${displayName} global not available after script-tag load`);
+          if (typeof onReady === 'function') onReady(lib, candidate);
+          return registerNamedGlobal(names, lib, validator);
+        } catch (error) {
+          errors.push(`${candidate.id}/tag: ${error?.message || error}`);
+        }
+      }
+
+      throw new Error(`${displayName} load failed (${errors.join(' | ') || 'unknown error'})`);
+    })().catch((error) => {
+      runtime[promiseKey] = null;
+      throw error;
+    });
+
+    return runtime[promiseKey];
+  }
+
+  function isPdfJsLibrary(lib) {
+    return !!(lib && typeof lib.getDocument === 'function');
+  }
+
+  function resolvePdfJsModule(mod) {
+    return isPdfJsLibrary(mod)
+      ? mod
+      : isPdfJsLibrary(mod?.pdfjsLib)
+        ? mod.pdfjsLib
+        : null;
+  }
+
+  function getPdfJsGlobal() {
+    return getNamedGlobal(['pdfjsLib', 'pdfjs-dist/build/pdf'], isPdfJsLibrary);
   }
 
   async function ensurePdfJs(signal) {
-    const existing = getPdfJsGlobal();
-    if (existing) return existing;
-    if (runtime.pdfjsPromise) return runtime.pdfjsPromise;
-
-    runtime.pdfjsPromise = (async () => {
-      const errors = [];
-
-      for (const candidate of PDF_JS_CANDIDATES) {
-        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-
-        clearPdfJsGlobals();
-
-        try {
-          const code = await loadExternalScriptText(candidate.lib, signal);
-          const head = String(code || '').slice(0, 400);
-          if (!code || code.length < 1000 || /<html|<!doctype/i.test(head)) {
-            throw new Error('non-script payload received');
-          }
-          const lib = evaluateExternalScriptCode(code, `eporp-pdfjs-${candidate.id}-text`);
-          if (!lib?.getDocument) throw new Error('pdf.js global not available after text load/eval');
-          lib.GlobalWorkerOptions.workerSrc = candidate.worker;
-          return registerPdfJsGlobal(lib);
-        } catch (error) {
-          errors.push(`${candidate.id}/text: ${error?.message || error}`);
-        }
-
-        try {
-          await loadExternalScriptTag(candidate.lib, signal);
-          const lib = getPdfJsGlobal();
-          if (!lib?.getDocument) throw new Error('pdf.js global not available after script-tag load');
-          lib.GlobalWorkerOptions.workerSrc = candidate.worker;
-          return registerPdfJsGlobal(lib);
-        } catch (error) {
-          errors.push(`${candidate.id}/tag: ${error?.message || error}`);
-        }
-      }
-
-      throw new Error(`pdf.js load failed (${errors.join(' | ') || 'unknown error'})`);
-    })().catch((error) => {
-      runtime.pdfjsPromise = null;
-      throw error;
+    return ensureNamedLibrary(signal, {
+      promiseKey: 'pdfjsPromise',
+      candidates: PDF_JS_CANDIDATES,
+      names: ['pdfjsLib', 'pdfjs-dist/build/pdf'],
+      validator: isPdfJsLibrary,
+      moduleResolver: resolvePdfJsModule,
+      minLength: 1000,
+      labelPrefix: 'eporp-pdfjs',
+      displayName: 'pdf.js',
+      onReady: (lib, candidate) => {
+        lib.GlobalWorkerOptions.workerSrc = candidate.worker;
+      },
     });
+  }
 
-    return runtime.pdfjsPromise;
+  function isTesseractLibrary(lib) {
+    return !!(lib && typeof lib.recognize === 'function');
+  }
+
+  function resolveTesseractModule(mod) {
+    return isTesseractLibrary(mod)
+      ? mod
+      : isTesseractLibrary(mod?.Tesseract)
+        ? mod.Tesseract
+        : null;
   }
 
   function getTesseractGlobal() {
-    const uw = getUnsafeWindow();
-    const candidates = [window?.Tesseract, globalThis?.Tesseract, uw?.Tesseract];
-    return candidates.find((lib) => lib && typeof lib.recognize === 'function') || null;
-  }
-
-  function clearTesseractGlobals() {
-    const uw = getUnsafeWindow();
-    const holders = [window, globalThis, uw].filter(Boolean);
-    for (const holder of holders) {
-      if (holder.Tesseract && typeof holder.Tesseract.recognize !== 'function') {
-        try { delete holder.Tesseract; } catch { holder.Tesseract = undefined; }
-      }
-    }
-  }
-
-  function registerTesseractGlobal(lib) {
-    if (!lib || typeof lib.recognize !== 'function') return null;
-    const uw = getUnsafeWindow();
-    try { window.Tesseract = lib; } catch {}
-    try { globalThis.Tesseract = lib; } catch {}
-    if (uw) {
-      try { uw.Tesseract = lib; } catch {}
-    }
-    return lib;
-  }
-
-  function evaluateTesseractScriptCode(code, label = 'external-tesseract') {
-    const source = `${String(code || '')}\n//# sourceURL=${label}.js`;
-    let lastError = null;
-
-    const existing = getTesseractGlobal();
-    if (existing) return existing;
-
-    try {
-      // eslint-disable-next-line no-new-func
-      Function(source)();
-    } catch (error) {
-      lastError = error;
-    }
-
-    const afterFunction = getTesseractGlobal();
-    if (afterFunction) return registerTesseractGlobal(afterFunction);
-
-    try {
-      // eslint-disable-next-line no-eval
-      (0, eval)(source);
-    } catch (error) {
-      lastError = error;
-    }
-
-    const afterEval = getTesseractGlobal();
-    if (afterEval) return registerTesseractGlobal(afterEval);
-
-    try {
-      const root = document.head || document.documentElement || document.body;
-      if (!root) throw new Error('Document root unavailable for inline script evaluation');
-      const script = document.createElement('script');
-      script.textContent = source;
-      root.appendChild(script);
-      script.remove();
-    } catch (error) {
-      lastError = error;
-    }
-
-    const afterInline = getTesseractGlobal();
-    if (afterInline) return registerTesseractGlobal(afterInline);
-    if (lastError) throw lastError;
-    throw new Error('Script evaluated but tesseract global/module was not exposed');
+    return getNamedGlobal(['Tesseract'], isTesseractLibrary);
   }
 
   async function ensureTesseract(signal) {
-    const existing = getTesseractGlobal();
-    if (existing) return existing;
-    if (runtime.tesseractPromise) return runtime.tesseractPromise;
-
-    runtime.tesseractPromise = (async () => {
-      const errors = [];
-
-      for (const candidate of OCR_TESSERACT_CANDIDATES) {
-        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-
-        clearTesseractGlobals();
-
-        try {
-          const code = await loadExternalScriptText(candidate.lib, signal);
-          const head = String(code || '').slice(0, 400);
-          if (!code || code.length < 900 || /<html|<!doctype/i.test(head)) {
-            throw new Error('non-script payload received');
-          }
-          const lib = evaluateTesseractScriptCode(code, `eporp-tesseract-${candidate.id}-text`);
-          if (!lib?.recognize) throw new Error('Tesseract global not available after text load/eval');
-          return registerTesseractGlobal(lib);
-        } catch (error) {
-          errors.push(`${candidate.id}/text: ${error?.message || error}`);
-        }
-
-        try {
-          await loadExternalScriptTag(candidate.lib, signal);
-          const lib = getTesseractGlobal();
-          if (!lib?.recognize) throw new Error('Tesseract global not available after script-tag load');
-          return registerTesseractGlobal(lib);
-        } catch (error) {
-          errors.push(`${candidate.id}/tag: ${error?.message || error}`);
-        }
-      }
-
-      throw new Error(`Tesseract load failed (${errors.join(' | ') || 'unknown error'})`);
-    })().catch((error) => {
-      runtime.tesseractPromise = null;
-      throw error;
+    return ensureNamedLibrary(signal, {
+      promiseKey: 'tesseractPromise',
+      candidates: OCR_TESSERACT_CANDIDATES,
+      names: ['Tesseract'],
+      validator: isTesseractLibrary,
+      moduleResolver: resolveTesseractModule,
+      minLength: 900,
+      labelPrefix: 'eporp-tesseract',
+      displayName: 'Tesseract',
     });
-
-    return runtime.tesseractPromise;
   }
 
   function fetchCrossOrigin(url, signal) {
