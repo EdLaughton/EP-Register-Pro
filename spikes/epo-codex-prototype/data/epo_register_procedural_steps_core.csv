@@ -1,0 +1,28 @@
+code_namespace,procedural_step_code,step_description,phase,what_it_means,legal_reference_context,primary_dates,parser_treatment,notes
+procedural_step,ABEX,Amendments,examination,Applicant amendments to claims/description,Art. 123 EPC,DATE_OF_REQUEST,none,
+procedural_step,ADWI,Application deemed to be withdrawn,examination,Rule 112(1) loss-of-rights communication,Rule 112(1) EPC,DATE_OF_DISPATCH / DATE_EFFECTIVE,consequence notice,Underlying reason may be in STEP_DESCRIPTION_NAME; use it to route to missed-act taxonomy.
+procedural_step,DOBS,Communication of observations of proprietor,opposition,Communication of proprietor observations,Opposition procedure,DATE_OF_DISPATCH,time-limit in record,
+procedural_step,EXRE,Invitation to indicate the basis for amendments,examination,Basis-for-amendments invitation,Rule 137(4) EPC context,DATE_OF_DISPATCH,time-limit in record,
+procedural_step,FFEE,Payment of national basic fee,entry-regional-phase,National basic fee paid,Euro-PCT entry,DATE_OF_PAYMENT,none,
+procedural_step,IDOP,Interlocutory decision in opposition,opposition,Interlocutory decision,"Art. 101(3)(a), 106(2) EPC",DATE_OF_DISPATCH / DATE_EFFECTIVE,decision,
+procedural_step,IGRA,Intention to grant the patent,examination,Rule 71(3) communication,Rule 71(3) EPC,DATE_OF_DISPATCH,grant fee / translations tracked in record,Best grant-stage communication marker in ST.36 procedural steps.
+procedural_step,IGRE,Disapproval of the communication of intention to grant the patent,examination,Applicant disapproval / amendment after Rule 71(3),Rule 71(6) EPC context,DATE_OF_REPLY,none,
+procedural_step,ISAT,International searching authority,entry-regional-phase,ISA code,Art. 152 EPC,n/a,none,
+procedural_step,LIRE,Communication from the examining division in a limitation procedure,limitation,Limitation communication,Limitation procedure,DATE_OF_DISPATCH,time-limit in record,Limitation procedure communication with explicit reply time-limit in the record.
+procedural_step,ORAL,Oral proceedings,examination/opposition/appeal,Oral proceedings event,"Rules 115, 124 EPC",DATE_OF_REQUEST / DATE_OF_DISPATCH / DATE_OF_CANCELLATION,case-specific,
+procedural_step,OREX,Communication from the opposition division,opposition,Opposition division communication,"Art. 101(2), Rule 81(2) EPC",DATE_OF_DISPATCH,time-limit in record,Opposition communication with explicit reply time-limit in the record.
+procedural_step,PART,Invitation to provide information on prior art,examination,Prior-art information invitation,Art. 124 EPC,DATE_OF_DISPATCH,time-limit in record or manual review,
+procedural_step,PFEE,Penalty fee / additional fee,examination,Surcharge or additional fee event,Rules 85a/85b EPC 1973 legacy and fee contexts,DATE_OF_DISPATCH,time-limit in record,
+procedural_step,PMAP,Preparation for maintenance of the patent in an amended form,opposition,Rule 82 maintenance communication,"Rule 82(1),(2) EPC",DATE_OF_DISPATCH,payment tracked in record,
+procedural_step,PREX,Preliminary examination - PCT II,international-examination,PCT Chapter II request,PCT Chapter II / EPC Art. 152,DATE_OF_REQUEST,none,
+procedural_step,PROL,Language of the procedure,all,Procedure language,Rule 3 EPC,n/a,none,
+procedural_step,RAEX,Request for accelerated examination,examination,PACE-type request metadata,Accelerated examination,DATE_RAEX / DATE_DECISION_RAEX,none,
+procedural_step,REJR,Rejection of the request for revocation of the patent,revocation,Revocation-request rejection decision,Rule 94 EPC (old numbering context in doc),DATE_OF_DISPATCH / DATE_EFFECTIVE,decision,
+procedural_step,RFEE,Renewal fee payment,all,Renewal fee paid,Renewals,DATE_OF_PAYMENT,none,
+procedural_step,RFPR,Request for further processing,all,Further processing request,Art. 121 EPC,DATE_OF_REQUEST / DATE_OF_PAYMENT1 / RESULT_DATE,remedial branch,Use STEP_DESCRIPTION_NAME and result fields to tie FP request to the missed act.
+procedural_step,SFEE,Fee for a supplementary search,entry-regional-phase,Supplementary search fee paid,Art. 153(7) EPC,DATE_OF_PAYMENT,none,
+procedural_step,TRAN,Translation of the application,entry-regional-phase,Euro-PCT translation received,Euro-PCT entry,DATE_OF_RECEIPT,none,
+procedural_step,DDIV,First communication from the examining division,examination,First-exam-communication marker for divisional window,Rule 36 EPC,DATE_OF_DISPATCH,none,"Useful for divisional-window logic, not just communication logging."
+procedural_step,WINT,Withdrawal during international phase - procedure closed,entry-regional-phase,WIPO-phase withdrawal,PCT international phase,DATE_OF_REQUEST,procedure closed,
+procedural_step,ACOR,Despatch of invitation to pay additional claims fees,examination,Additional claims-fee invitation after allowed grant-text amendment/correction,Grant-stage fee handling,DATE_OF_DISPATCH,time-limit in record,Grant-stage invitation after allowed amendment/correction of intended text.
+procedural_step,CDEC,Request for correction of the decision to grant filed,grant,Correction request after grant decision,Correction of grant decision,DATE_OF_DISPATCH,none,
