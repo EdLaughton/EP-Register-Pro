@@ -15,6 +15,10 @@ Per-tab live capture status is tracked separately in `tests/live-fixture-tracker
 | `EP19205846` | Withdrawn/deemed-withdrawn + renewal-history + UPC opt-out negative control | Status simplification, repeated R71 cycles, deemed-withdrawn outcome, renewal-fee extraction, publication fallback behavior, UPC lookup resolves as no opt-out found | `EP3816364` |
 | `EP24189818` | Divisional child / branching procedural path / renewal-heavy / UPC opt-out positive control | Parent link to `EP19871250`, repeated grant-intention cycles, renewal-fee extraction through later years, family/publication linkage, UPC registry lookup resolves as opted out | `EP4438108` |
 | `EP19871250` | Parent granted baseline + Euro-PCT + unitary effect | Parent half of the `EP19871250` ↔ `EP24189818` divisional pair; granted/no-opposition happy path, unitary effect extraction, federated-register national/UP summary, citations grouping, B1/C0 family/publication coverage, post-grant lapse signals | `EP3863511` |
+| `EP22809254` | Euro-PCT non-entry withdrawal + partial/final international-search packet mix | Deemed-withdrawn non-entry posture, Euro-PCT deadline heuristics, real-world `Partial international search` + `International search / IPRP` packet labelling, WO-family publication carry-through | `WO2023081017` |
+| `EP24163939` | Divisional R71 / grant-intended control | Parent-link parsing, intention-to-grant packet grouping, response-to-intention packet grouping, R71 deadline family, later renewal-year carry-through before grant | `EP4397970` |
+| `EP23182542` | Granted divisional with withdrawal/further-processing conflict history | Tests precedence-sensitive posture: deemed-withdrawn after R71, later further processing, then grant; also preserves parent/child family publications and post-grant deadline windows | `EP4270008` |
+| `EP25193159` | Divisional search-stage control with extended-ESR annex | Search-stage divisional with `Document annexed to the Extended European Search Report`; useful for packet-grouping nuance and parent-family publication carry-through | `EP4682536` |
 
 ## Queued high-value additions
 

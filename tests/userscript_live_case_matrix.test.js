@@ -91,6 +91,96 @@ function caseDoc(caseNo, tab) {
   assert(/AT, BE, BG, DE/.test(ue.memberStates || ''), 'Granted baseline should retain covered UP member states');
 }
 
+// EP22809254 — Euro-PCT non-entry withdrawal + partial/final international-search packet mix
+{
+  const caseNo = 'EP22809254';
+  const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
+  const doclistDoc = caseDoc(caseNo, 'doclist');
+  const doclist = hooks.parseDoclist(doclistDoc);
+  const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
+  const preview = hooks.doclistGroupingPreview(doclistDoc);
+
+  assert.strictEqual(main.applicationType, 'E/PCT regional phase', 'Euro-PCT non-entry control should remain classified as Euro-PCT regional phase');
+  assert(/deemed to be withdrawn/i.test(main.statusRaw || ''), 'Euro-PCT non-entry control should preserve deemed-withdrawn wording in the main status');
+  assert(preview.some((g) => g.label === 'International search / IPRP' && g.dateStr === '18.04.2023' && g.size === 4), 'Euro-PCT non-entry control should keep the full ISA/IPRP packet together under the PCT-aware search label');
+  assert(preview.some((g) => g.label === 'Partial international search' && g.dateStr === '21.02.2023' && g.size === 2), 'Euro-PCT non-entry control should keep the partial-ISR packet together under the partial-search label');
+  assert(eventHistory.events.some((e) => /Application deemed to be withdrawn/i.test(e.title)), 'Euro-PCT non-entry control should retain the deemed-withdrawn event-history entry');
+  assert(deadlines.some((d) => d.label === 'Euro-PCT entry acts (31-month stop)'), 'Euro-PCT non-entry control should keep Euro-PCT entry-stop guidance in the deadline model');
+  assert(family.publications.some((p) => p.no === 'WO2023081017' && p.kind === 'A1'), 'Euro-PCT non-entry control should retain the WO publication reference in the family/publication parse');
+}
+
+// EP24163939 — divisional R71 / grant-intended control with clean response packet
+{
+  const caseNo = 'EP24163939';
+  const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
+  const doclistDoc = caseDoc(caseNo, 'doclist');
+  const doclist = hooks.parseDoclist(doclistDoc);
+  const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
+  const preview = hooks.doclistGroupingPreview(doclistDoc);
+
+  assert.strictEqual(main.applicationType, 'Divisional', 'Grant-intended control should remain classified as divisional');
+  assert.strictEqual(main.parentCase, 'EP3440098', 'Grant-intended control should expose its parent case number');
+  assert(/Grant of patent is intended/i.test(main.statusRaw || ''), 'Grant-intended control should preserve the R71/grant-intended status text');
+  assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '07.11.2025' && g.size === 6), 'Grant-intended control should keep the full R71 packet together under the intention-to-grant label');
+  assert(preview.some((g) => g.label === 'Response to intention to grant' && g.dateStr === '09.03.2026' && g.size === 5), 'Grant-intended control should keep the post-R71 translations/receipt bundle together as the response-to-grant packet');
+  assert(eventHistory.events.some((e) => /Communication of intention to grant/i.test(e.title)), 'Grant-intended control should retain the R71 communication event in event history');
+  assert(deadlines.some((d) => d.label === 'R71(3) response period'), 'Grant-intended control should derive the R71 response deadline family from live docs/events');
+  assert(legal.renewals.some((r) => r.year === 9), 'Grant-intended control should retain later renewal-year history');
+  assert(family.publications.some((p) => p.no === 'EP4397970' && p.kind === 'A3'), 'Grant-intended control should retain its own A3 publication in the family/publication parse');
+}
+
+// EP23182542 — granted divisional with withdrawal/further-processing conflict history
+{
+  const caseNo = 'EP23182542';
+  const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
+  const doclist = hooks.parseDoclist(caseDoc(caseNo, 'doclist'));
+  const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
+
+  assert.strictEqual(main.applicationType, 'Divisional', 'Conflict-history control should remain classified as divisional');
+  assert.strictEqual(main.parentCase, 'EP4070092', 'Conflict-history control should expose its parent case number');
+  assert(/The patent has been granted/i.test(main.statusRaw || ''), 'Conflict-history control should preserve the granted top-level status after further processing');
+  assert(doclist.docs.some((d) => /Decision to grant a European patent/i.test(d.title)), 'Conflict-history control should keep the grant-decision document in the doclist parse');
+  assert(doclist.docs.some((d) => /Application deemed to be withdrawn \( translations of claims\/payment missing\)/i.test(d.title)), 'Conflict-history control should keep the post-R71 deemed-withdrawn document in the doclist parse');
+  assert(doclist.docs.some((d) => /Decision to allow further processing/i.test(d.title)), 'Conflict-history control should keep the further-processing decision in the doclist parse');
+  assert(eventHistory.events.some((e) => /Decision on request for further processing/i.test(e.title)), 'Conflict-history control should retain the further-processing event-history entry');
+  assert(eventHistory.events.some((e) => /Application deemed to be withdrawn/i.test(e.title)), 'Conflict-history control should retain the deemed-withdrawn event-history entry');
+  assert(legal.events.some((e) => /European patent granted/i.test(e.title)), 'Conflict-history control should preserve the eventual grant in legal-status data');
+  assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Conflict-history control should derive the post-grant opposition monitoring window');
+  assert(deadlines.some((d) => d.label === 'Unitary effect request window'), 'Conflict-history control should derive the post-grant unitary-effect window');
+  assert(family.publications.some((p) => p.no === 'EP4070092' && p.kind === 'B1'), 'Conflict-history control should retain the parent-family grant publication');
+  assert(family.publications.some((p) => p.no === 'EP4671766' && p.kind === 'A2'), 'Conflict-history control should retain the downstream divisional publication reference');
+}
+
+// EP25193159 — divisional search-stage control with extended-ESR annex
+{
+  const caseNo = 'EP25193159';
+  const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
+  const doclistDoc = caseDoc(caseNo, 'doclist');
+  const doclist = hooks.parseDoclist(doclistDoc);
+  const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const preview = hooks.doclistGroupingPreview(doclistDoc);
+
+  assert.strictEqual(main.applicationType, 'Divisional', 'Extended-ESR control should remain classified as divisional');
+  assert.strictEqual(main.parentCase, 'EP4168798', 'Extended-ESR control should expose its parent case number');
+  assert(/The application has been published/i.test(main.statusRaw || ''), 'Extended-ESR control should preserve its published/search-stage status');
+  assert(doclist.docs.some((d) => /Document annexed to the Extended European Search Report/i.test(d.title)), 'Extended-ESR control should retain the extended-ESR annex document in the doclist parse');
+  assert(preview.some((g) => g.dateStr === '19.02.2026' && g.size === 5 && g.titles.some((title) => /Extended European Search Report/i.test(title))), 'Extended-ESR control should keep the full search packet together even when an extended-search annex is present');
+  assert(eventHistory.events.some((e) => /Publication of search report/i.test(e.title)), 'Extended-ESR control should retain the search-report publication event');
+  assert(legal.renewals.some((r) => r.year === 5), 'Extended-ESR control should retain renewal-fee history already visible during early search-stage prosecution');
+  assert(family.publications.some((p) => p.no === 'EP4168798' && p.kind === 'B1'), 'Extended-ESR control should retain the parent-family grant publication reference');
+}
+
 // Live UPC registry positive / negative controls
 {
   const negative = hooks.parseUpcOptOutResult(loadFixtureText('upc', 'EP3816364.html'), 'EP3816364');

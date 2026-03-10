@@ -1,0 +1,1251 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+  <meta http-equiv="Content-Script-Type" content="text/javascript" />
+  <meta http-equiv="Content-Style-Type" content="text/css"/>
+
+  <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon"/>
+  <title> EP All documents - European Patent Register</title>
+  <link rel="stylesheet" href="/theme/cssPrint.css"  media="print" type="text/css"/>
+  
+  <link rel="stylesheet" href="/theme/cssPrintLayout.css"  media="print" type="text/css"/>
+
+  <link rel="stylesheet" href="/theme/rplusPrint.css" media="print" type="text/css"/>
+  
+  <link rel="stylesheet" href="/theme/common.css"  media="screen" type="text/css"/>
+
+  <!--[if IE 8]>
+		<link rel="stylesheet" href="/theme/css_IE8.css" type="text/css"/>
+		<link rel="stylesheet" href="/theme/rplus_IE8.css" type="text/css"/>
+		<link rel="stylesheet" href="/theme/css_ie8_print.css" type="text/css"/>
+  <![endif]-->
+  <!--[if IE 7]>
+		<link rel="stylesheet" href="/theme/css_IE7.css" type="text/css"/>
+		<link rel="stylesheet" href="/theme/rplus_IE7.css" type="text/css"/>
+  <![endif]-->
+  <!--[if IE 6]>
+		<link rel="stylesheet" href="/theme/css_IE6.css" type="text/css"/>
+		<link rel="stylesheet" href="/theme/rplus_IE6.css" type="text/css"/>
+  <![endif]-->
+  <!--[if Opera]>
+		<link rel="stylesheet" href="/theme/rplus_opera.css" type="text/css"/>
+	<![endif]-->
+	
+  <link rel="stylesheet" href="/theme/rplus.css" type="text/css"/>
+  
+  <link rel="stylesheet" href="/theme/cssJQuery.css" type="text/css"/>
+
+<!--c:set var="jsStatic" value="/" scope="application" /--> <!-- AMF -->
+
+<script language="javascript" type="text/javascript" src = "/scripts/jquery-1.7.2.min.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/jquery.combobox.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/iutil.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/accordion.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/jquery.tools.min.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/jquery.expandableinput.js"></script>
+<script language="javascript" type="text/javascript" src = "/scripts/jquery.session.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/main.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/alert.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/rplus.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/jquery.blockUI.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/federated.js"></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/jquery.jsonp-2.4.0.min.js"></script>
+<script type='text/javascript' src='/dwr/engine.js'></script>
+<script type='text/javascript' src='/dwr/util.js'></script>
+<script type='text/javascript' src='/dwr/interface/MonitoredList.js'></script>
+<script type='text/javascript' src='/statusMap.js'></script>
+<script type='text/javascript' src='/txtMessages.js'></script>
+<script language="javascript" type="text/javascript" src=  "/scripts/bot.js"></script>
+<!-- Matomo Tag Manager -->
+
+<script>
+
+var container_ID = 'K4s1az21', env = '-i';
+var currentUrl = document.location.href;
+if (currentUrl.includes('register.epo.org')) {
+  env = '';
+  container_ID = '6yl2jF3T';
+}
+var _mtm = window._mtm = window._mtm || [];
+_mtm.push({'mtm.startTime': (new Date().getTime()), 'event': 'mtm.Start'});
+var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+g.async=true; g.src='https://matomo' + env + '.epo.org/js/container_' + container_ID + '.js'; s.parentNode.insertBefore(g,s);
+
+</script>
+
+<!-- End Matomo Tag Manager -->
+</head>
+
+<body lang="en" class="present">
+<script language="javascript" type="text/javascript">
+   $(document).ready(function() {
+          $('.hoverable').hover(
+             function() {
+                $(this).addClass('hovered');
+             }, function() {
+                $(this).removeClass('hovered');
+             }
+          );
+          var path = '';
+          var param = {clnrefer : ""}
+          if (path == '/regviewer') {
+        	  $('#smartSearchForm textarea[name="query"]').val('');
+          } else if (path == '/advancedSearch' && param.clnrefer == 'yes') {
+        	  $('#searchForm textarea[class="expandable"]').each(function() {
+        		  $(this).val('');
+        		  removeSessionAttr(getPage() + $(this).attr("name"));
+	      	  });
+          }
+
+       });
+</script>
+<div class="printGrid">
+	<div class="printIt">
+		<div class="printLogo">
+			<img alt="logo" src="/images/header/logo.gif" />
+		</div>
+	</div>
+	<div id="page" class="pageWrap">
+	<a name="toplink"></a>
+	<div class="epoHeader">
+	<div id="epoHeader" class="clearfix">
+	<a id="epoLogo" href="http://www.epo.org" name="epoLogo"><img alt="logo missing" src="/images/header/logo.gif"/></a>
+	
+	<div id="epoHeaderCenter"><img alt="logo center" src="/images/header/logo_patent_register_en.gif"/></div>
+	<div id="epoHeaderMetaNav">
+		<ul class="modLanguageNavi clearfix">
+			<li>
+				<a href="?lng=de&amp;number=EP23182542&amp;tab=doclist">
+   Deutsch</a>
+
+<a href="?lng=en&amp;number=EP23182542&amp;tab=doclist">
+   English</a>
+
+<a href="?lng=fr&amp;number=EP23182542&amp;tab=doclist">
+   Français</a>
+
+</li>
+		</ul>
+		<ul class="modServiceNavi clearfix">
+			<li class="navElem contact">
+				<a href="http://www.epo.org/service-support/contact-us.html" target="_blank">Contact</a>
+			</li>
+		</ul>
+	</div>
+	</div>
+</div><div class="modAppFlyoutNavi noPrint">
+		<div class="lvl1ul clearfix">
+			<ul class="primary">
+				<li class="lvl1li"><a class="leftArrow" href="https://www.epo.org/searching-for-patents/legal/register.html">About European Patent Register</a></li>
+				
+				<li class="lvl1li">
+					<a class="hasSubMenu sel" href="#">Other EPO online services</a>
+					<div class="lvl2ul epoMenu" style="opacity: 1; visibility: hidden; display: none;">
+						<ul class="epoGrpList epoGrpLeft">
+							
+   
+    
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="http://worldwide.espacenet.com">Espacenet
+            </a>
+</li>
+        
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="https://register.epo.org/login">Register Alert
+            </a>
+</li>
+        
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="https://data.epo.org/publication-server/?hp=stages">European Publication Server
+            </a>
+</li>
+        
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="http://www.epo.org/searching/subscription/gpi.html">Global Patent Index
+            </a>
+</li>
+        
+        
+            <li xmlns:editorial="http://espacenet.com/maintenance/editorial">
+<a target="_blank" class="grpLink" href="http://www.epo.org/searching/free/bulletin.html">European Patent Bulletin
+            </a>
+</li>
+        
+    
+</ul>
+					</div>
+				</li>
+            </ul>
+			<ul class="secondary">
+				<li><a class="tooltipHeader registerAlertLogin" title="Subscribe to this email alert service to monitor patent applications throughout the EP grant procedure." href="authenticate">Register Alert (email alerts)</a></li>
+					</ul>
+		</div>			
+	</div>
+	<div id="content"></div>
+      <script language="JavaScript" type="text/javascript">
+
+<!--
+	var status = "false";
+	$(document).ready(function(){
+	$("div.pageWrap").addClass("screenWide");
+	$('a[href="#"]').click(function(e) { e.preventDefault ? e.preventDefault() : e.returnValue = false; });
+	$('<p class="tooltipForRSSApnsEmail"></p>').appendTo('body');
+	 
+	// email valid format
+	var pattern = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+	//disable submit button
+	$("#okSubmit").attr('disabled', true);
+	$("#okSubmit").css("color","#C0C0C0");
+	$("#okSubmit").css("cursor","default");
+	
+	$("#alertSubscribeId").on('mouseover',function() {
+    var textarea_value = $("#emailadresse").val();
+	var valid = pattern.test(textarea_value);
+    if(textarea_value != '' && valid ) {
+		//enable submit button
+        $("#okSubmit").attr('disabled' , false);
+		$("#okSubmit").css("color","#000000");
+		$("#okSubmit").css("cursor","pointer");
+    }else{
+		//disable submit button
+        $("#okSubmit").attr('disabled' , true);
+		$("#okSubmit").css("color","#C0C0C0");
+		$("#okSubmit").css("cursor","default");
+    }
+	});
+	
+	}); 
+	 //To open the dialog box of RSS subscription alert
+	 function openAlert(){	 
+		var dialog = document.getElementById('alertSubscribeId');
+		var email = document.getElementById("emailId");
+		dialog.style.display = "block";
+		window.onclick = function(event) {
+		if (event.target == dialog) {
+        dialog.style.display = "none";
+			}
+		} 
+		 
+	 }
+	//To close the dialog box of RSS subscription alert
+	function closeAlert(){	 
+		var dialog = document.getElementById('alertSubscribeId');
+		var cancel = document.getElementById("cancel");
+        dialog.style.display = "none";
+	 }
+	 
+	 
+	function showDetails() {
+		if (status === "false") {
+			$("#historyButton").text('Hide history');
+            $("#historyButton").removeClass('showHist');
+            $("#historyButton").addClass('hideHist');
+            $(".former").show();
+			status = "true";
+		} else {
+			$("#historyButton").text('Show history');
+            $("#historyButton").removeClass('hideHist');
+            $("#historyButton").addClass('showHist');
+            $(".former").hide();
+			status = "false";
+		}
+	}
+
+	function downloadXML(href, message) {
+		if(message.length > 0){
+			alert(message);
+		}
+        window.open(href,"DownloadXML");     // Open in a new window
+         //window.open(href); self.focus();   // Background window
+         //window.location = href;            // Open in the current window
+	}
+
+	function refineSearch() {
+		window.location.href="application?lastSearch=advanced";
+	}
+
+	function filterDocs(number, lng) {
+		var filter = $("select").val();
+		window.location.href="application?lng="+lng+"&tab=doclist&number="+number+"&filter="+encodeURIComponent(filter);
+	}
+	function filterueDocs(number, lng) {
+		var filter = $("select").val();
+		window.location.href="application?lng="+lng+"&tab=ueDoclist&number="+number+"&filter="+encodeURIComponent(filter);
+	}
+-->
+
+
+</script>
+
+<div id="epoNavigation" class="epoNavigation">
+		<script type="text/javascript">
+$(document).ready(function(){
+   if (false) {
+      if ($("#").hasClass("bendr")) {
+         $("#").removeClass("bendr").addClass("bendractive");
+      }
+      if ($("#").hasClass("bendl")) {
+         $("#").removeClass("bendl").addClass("bendlactive");
+      }
+   }
+});
+</script>
+
+<spring:url var="rootCont" value="/"/>
+
+  <div class="modAppNav noScript">
+      <ul>
+		<li id="smartSearch" class="bendr"><a href="regviewer?lng=en">Smart search</a></li>
+        <li id="advancedSearch" class="bendr"><a href="advancedSearch?lng=en&amp;clnrefer=yes">Advanced search</a></li>
+        <li class="spacer"></li>
+        <li id="help" class="bendl last"><a href="help?topic=index&amp;lng=en">Help</a></li>
+        </ul>
+   </div>
+</div>
+
+	<div id="epoContentLeft" class="noPrint" >
+			<ul class="epoContentNav">
+				<span class="sel" style="padding-left: 6px;">EP4270008</span>
+				<span class="sel" style="padding-left: 16px;">European procedure</span>
+				<ul>
+					<li>
+						<a href="/application?number=EP23182542&amp;lng=en&amp;tab=main">EP About this file</a>
+								</li>
+					<li>
+						<a href="/application?number=EP23182542&amp;lng=en&amp;tab=legal">EP Legal status</a>
+								</li>
+					<li>
+						<a href="/application?number=EP23182542&amp;lng=en&amp;tab=federated">EP Federated register</a>
+								</li>
+					<li>
+						<a href="/application?number=EP23182542&amp;lng=en&amp;tab=event">EP Event history</a>
+								</li>
+					<li>
+						<a href="/application?number=EP23182542&amp;lng=en&amp;tab=citations">EP Citations</a>
+								</li>
+					<li>
+						<a href="/application?number=EP23182542&amp;lng=en&amp;tab=family">EP Patent family</a>
+								</li>
+					<li>
+						<a class="sel lastActiveElement" href='/application?number=EP23182542&amp;lng=en&amp;tab=doclist'>EP All documents</a>
+							</li>
+					</ul>
+				<span class="sel" style="padding-left: 16px;">Unitary Patent</span>
+					<ul>
+						</ul>
+				</ul>
+			<div style="clear: right;">&nbsp;</div>
+
+			<!-- only context menu for results page -->
+			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+
+<script>
+$(document).ready(function() {
+  $('.dijitAccordionTitle').click(function() {
+    var accordionContainer = $('.epoAccordionContainer');
+    var contentContainer = $('.dijitContainer.dijitAccordionContainer.dijitLayoutContainer');
+    accordionContainer.css('height', 'auto');
+    contentContainer.css('height', 'auto');
+  });
+});
+</script>
+
+   <div class="epoAccordionContainer" style="height: auto;">
+       <div class="dijitContainer dijitAccordionContainer dijitLayoutContainer" style="overflow: hidden; height: auto;" >
+			
+            
+               
+            
+
+            
+            
+
+            
+               <div class="dijitAccordionTitle">
+                  <span class="dijitInline dijitAccordionArrow"></span>
+                  <img style="vertical-align: middle;" alt="blank" src="/images/blank.gif"/>
+                  <span class="dijitAccordionText">Quick help</span>
+               </div>
+               <div class="dijitContentPane dijitAccordionContainer-child dijitAccordionContainer-dijitContentPane">
+                           <ul>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=doclist.1&amp;lng=en" title="&lt;h4&gt;Is it possible to download documents?&lt;/h4&gt;&lt;p&gt;You can select a document for download by ticking the checkbox next to its title. Click on &amp;#034;Selected Documents&amp;#034; to save it as a PDF file to your preferred location. If you wish to select all the documents from the list, tick the box next to &amp;#034;Date&amp;#034; and then click on &amp;#034;Selected documents&amp;#034;. These documents will be saved as one single PDF file.&lt;/p&gt;">Is it possible to download documents?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=doclist.2&amp;lng=en" title="&lt;h4&gt;Is it possible to print a list of all the documents?&lt;/h4&gt;&lt;p&gt;Yes. All you have to do is click on the printer icon in the toolbar.&lt;/p&gt;">Is it possible to print a list of all the documents?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=doclist.3&amp;lng=en" title="&lt;h4&gt;Can I sort the list of documents?&lt;/h4&gt;&lt;p&gt;You can sort the list of documents by ascending or descending date.&lt;/p&gt;">Can I sort the list of documents?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=doclist.4&amp;lng=en" title="&lt;h4&gt;Is it possible to open one of the documents?&lt;/h4&gt;&lt;p&gt;Click on the document title to open it in PDF format. This will display the first page only. If you wish to view all the pages, click on &amp;#039;Load all pages&amp;#039;.&lt;/p&gt;">Is it possible to open one of the documents?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=doclist.5&amp;lng=en" title="&lt;h4&gt;Can I open multiple documents in separate windows?&lt;/h4&gt;&lt;p&gt;Yes, simply click on each document you wish to view and they will be opened in a separate window.&lt;/p&gt;">Can I open multiple documents in separate windows?</a>
+                                 </li>
+                              
+                                 
+                                 
+                                 
+                                 
+
+                                 
+                                 <li>
+                                   <a class="int" href="help?quickHelpPage=doclist.6&amp;lng=en" title="&lt;h4&gt;Is it possible to print a document?&lt;/h4&gt;&lt;p&gt;Once you have selected a document, it is opened in a new window and only the first page is displayed. Click on the printer icon in the PDF toolbar to print this page. If you wish to print the whole document, click &amp;#034;Load all pages&amp;#034; first, then click on the printer icon.&lt;/p&gt;">Is it possible to print a document?</a>
+                                 </li>
+                              
+                           </ul>
+                </div>
+            
+      
+		
+		
+		<div class="dijitAccordionTitle">
+			<span class="dijitInline dijitAccordionArrow"></span>
+			<img style="vertical-align: middle;" alt="blank" src="/images/blank.gif"/>
+			<span class="dijitAccordionText">Maintenance news</span>
+		</div>
+			 
+		<div class="dijitContentPane dijitAccordionContainer-child dijitAccordionContainer-dijitContentPane">
+			
+				
+				
+                 
+				
+				
+				
+				
+				 
+                <p>
+<b>Scheduled maintenance</b>
+<span style="float:right;">
+<a title="Maintenance news" href="maintenance?lng=en">
+<img src="images/rss.gif"/>
+</a>
+</span>
+</p><p>Regular maintenance outages:<br/>
+between 05.00 and 05.15 hrs CET (Monday to Sunday).<br/>
+<br/>
+<b>Other outages</b>
+<br/>
+<a href="https://www.epo.org/service-support/availability-of-online-services.htmlhttps://www.epo.org/service-support/availability-of-online-services.htmlhttps://www.epo.org/service-support/availability-of-online-services.html" target="_blank">Availability</a>
+<br/>
+</p><p>2022.02.11</p>
+
+
+				<a class="int" href="news?type=NEWS_MAINTENANCE&amp;lng=en">More...</a>
+			
+
+			
+		</div>
+
+		
+		
+		<div class="dijitAccordionTitle">
+			<span class="dijitInline dijitAccordionArrow"></span>
+			<img style="vertical-align: middle;" alt="blank" src="/images/blank.gif"/>
+			<span class="dijitAccordionText">News flashes</span>
+		</div>
+		<div class="dijitContentPane dijitAccordionContainer-child dijitAccordionContainer-dijitContentPane">
+			
+				
+				
+                 
+				
+				
+				
+				
+                 
+				<p>
+<b>Italy joins the Federated Register</b>
+<span style="float:right;">
+<a title="News flashes" href="flashnews?lng=en">
+<img src="images/rss.gif"/>
+</a>
+</span>
+</p><p>Click <a href="https://register.epo.org/help?lng=en&amp;topic=federated" target="_blank">here</a> for more information on the Federated Register.</p><p>2025-06-12</p>
+
+				<a class="int" href="news?type=NEWSFLASH&amp;lng=en">More...</a>
+			
+
+			
+		</div>
+
+
+          <div class="dijitAccordionTitle">
+                  <span class="dijitInline dijitAccordionArrow"></span>
+                  <img style="vertical-align: middle;" alt="blank" src="/images/blank.gif"/>
+                  <span class="dijitAccordionText">Related links</span>
+          </div>
+          <div class="dijitContentPane dijitAccordionContainer-child dijitAccordionContainer-dijitContentPane">
+           
+		        
+		        
+		
+		        
+    <p xmlns:editorial="http://espacenet.com/maintenance/editorial">
+        
+            <a href="https://www.epo.org/searching-for-patents/legal/register/archive.html" target="_blank" class="ext">Release notes
+            </a>
+        <br/>
+        
+            <a href="https://e-courses.epo.org/wbts/europeanpatentregisterassistant/index.html" target="_blank" class="ext">European Patent Register Assistant
+            </a>
+        <br/>
+        
+            <a href="https://link.epo.org/web/legal/register/en-european-patent-register-user-manual.pdf" target="_blank" class="ext">European Patent Register User Manual
+            </a>
+        <br/>
+        
+            <a href="http://documents.epo.org/projects/babylon/eponet.nsf/0/61E49C570C2441DDC12581AF00494F04/$File/european_patent_register-pocket_guide_en.pdf" target="_blank" class="ext">European Patent Register – pocket guide
+            </a>
+        <br/>
+        
+            <a href="http://www.epo.org/searching-for-patents/legal/register/faq.html" target="_blank" class="ext">FAQ - European Patent Register
+            </a>
+        <br/>
+        
+            <a href="http://documents.epo.org/projects/babylon/eponet.nsf/0/B7C67A1394E42810C1257EC300537D68/$File/federated_register_flyer_en.pdf" target="_blank" class="ext">Federated Register (Flyer)
+            </a>
+        <br/>
+        
+            <a href="http://documents.epo.org/projects/babylon/eponet.nsf/0/9D94DCA14F468A24C1257EC300536856/$File/global_dossier_flyer2016_en.pdf" target="_blank" class="ext">Global Dossier (Flyer)
+            </a>
+        <br/>
+        
+            <a href="http://www.epo.org/searching-for-patents/legal/register/documentation/events.html" target="_blank" class="ext">Register events
+            </a>
+        <br/>
+        
+            <a href="http://www.epo.org/searching-for-patents/legal/register/documentation/data-coverage.html" target="_blank" class="ext">Deep link coverage
+            </a>
+        <br/>
+        
+            <a href="https://www.epo.org/searching-for-patents/legal/register/documentation/federated-register.html" target="_blank" class="ext">Federated Register content
+            </a>
+        <br/>
+        
+            <a href="https://e-courses.epo.org/wbts/PI_Tour/" target="_blank" class="ext">The Patent Information Tour
+            </a>
+        <br/>
+        
+            <a href="http://www.epo.org/service-support/ordering/fair-use.html" target="_blank" class="ext">Fair use charter
+            </a>
+        <br/>
+    </p>
+
+		   
+		   
+          </div>
+      </div>
+
+    </div></div>
+    <div class="epoContentWrap clearfix">
+		<div id="pagebody" >
+			<a name="Content"></a>
+			
+			<div class="printTitle printIt">
+			<h3>Extract from the Register of European Patents</h3>
+			</div>
+			<span style="font-size:1.6em;font-weight: bold;">EP All documents: EP4270008<span style="padding-left:15px; font-size:12px;font-weight: normal; font-family: Arial">
+						 Dossier alert:</span>
+					<a class="rssDownload tooltipForRSS" title="RSS: Subscribe to this feed (changes in the dossier)" href="rssDocuments?application=EP23182542&proc=EP-PCT&lng=en" target="_blank">
+						<span style="padding-left: 23px; font-size:0.65em;font-weight: normal; vertical-align: middle; padding-bottom: 1px;">
+						RSS</span>
+					</a>
+					<!-- add span inside <a> PREG-1698 -->
+					<a  href='#' id ="emailId" class="rssEmailSubscribe tooltipForRSSEmail" title="Email: Subscribe to email alerts (about changes in the dossier)"  onclick="openAlert();return false;">
+						<span class="emailTitle">
+						Email</span>
+					</a>
+					<div id="alertSubscribeId" class="alertSubscribe">
+						 <div class="alertSubscribe-content">
+						 </br>
+							<h2>Subscribe to email alerts</h2>
+							</br>
+							<span style="font-size:10px;font-weight: normal; font-family: Arial">
+							<div><nobr><p>Dossier(s):&nbsp;&nbsp;&nbsp;EP4270008</p></nobr></div>
+								<form id="subAlert" action="rssEmail?action=subscription&amp;application=EP23182542&amp;lng=en&amp;tab=doclist" method="post"><input id="emailadresse" class="alertEmail" type="text"  name="emailadresse" placeholder="Enter your email address" /></br></br>
+									<p>A confirmation email will be sent to the email address indicated</p>
+									</br></br>
+									<button id="okSubmit" style="padding-left: 25px; padding-right: 25px; padding-top: 1px; padding-bottom: 1px; width: 20%;" type="submit" class="alertSubscribe-content_button_submit"><b>OK</b></button>
+									<button id="cancel" style=" padding-top: 1px; padding-bottom: 1px; width: 20%;"  onclick="closeAlert();return false;" class="alertSubscribe-content_button_cancel"><b>Cancel</b></button>
+									</br>
+								</form></span>
+						 </div>				
+					</div>	
+					</span>
+
+				</span>	
+				<hr style="padding-bottom: 0.01em; margin-bottom: 2.26em;margin-top: 0.3em;">
+			<div id="body" class="clearfix">
+					<div class="epoToolBar firstChildToolbar">
+						<ul class="clearfix">
+							<li class="separator separatorFirst"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="rfnLst" title="Refine search" href="simpleSearch?lng=en">Refine search</a></li>
+							
+							<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+									<li style="padding-right: 0.4em;"><a class="download" title="Download selected documents in a single PDF file" href="javascript:downloadDocuments();">Selected documents</a></li>
+									<li class="separator"><span class="firstFollow">|</span></li>
+										<li><a class="download" title="Download selected documents separately in a zipped archive" href="javascript:zipDocuments();">Zip Archive</a></li>
+										<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="ext" title="Open in Espacenet" href="https://worldwide.espacenet.com/patent/search?q=pn%3DEP4270008&called_by=EuropeanRegister" target="_blank">Espacenet</a></li>
+								<li style="padding-right: 0.4em;" class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="thirdParty" title="Third Party Observation" href="https://tpo.apps.epo.org/tpo/ui/prod/?subject.publicationNumber=EP4270008" target="_blank">Submit observations</a></li>
+								<li style="padding-right: 0.4em;"class="separator"><span class="firstFollow">|</span></li>
+							<li style="padding-right: 0.4em;"><a class="reportErr" title="Send us your questions or feedback" href="http://www.epo.org/service-support/contact-us/contact2-form.html?number=EP23182542&subject=EPRegister" target="_blank">Report error</a></li>
+							
+							<li style="padding-right: 0.4em;" class="floatRight prt line"><a href="javascript:window.print();" class="prt" title="Print">Print</a></li>
+							<li style="padding-right: 0.4em;" class="floatRight separator"><span class="firstFollow">|</span></li>
+						</ul>
+					</div>
+					<br/>
+					<div class="epoBar epoBarFilter">
+						<div class="primary">
+							<form action="#">
+								<div class="epoBarItem epoBarItemForm">
+									<div class="formElement">
+									<span class="select">
+										<select style="width:150px;" name="id1" id="id1" >
+											<option selected="selected" value="ALL">All documents(59)</option>
+           <option value="SEARCH/EXAM">Search / examination(59)</option>
+           <option value="INCOMING">Received by EPO(29)</option>
+           <option value="INTERNAL">Internal(5)</option>
+           <option value="OUTGOING">Sent by EPO(25)</option>
+           </select>
+									</span>
+									</div>
+									<div class="formElement">
+									<span class="inputsubmit">
+										<input class="submit" onclick="filterDocs('EP23182542', 'en')" type="button" value="Search" />
+									</span>
+									</div>
+								</div>
+							</form>
+						</div>
+						<div class="secondary">
+						</div>
+					</div>
+					<script type="text/javascript">
+$(document).ready(function(){
+     // add class to date th element
+	$(".order2 a").addClass("resSorting desc");
+	$(".order1 a").addClass("resSorting asc");
+
+	if ((!isChrome() && (isOpera()))) {
+		$(".docList tbody td a").each(function() {
+			$(this).attr("onClick", $(this).attr("href"));
+            $(this).attr("href", "#"+$(this).attr("id"));
+		});
+	}
+	$('#okButton').click(function() { 
+		$.unblockUI(); 
+		if ($("#pdfOrZipClicked").val() === "pdf") {
+			document.pdfForm.submit();
+		} else if ($("#pdfOrZipClicked").val() === "zip") {
+			document.zipForm.submit();
+		}
+	}); 
+	
+	// The caracter "-" should be displayed in the Number of pages value for SEQLCON25 documents with zip or SEQLCON26 documents 
+	$(".noOfPages.isSEQLZIP").html("-")
+});
+
+
+function downloadDocuments() {
+    var checkboxes = document.getElementsByName("identivier");
+	var discIdSet = new Array();
+    var idList="";
+    var nonPatentLiteratureIncluded = false;
+
+    for (var i = 0; i < checkboxes.length; i++) {
+       if(checkboxes[i].checked) {
+			// 1. Collect the document IDs	   
+           if(idList==""){
+              idList = checkboxes[i].value;
+           }else{
+              idList = idList + "+" + checkboxes[i].value;
+           }
+		   
+		   // 2. Create a set of disclaimer IDs
+           if(checkboxes[i].title != ""){
+             nonPatentLiteratureIncluded = true;
+			 var ids = checkboxes[i].title.split(" , ");
+			 for(id in ids){
+				discIdSet[ids[id]] = ids[id];
+			 }
+           }
+       }
+    }
+
+    if(idList==""){
+       alert("You have not selected any document(s) to download.");
+    }else{
+       if (nonPatentLiteratureIncluded)
+          {
+			var text = buildDisclaimerText(discIdSet);
+			$('#disclTextId').html(text);
+			
+				$.blockUI({ message: $('#infoMessage'), css: {
+                left: $(window).width() - ($(window).width())*0.75 + 'px', 
+				width: ($(window).width())/2 + 'px'
+			} }); 
+			
+				$("#pdfOrZipClicked").val("pdf");
+			 	document.pdfForm.documentIdentifiers.value = idList;			
+          } else {
+				document.pdfForm.documentIdentifiers.value = idList;
+				document.pdfForm.submit();
+		  }
+    }
+ }
+ 
+function zipDocuments() {
+    var checkboxes = document.getElementsByName("identivier");
+	var discIdSet = new Array();
+    var idList="";
+    var nonPatentLiteratureIncluded = false;
+
+    for (var i = 0; i < checkboxes.length; i++) {
+       if(checkboxes[i].checked) {
+			// 1. Collect the document IDs	   
+           if(idList==""){
+              idList = checkboxes[i].value;
+           }else{
+              idList = idList + "+" + checkboxes[i].value;
+           }
+		   
+		   // 2. Create a set of disclaimer IDs
+           if(checkboxes[i].title != ""){
+             nonPatentLiteratureIncluded = true;
+			 var ids = checkboxes[i].title.split(" , ");
+			 for(id in ids){
+				discIdSet[ids[id]] = ids[id];
+			 }
+           }
+       }
+    }
+
+    if(idList==""){
+       alert("You have not selected any document(s) to download.");
+    }else{
+       if (nonPatentLiteratureIncluded)
+          {
+			var text = buildDisclaimerText(discIdSet);
+			$('#disclTextId').html(text);
+			
+				$.blockUI({ message: $('#infoMessage'), css: {
+                left: $(window).width() - ($(window).width())*0.75 + 'px', 
+				width: ($(window).width())/2 + 'px'
+			} }); 
+			
+				$("#pdfOrZipClicked").val("zip");
+			 	document.zipForm.documentIdentifiers.value = idList;			
+          } else {
+				document.zipForm.documentIdentifiers.value = idList;
+				document.zipForm.submit();
+		  }
+    }
+    console.log(idList);
+ }
+
+//Build a disclaimer message from disclaimer-IDs
+function buildDisclaimerText(discIdSet){
+	var disclmessage = "";
+	var disclaimers = document.getElementsByName("disclaimer");
+	
+	for(id in discIdSet){
+		for (var i = 0; i < disclaimers.length; i++) {
+			if(disclaimers[i].id == id){
+				if(disclmessage==""){
+					disclmessage = disclaimers[i].value;
+				}else{
+					disclmessage = disclmessage + "<br/><br/>" + disclaimers[i].value;
+				}
+			}
+		}
+	}
+	if(disclmessage==""){
+		disclmessage="(Disclaimer text is not available)";
+	}
+	return disclmessage;
+}
+
+function filterDocuments(number, filter) {
+         window.location.href="application?tab=doclist&amp;number="+number+"&amp;filter="+encodeURIComponent(filter);
+}
+
+</script>
+
+<div id="infoMessage" style="display:none; cursor: default"> 
+	<div class="eprDisclaimer">
+		<span id="disclTextId"> Disclaimer </span>
+	</div>
+	<p>
+		<input type="hidden" id="pdfOrZipClicked"/>
+		<input class="submit submitDisclaimer" type="button" id="okButton" value="OK" /> 
+	</p>
+</div>
+ 
+<form id="application" action="/application?number=EP23182542&amp;lng=en&amp;tab=doclist" method="get" enctype="UTF-8"><input id="applicationNumber" name="applicationNumber" type="hidden" value="EP23182542"/><div class="modList" >
+      
+<table class="application docList" id="row">
+<thead>
+<tr>
+<th><input type="checkbox" onclick="selectAllDocuments();" id="selectAllCheckbox" /></th>
+<th class="sortable sorted order2">
+<a href="application?number=EP23182542&amp;d-16544-o=2&amp;lng=en&amp;tab=doclist&amp;d-16544-s=1">Date</a></th>
+<th>Document type</th>
+<th>Procedure</th>
+<th>Number&nbsp;of&nbsp;pages</th></tr></thead>
+<tfoot><tr><td colspan="5" align="right">Total number of pages:&nbsp;805</td></tr>
+         </tfoot>
+<tbody>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MLFRKI5X19DOTD0" title=""/></td>
+<td>17.02.2026</td>
+<td class="nowrap"><a id="MLFRKI5X19DOTD0" href="javascript:NewPDFWindow('application?documentId=MLFRKI5X19DOTD0&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MLFRKI5X19DOTD0_EP23182542_en')">Transmission of the certificate for a European patent pursuant to Rule 74 EPC</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MJW32MPF34GF2EL" title=""/></td>
+<td>09.01.2026</td>
+<td class="nowrap"><a id="MJW32MPF34GF2EL" href="javascript:NewPDFWindow('application?documentId=MJW32MPF34GF2EL&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MJW32MPF34GF2EL_EP23182542_en')">Decision to grant a European patent</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">3</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MHVTPV1TUYEG0LH" title=""/></td>
+<td>14.11.2025</td>
+<td class="nowrap"><a id="MHVTPV1TUYEG0LH" href="javascript:NewPDFWindow('application?documentId=MHVTPV1TUYEG0LH&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MHVTPV1TUYEG0LH_EP23182542_en')">Decision to allow further processing</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MHUOPNUGNXNWARH" title=""/></td>
+<td>11.11.2025</td>
+<td class="nowrap"><a id="MHUOPNUGNXNWARH" href="javascript:NewPDFWindow('application?documentId=MHUOPNUGNXNWARH&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MHUOPNUGNXNWARH_EP23182542_en')">(Electronic) Receipt</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MHUOPKMR43J0MHI" title=""/></td>
+<td>11.11.2025</td>
+<td class="nowrap"><a id="MHUOPKMR43J0MHI" href="javascript:NewPDFWindow('application?documentId=MHUOPKMR43J0MHI&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MHUOPKMR43J0MHI_EP23182542_en')">Filing of the translations of the claims</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MHUOPML6LSVDS7K" title=""/></td>
+<td>11.11.2025</td>
+<td class="nowrap"><a id="MHUOPML6LSVDS7K" href="javascript:NewPDFWindow('application?documentId=MHUOPML6LSVDS7K&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MHUOPML6LSVDS7K_EP23182542_en')">French translation of claims</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">8</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MHUOPLPP1K4888A" title=""/></td>
+<td>11.11.2025</td>
+<td class="nowrap"><a id="MHUOPLPP1K4888A" href="javascript:NewPDFWindow('application?documentId=MHUOPLPP1K4888A&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MHUOPLPP1K4888A_EP23182542_en')">German translation of the claims</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">7</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MHUOPK4U10ABFZQ" title=""/></td>
+<td>11.11.2025</td>
+<td class="nowrap"><a id="MHUOPK4U10ABFZQ" href="javascript:NewPDFWindow('application?documentId=MHUOPK4U10ABFZQ&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MHUOPK4U10ABFZQ_EP23182542_en')">Letter accompanying subsequently filed items</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MHUOPKZK1CC3MFJ" title=""/></td>
+<td>11.11.2025</td>
+<td class="nowrap"><a id="MHUOPKZK1CC3MFJ" href="javascript:NewPDFWindow('application?documentId=MHUOPKZK1CC3MFJ&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MHUOPKZK1CC3MFJ_EP23182542_en')">Request for further processing</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MG5V5NN8E7C8HJ3" title=""/></td>
+<td>01.10.2025</td>
+<td class="nowrap"><a id="MG5V5NN8E7C8HJ3" href="javascript:NewPDFWindow('application?documentId=MG5V5NN8E7C8HJ3&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MG5V5NN8E7C8HJ3_EP23182542_en')">Application deemed to be withdrawn ( translations of claims/payment missing)</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MCONVICF1CJOHPX" title=""/></td>
+<td>09.07.2025</td>
+<td class="nowrap"><a id="MCONVICF1CJOHPX" href="javascript:NewPDFWindow('application?documentId=MCONVICF1CJOHPX&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MCONVICF1CJOHPX_EP23182542_en')">Communication concerning corrected entries of the applicant</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MCNQ2DV7P25ZPVN" title=""/></td>
+<td>03.07.2025</td>
+<td class="nowrap"><a id="MCNQ2DV7P25ZPVN" href="javascript:NewPDFWindow('application?documentId=MCNQ2DV7P25ZPVN&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MCNQ2DV7P25ZPVN_EP23182542_en')">(Electronic) Receipt</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MCNQ2D2L1V7SQ6I" title=""/></td>
+<td>03.07.2025</td>
+<td class="nowrap"><a id="MCNQ2D2L1V7SQ6I" href="javascript:NewPDFWindow('application?documentId=MCNQ2D2L1V7SQ6I&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MCNQ2D2L1V7SQ6I_EP23182542_en')">Letter accompanying subsequently filed items</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MCNQ2DDT1K6C82K" title=""/></td>
+<td>03.07.2025</td>
+<td class="nowrap"><a id="MCNQ2DDT1K6C82K" href="javascript:NewPDFWindow('application?documentId=MCNQ2DDT1K6C82K&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MCNQ2DDT1K6C82K_EP23182542_en')">Submission concerning change of applicant's address</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MAGNYB8K1Q9883F" title=""/></td>
+<td>13.05.2025</td>
+<td class="nowrap"><a id="MAGNYB8K1Q9883F" href="javascript:NewPDFWindow('application?documentId=MAGNYB8K1Q9883F&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MAGNYB8K1Q9883F_EP23182542_en')">Annex to the communication about intention to grant a European patent</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MAGNYB8J1812L0B" title=""/></td>
+<td>13.05.2025</td>
+<td class="nowrap"><a id="MAGNYB8J1812L0B" href="javascript:NewPDFWindow('application?documentId=MAGNYB8J1812L0B&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MAGNYB8J1812L0B_EP23182542_en')">Bibliographic data of the European patent application</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MAGNYB8HRK7AYOA" title=""/></td>
+<td>13.05.2025</td>
+<td class="nowrap"><a id="MAGNYB8HRK7AYOA" href="javascript:NewPDFWindow('application?documentId=MAGNYB8HRK7AYOA&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MAGNYB8HRK7AYOA_EP23182542_en')">Communication about intention to grant a European patent</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">5</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MAGNYB8NIW7CX5O" title=""/></td>
+<td>13.05.2025</td>
+<td class="nowrap"><a id="MAGNYB8NIW7CX5O" href="javascript:NewPDFWindow('application?documentId=MAGNYB8NIW7CX5O&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MAGNYB8NIW7CX5O_EP23182542_en')">Intention to grant (signatures)</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MAFY15SA8LNI0NH" title=""/></td>
+<td>13.05.2025</td>
+<td class="nowrap"><a id="MAFY15SA8LNI0NH" href="javascript:NewPDFWindow('application?documentId=MAFY15SA8LNI0NH&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MAFY15SA8LNI0NH_EP23182542_en')">Text intended for grant (clean copy)</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">100</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="MAFY1IL61UYH5OV" title=""/></td>
+<td>13.05.2025</td>
+<td class="nowrap"><a id="MAFY1IL61UYH5OV" href="javascript:NewPDFWindow('application?documentId=MAFY1IL61UYH5OV&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'MAFY1IL61UYH5OV_EP23182542_en')">Text intended for grant (version for approval)</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">100</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M69918EC1CS5GRU" title=""/></td>
+<td>23.01.2025</td>
+<td class="nowrap"><a id="M69918EC1CS5GRU" href="javascript:NewPDFWindow('application?documentId=M69918EC1CS5GRU&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M69918EC1CS5GRU_EP23182542_en')">(Electronic) Receipt</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M69914QABK0T44F" title=""/></td>
+<td>23.01.2025</td>
+<td class="nowrap"><a id="M69914QABK0T44F" href="javascript:NewPDFWindow('application?documentId=M69914QABK0T44F&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M69914QABK0T44F_EP23182542_en')">Amended description with annotations</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">88</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M699119N96GD9W2" title=""/></td>
+<td>23.01.2025</td>
+<td class="nowrap"><a id="M699119N96GD9W2" href="javascript:NewPDFWindow('application?documentId=M699119N96GD9W2&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M699119N96GD9W2_EP23182542_en')">Description</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">78</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M69910ITEZ2NFSK" title=""/></td>
+<td>23.01.2025</td>
+<td class="nowrap"><a id="M69910ITEZ2NFSK" href="javascript:NewPDFWindow('application?documentId=M69910ITEZ2NFSK&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M69910ITEZ2NFSK_EP23182542_en')">Letter accompanying subsequently filed items</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M69910WK14UNV1S" title=""/></td>
+<td>23.01.2025</td>
+<td class="nowrap"><a id="M69910WK14UNV1S" href="javascript:NewPDFWindow('application?documentId=M69910WK14UNV1S&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M69910WK14UNV1S_EP23182542_en')">Reply to communication from the Examining Division</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M3WMBRK5RL9MDI9" title=""/></td>
+<td>28.11.2024</td>
+<td class="nowrap"><a id="M3WMBRK5RL9MDI9" href="javascript:NewPDFWindow('application?documentId=M3WMBRK5RL9MDI9&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M3WMBRK5RL9MDI9_EP23182542_en')">Annex to the communication</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M3WMBRK2QXD588P" title=""/></td>
+<td>28.11.2024</td>
+<td class="nowrap"><a id="M3WMBRK2QXD588P" href="javascript:NewPDFWindow('application?documentId=M3WMBRK2QXD588P&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M3WMBRK2QXD588P_EP23182542_en')">Consultation by telephone/in person (with time limit)</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M3WMBRK41UINRQC" title=""/></td>
+<td>28.11.2024</td>
+<td class="nowrap"><a id="M3WMBRK41UINRQC" href="javascript:NewPDFWindow('application?documentId=M3WMBRK41UINRQC&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M3WMBRK41UINRQC_EP23182542_en')">Result of consultation by telephone/in person</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="M3SU0ZSD1NSIKRB" title=""/></td>
+<td>22.11.2024</td>
+<td class="nowrap"><a id="M3SU0ZSD1NSIKRB" href="javascript:NewPDFWindow('application?documentId=M3SU0ZSD1NSIKRB&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'M3SU0ZSD1NSIKRB_EP23182542_en')">Examination started</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LYFVD5434NXZ2FX" title=""/></td>
+<td>10.07.2024</td>
+<td class="nowrap"><a id="LYFVD5434NXZ2FX" href="javascript:NewPDFWindow('application?documentId=LYFVD5434NXZ2FX&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LYFVD5434NXZ2FX_EP23182542_en')">(Electronic) Receipt</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LYFVD2EOICWGN5O" title=""/></td>
+<td>10.07.2024</td>
+<td class="nowrap"><a id="LYFVD2EOICWGN5O" href="javascript:NewPDFWindow('application?documentId=LYFVD2EOICWGN5O&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LYFVD2EOICWGN5O_EP23182542_en')">Amended claims filed after receipt of (European) search report</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">5</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LYFVD2RC1DYY33E" title=""/></td>
+<td>10.07.2024</td>
+<td class="nowrap"><a id="LYFVD2RC1DYY33E" href="javascript:NewPDFWindow('application?documentId=LYFVD2RC1DYY33E&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LYFVD2RC1DYY33E_EP23182542_en')">Amended claims with annotations</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">5</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LYFVD1VH11ROIP5" title=""/></td>
+<td>10.07.2024</td>
+<td class="nowrap"><a id="LYFVD1VH11ROIP5" href="javascript:NewPDFWindow('application?documentId=LYFVD1VH11ROIP5&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LYFVD1VH11ROIP5_EP23182542_en')">Amendments received before examination</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">7</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LYFVD1FT35FXY2B" title=""/></td>
+<td>10.07.2024</td>
+<td class="nowrap"><a id="LYFVD1FT35FXY2B" href="javascript:NewPDFWindow('application?documentId=LYFVD1FT35FXY2B&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LYFVD1FT35FXY2B_EP23182542_en')">Letter accompanying subsequently filed items</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LYFVD35OFR13CPV" title="E1412EED1EC8AEBL"/></td>
+<td>10.07.2024</td>
+<td class="nowrap"><a id="LYFVD35OFR13CPV" href="javascript:NewPDFWindow('application?documentId=LYFVD35OFR13CPV&amp;number=EP23182542&amp;lng=en&amp;npl=true', 'LYFVD35OFR13CPV_EP23182542_en')">Non-patent literature cited during the examination procedure</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">13</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LR6YU89U1RKMJOV" title=""/></td>
+<td>15.01.2024</td>
+<td class="nowrap"><a id="LR6YU89U1RKMJOV" href="javascript:NewPDFWindow('application?documentId=LR6YU89U1RKMJOV&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LR6YU89U1RKMJOV_EP23182542_en')">Reminder period for payment of examination fee/designation fee and correction of deficiencies in Written Opinion/amendment</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LQ18BP49F41O9KW" title=""/></td>
+<td>14.12.2023</td>
+<td class="nowrap"><a id="LQ18BP49F41O9KW" href="javascript:NewPDFWindow('application?documentId=LQ18BP49F41O9KW&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LQ18BP49F41O9KW_EP23182542_en')">Refund of fees</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LPSYGE8NUJO9ZVG" title=""/></td>
+<td>11.12.2023</td>
+<td class="nowrap"><a id="LPSYGE8NUJO9ZVG" href="javascript:NewPDFWindow('application?documentId=LPSYGE8NUJO9ZVG&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LPSYGE8NUJO9ZVG_EP23182542_en')">Communication regarding the transmission of the European search report</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LPT1ROJYSPFFKKE" title=""/></td>
+<td>11.12.2023</td>
+<td class="nowrap"><a id="LPT1ROJYSPFFKKE" href="javascript:NewPDFWindow('application?documentId=LPT1ROJYSPFFKKE&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LPT1ROJYSPFFKKE_EP23182542_en')">European search opinion</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">4</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LPT1PO24N07QIE0" title=""/></td>
+<td>11.12.2023</td>
+<td class="nowrap"><a id="LPT1PO24N07QIE0" href="javascript:NewPDFWindow('application?documentId=LPT1PO24N07QIE0&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LPT1PO24N07QIE0_EP23182542_en')">European search report</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">4</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LPT1POLZF4BNWVG" title=""/></td>
+<td>11.12.2023</td>
+<td class="nowrap"><a id="LPT1POLZF4BNWVG" href="javascript:NewPDFWindow('application?documentId=LPT1POLZF4BNWVG&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LPT1POLZF4BNWVG_EP23182542_en')">Information on Search Strategy</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LPKZREGZT19FA33" title=""/></td>
+<td>30.11.2023</td>
+<td class="nowrap"><a id="LPKZREGZT19FA33" href="javascript:NewPDFWindow('application?documentId=LPKZREGZT19FA33&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LPKZREGZT19FA33_EP23182542_en')">Search started</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LN3SCCVR1XUKIR3" title=""/></td>
+<td>05.10.2023</td>
+<td class="nowrap"><a id="LN3SCCVR1XUKIR3" href="javascript:NewPDFWindow('application?documentId=LN3SCCVR1XUKIR3&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LN3SCCVR1XUKIR3_EP23182542_en')">Notification of forthcoming publication</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LMHWNZDNJFFWGRN" title=""/></td>
+<td>13.09.2023</td>
+<td class="nowrap"><a id="LMHWNZDNJFFWGRN" href="javascript:NewPDFWindow('application?documentId=LMHWNZDNJFFWGRN&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LMHWNZDNJFFWGRN_EP23182542_en')">(Electronic) Receipt</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LMHWNYJTVPUFH55" title=""/></td>
+<td>13.09.2023</td>
+<td class="nowrap"><a id="LMHWNYJTVPUFH55" href="javascript:NewPDFWindow('application?documentId=LMHWNYJTVPUFH55&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LMHWNYJTVPUFH55_EP23182542_en')">Claims</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">5</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LMHWNVJ6GN0Q7MA" title=""/></td>
+<td>13.09.2023</td>
+<td class="nowrap"><a id="LMHWNVJ6GN0Q7MA" href="javascript:NewPDFWindow('application?documentId=LMHWNVJ6GN0Q7MA&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LMHWNVJ6GN0Q7MA_EP23182542_en')">Letter accompanying subsequently filed items</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LMHWNW0Z1UTUN5G" title=""/></td>
+<td>13.09.2023</td>
+<td class="nowrap"><a id="LMHWNW0Z1UTUN5G" href="javascript:NewPDFWindow('application?documentId=LMHWNW0Z1UTUN5G&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LMHWNW0Z1UTUN5G_EP23182542_en')">Matter concerning the application</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJSLNLD472UYO18" title=""/></td>
+<td>12.07.2023</td>
+<td class="nowrap"><a id="LJSLNLD472UYO18" href="javascript:NewPDFWindow('application?documentId=LJSLNLD472UYO18&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJSLNLD472UYO18_EP23182542_en')">Communication for party to proceedings/third party</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJHETGSWQ45OUXX" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJHETGSWQ45OUXX" href="javascript:NewPDFWindow('application?documentId=LJHETGSWQ45OUXX&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJHETGSWQ45OUXX_EP23182542_en')">Abstract</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJHEUFWX1G5DVXD" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJHEUFWX1G5DVXD" href="javascript:NewPDFWindow('application?documentId=LJHEUFWX1G5DVXD&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJHEUFWX1G5DVXD_EP23182542_en')">Acknowledgement of receipt of electronic submission of the request for grant of a European patent</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJHEYHI01H0ITV9" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJHEYHI01H0ITV9" href="application?documentId=LJHEYHI01H0ITV9&amp;number=EP23182542&amp;SEQLZIP26=true&amp;lng=en&amp;npl=false">Sequence listing in ST.26 (.XML)</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages isSEQLZIP">0</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJHETGSUFWTSYTO" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJHETGSUFWTSYTO" href="javascript:NewPDFWindow('application?documentId=LJHETGSUFWTSYTO&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJHETGSUFWTSYTO_EP23182542_en')">Description</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">87</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJHEUF2G277Q8UK" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJHEUF2G277Q8UK" href="javascript:NewPDFWindow('application?documentId=LJHEUF2G277Q8UK&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJHEUF2G277Q8UK_EP23182542_en')">Designation of inventor</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">1</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJS9VITO4SS4SG2" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJS9VITO4SS4SG2" href="javascript:NewPDFWindow('application?documentId=LJS9VITO4SS4SG2&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJS9VITO4SS4SG2_EP23182542_en')">Drawings</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">17</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJHEUC2B12IKJRK" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJHEUC2B12IKJRK" href="javascript:NewPDFWindow('application?documentId=LJHEUC2B12IKJRK&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJHEUC2B12IKJRK_EP23182542_en')">Letter concerning search matters</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">15</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJHEUEKQS02SDSC" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJHEUEKQS02SDSC" href="javascript:NewPDFWindow('application?documentId=LJHEUEKQS02SDSC&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJHEUEKQS02SDSC_EP23182542_en')">Matter concerning the application</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">2</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJHETG0W1ST3O3B" title=""/></td>
+<td>29.06.2023</td>
+<td class="nowrap"><a id="LJHETG0W1ST3O3B" href="javascript:NewPDFWindow('application?documentId=LJHETG0W1ST3O3B&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJHETG0W1ST3O3B_EP23182542_en')">Request for grant of a European patent</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">5</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJQ1IWVJ63NR1UF" title=""/></td>
+<td>28.06.2021</td>
+<td class="nowrap"><a id="LJQ1IWVJ63NR1UF" href="javascript:NewPDFWindow('application?documentId=LJQ1IWVJ63NR1UF&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJQ1IWVJ63NR1UF_EP23182542_en')">Priority document (electronically transmitted)</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">93</td></tr>
+<tr>
+<td class="smallBorder"><input type="checkbox" name="identivier" value="LJQ1IWX610JW17N" title=""/></td>
+<td>28.06.2021</td>
+<td class="nowrap"><a id="LJQ1IWX610JW17N" href="javascript:NewPDFWindow('application?documentId=LJQ1IWX610JW17N&amp;number=EP23182542&amp;lng=en&amp;npl=false', 'LJQ1IWX610JW17N_EP23182542_en')">Priority document (electronically transmitted)</a></td>
+<td>Search&nbsp;/&nbsp;examination</td>
+<td class="right noOfPages">107</td></tr></tbody></table></div>
+    </form><form name="pdfForm" action="application" method="post">
+      <input type="hidden" name="documentIdentifiers"/>
+      <input type="hidden" name="number" value ="EP23182542" />
+   </form>
+   
+     <form name="zipForm" action="download" method="post">
+      <input type="hidden" name="documentIdentifiers"/>
+      <input type="hidden" name="number" value ="EP23182542" />
+      <input type="hidden" name="unip" value ="false" />
+      <input type="hidden" name="output" value ="zip" />
+   </form>
+	
+	<input type="hidden" id="E1412EED1EC8AEBL" name="disclaimer" value="<i>The Online File Inspection service gives users access to the information contained in the European Patent Office (EPO) databases connected to the service. The EPO cannot assume liability for the correctness, completeness or quality of the information thus accessed, nor can it guarantee that it is up to date. Documents viewed via this service, particularly non-patent literature items, may be subject to copyright. Before copying or using such documents in other electronic or printed publications, it is up to users of the Online Public File Inspection service to check whether the permission of the author, publisher or other right holder is required. Where no third-party rights exist or are affected, the EPO gives permission for the information retrieved to be reproduced together with an indication of the source, provided that the content is correctly reproduced.</i>" />
+		</div>
+			</div>
+	</div>
+<div id="epoFooter" class="noPrint">
+				<ul>
+				<li>
+					<a href="https://www.epo.org/footer/legal-notice.html" target="_blank">Legal notice</a></li>
+					<li>
+					<a href="https://www.epo.org/footer/terms.html" target="_blank">Terms of use</a></li>
+					<li>24.3.42; 39p</li>
+					</ul>
+			</div>
+		</div>
+</div>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9da4e392dd20f0a3',t:'MTc3MzE3MjY1MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
