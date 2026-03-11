@@ -27,6 +27,7 @@ function loadUserscriptHooks() {
 
   const source = fs.readFileSync(repoPath('script.user.js'), 'utf8');
   const hookNames = [
+    'parseApplicationType',
     'parseMain',
     'parseDoclist',
     'parseFamily',

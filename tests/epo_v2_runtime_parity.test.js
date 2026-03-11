@@ -13,6 +13,7 @@ const { parseUeFromDocument, parseFederatedFromDocument } = require('../lib/epo_
 const { parseMainRawFromDocument } = require('../lib/epo_v2_main_parser');
 const { parsePdfDeadlineHints } = require('../lib/epo_v2_pdf_parser');
 const { parseUpcOptOutResult } = require('../lib/epo_v2_upc_parser');
+const { parseApplicationType, classifyDocument, refineDocumentClassification } = require('../lib/epo_v2_document_classification');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -30,6 +31,7 @@ const partyHead = (value) => {
 
 assert.strictEqual(typeof hooks.summarizeStatus, 'function', 'Runtime hook surface should expose summarizeStatus');
 assert.strictEqual(typeof hooks.inferStatusStage, 'function', 'Runtime hook surface should expose inferStatusStage');
+assert.strictEqual(typeof hooks.parseApplicationType, 'function', 'Runtime hook surface should expose parseApplicationType');
 assert.strictEqual(typeof hooks.normalizedDocSignal, 'function', 'Runtime hook surface should expose normalizedDocSignal');
 assert.strictEqual(typeof hooks.normalizedPacketSignal, 'function', 'Runtime hook surface should expose normalizedPacketSignal');
 assert.strictEqual(typeof hooks.buildDeadlineRecords, 'function', 'Runtime hook surface should expose buildDeadlineRecords for parity checks');
@@ -91,6 +93,32 @@ assert.strictEqual(hooks.timelineSubtitleText(timelineSubtitleSample), timelineS
 assert.strictEqual(hooks.docPacketExplanation('Further processing'), docPacketExplanation('Further processing'), 'Runtime packet explanation helper should match lib timeline explanation text');
 assert.strictEqual(hooks.compactOverviewTitle('Communication about intention to grant a European patent'), compactOverviewTitle('Communication about intention to grant a European patent'), 'Runtime compact-title helper should match lib title compaction');
 assert.strictEqual(hooks.shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), 'Runtime single-run-label policy should match lib timeline helper');
+
+const applicationTypeSamples = [
+  { appNo: 'EP19871250', internationalAppNo: 'WO2019US55678', priorities: [], statusRaw: '' },
+  { appNo: 'EP23182542', parentCase: 'EP4070092', priorities: [] },
+  { appNo: 'EP19205846', priorities: [{ no: 'GB20190017599', dateStr: '02.12.2019' }] },
+  { appNo: 'EP1234567', priorities: [] },
+];
+for (const sample of applicationTypeSamples) {
+  assert.strictEqual(hooks.parseApplicationType(sample), parseApplicationType(sample), `Runtime parseApplicationType should match lib classification helper for ${sample.appNo}`);
+}
+
+assert.deepStrictEqual(
+  plain(hooks.classifyDocument('Request for further processing', 'Examination')),
+  classifyDocument('Request for further processing', 'Examination'),
+  'Runtime classifyDocument should match lib classification helper for further-processing requests',
+);
+assert.deepStrictEqual(
+  plain(hooks.classifyDocument('Text intended for grant (version for approval)', 'Search / examination')),
+  classifyDocument('Text intended for grant (version for approval)', 'Search / examination'),
+  'Runtime classifyDocument should match lib classification helper for grant-package text-for-approval rows',
+);
+assert.deepStrictEqual(
+  plain(hooks.refineDocumentClassification('Communication concerning the reminder according to rule 39(1) EPC and the invitation pursuant to rule 45 EPC', 'Search / examination', { bundle: 'Response to search', actor: 'Applicant', level: 'warn' })),
+  refineDocumentClassification('Communication concerning the reminder according to rule 39(1) EPC and the invitation pursuant to rule 45 EPC', 'Search / examination', { bundle: 'Response to search', actor: 'Applicant', level: 'warn' }),
+  'Runtime refineDocumentClassification should match lib refinement helper for EPO reminder rows',
+);
 
 const pdfR71Text = loadFixtureText('pdf', 'r71_communication.txt');
 assert.deepStrictEqual(
