@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EPO Register Pro
 // @namespace    https://tampermonkey.net/
-// @version      7.1.05
+// @version      7.1.06
 // @description  EP patent attorney sidebar for the European Patent Register with cross-tab case cache, timeline, and diagnostics
 // @updateURL    https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/EdLaughton/EP-Register-Pro/nemo/post-merge-followups-3/script.user.js
@@ -24,7 +24,7 @@
   if (window.__epoRegisterPro700) return;
   window.__epoRegisterPro700 = true;
 
-  const VERSION = '7.1.05';
+  const VERSION = '7.1.06';
   const CACHE_KEY = 'epoRP_700_cache';
   const OPTIONS_KEY = 'epoRP_700_options';
   const UI_KEY = 'epoRP_700_ui';
@@ -6933,6 +6933,13 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|application refused|application rejected|revoked|revocation|not maintained|rights restored refused|re-establishment.*rejected/.test(String(textValue || '').toLowerCase());
   }
 
+  function isActualGrantMentionText(textValue = '') {
+    const low = normalize(textValue).toLowerCase();
+    if (!low) return false;
+    if (/request for grant/.test(low)) return false;
+    return /publication of (?:the )?mention of grant|mention of grant|european patent granted|patent has been granted|the patent has been granted|\bpatent granted\b/.test(low);
+  }
+
   function buildDeadlineComputationContext(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
     const out = [];
     const records = buildDeadlineRecords(docs, eventHistory, legal);
@@ -7187,7 +7194,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function appendPostGrantDeadlines(ctx) {
-    const grantMention = ctx.latestRecord(/mention of grant|patent has been granted|granted/i);
+    const grantMention = ctx.records.find((record) => isActualGrantMentionText(`${record.title || ''} ${record.detail || ''}`));
     if (grantMention) {
       const anchor = parseDateString(grantMention.dateStr);
       if (anchor) {
@@ -7299,7 +7306,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   function inferRenewalModel(main, legal, ue) {
     const now = new Date();
     const renewals = legal.renewals || [];
-    const mentionGrant = (legal.events || []).find((e) => /mention of grant|granted/i.test(`${e.title} ${e.detail}`));
+    const mentionGrant = (legal.events || []).find((e) => isActualGrantMentionText(`${e.title} ${e.detail}`));
     const ueRegistered = /unitary effect registered/i.test(ue.ueStatus || ue.statusRaw || '');
     const filingDate = parseDateString(main.filingDate);
     const highestYear = renewals.reduce((m, r) => (r.year && r.year > m ? r.year : m), 0) || null;

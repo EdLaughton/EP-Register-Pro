@@ -11,6 +11,15 @@ function caseDoc(caseNo, tab) {
   return loadFixtureDocument(['cases', caseNo, `${tab}.html`], `https://register.epo.org/application?number=${caseNo}&tab=${tab}&lng=en`);
 }
 
+function caseLegal(caseNo) {
+  try {
+    return hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return { events: [], codedEvents: [], renewals: [] };
+    throw error;
+  }
+}
+
 // EP19205846 — withdrawn/deemed-withdrawn + renewals + repeated R71 cycles
 {
   const caseNo = 'EP19205846';
@@ -54,7 +63,9 @@ function caseDoc(caseNo, tab) {
   const main = hooks.parseMain(caseDoc(caseNo, 'main'), caseNo);
   const doclist = hooks.parseDoclist(caseDoc(caseNo, 'doclist'));
   const eventHistory = hooks.parseEventHistory(caseDoc(caseNo, 'event'), caseNo);
+  const legal = caseLegal(caseNo);
   const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
+  const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
 
   assert.strictEqual(main.title, 'FACADE', 'Divisional child control should retain live English title');
   assert.strictEqual(main.applicationType, 'Divisional', 'Divisional child control should classify as divisional');
@@ -62,6 +73,8 @@ function caseDoc(caseNo, tab) {
   assert(doclist.docs.some((d) => /European search opinion/i.test(d.title)), 'Divisional child control should include search-opinion docs');
   assert(doclist.docs.some((d) => /Reminder period for payment of examination fee/i.test(d.title)), 'Divisional child control should include early reminder/deadline document');
   assert(eventHistory.events.some((e) => /Publication of search report/i.test(e.title)), 'Divisional child control should preserve search-report publication event');
+  assert(!deadlines.some((d) => d.label === 'Unitary effect request window'), 'Divisional child control should stay pre-grant and must not grow a unitary-effect window from publication/search-stage signals');
+  assert(!deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Divisional child control should stay pre-grant and must not grow an opposition window from publication/search-stage signals');
   assert(family.publications.some((p) => p.no === 'EP4644110' && p.kind === 'A3'), 'Divisional child control should retain its own A3 family publication');
   assert(family.publications.some((p) => p.no === 'EP4623169' && p.kind === 'A1'), 'Divisional child control should retain parent-family publication reference');
 }
