@@ -56,5 +56,7 @@ assert.strictEqual(normalizedCase.currentPosture.currentPosture, 'Granted', 'v2 
 assert.strictEqual(normalizedCase.posture.recoveredBeforeGrant, true, 'v2 normalized core should preserve recovered-before-grant posture state in the composed pipeline');
 assert(normalizedCase.doclist.docs.some((doc) => doc.bundle === 'Further processing'), 'v2 normalized core should compose shared doc classification into the normalized case pipeline');
 assert(normalizedCase.family.publications.some((publication) => publication.no === 'EP4070092'), 'v2 normalized core should preserve shared family parsing inside the normalized case pipeline');
+assert.strictEqual(normalizedCase.overviewActionable.status.simple, 'Granted', 'v2 normalized core should compose the shared overview helper into the normalized case pipeline');
+assert.strictEqual(normalizedCase.overviewActionable.recoveryAction.badge, 'Recovered before grant', 'v2 normalized core should surface the recovered-before-grant overview state from the shared overview helper');
 
 console.log('epo_v2_normalized.test.js passed');

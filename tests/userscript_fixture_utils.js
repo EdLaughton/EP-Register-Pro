@@ -49,6 +49,8 @@ function loadUserscriptHooks() {
     'doclistRunLabel',
     'timelineDocItemsFromDocs',
     'upcRegistryNoteText',
+    'resolvedOverviewStatus',
+    'deadlinePresentationBuckets',
     'selectNextDeadline',
     'activeDeadlineNoteText',
     'buildDeadlineRecords',

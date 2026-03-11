@@ -14,6 +14,7 @@ const { parseMainRawFromDocument } = require('../lib/epo_v2_main_parser');
 const { parsePdfDeadlineHints } = require('../lib/epo_v2_pdf_parser');
 const { parseUpcOptOutResult } = require('../lib/epo_v2_upc_parser');
 const { parseApplicationType, classifyDocument, refineDocumentClassification } = require('../lib/epo_v2_document_classification');
+const { resolvedOverviewStatus, deadlinePresentationBuckets, selectNextDeadline, activeDeadlineNoteText, recoveryActionModel, buildActionableOverviewState } = require('../lib/epo_v2_overview_signals');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -118,6 +119,62 @@ assert.deepStrictEqual(
   plain(hooks.refineDocumentClassification('Communication concerning the reminder according to rule 39(1) EPC and the invitation pursuant to rule 45 EPC', 'Search / examination', { bundle: 'Response to search', actor: 'Applicant', level: 'warn' })),
   refineDocumentClassification('Communication concerning the reminder according to rule 39(1) EPC and the invitation pursuant to rule 45 EPC', 'Search / examination', { bundle: 'Response to search', actor: 'Applicant', level: 'warn' }),
   'Runtime refineDocumentClassification should match lib refinement helper for EPO reminder rows',
+);
+
+const overviewStatusSample = resolvedOverviewStatus('ok', { simple: 'Published', level: 'info' }, { currentLabel: 'Grant intended (R71(3))', currentLevel: 'warn' });
+assert.deepStrictEqual(
+  plain(hooks.resolvedOverviewStatus('ok', { simple: 'Published', level: 'info' }, { currentLabel: 'Grant intended (R71(3))', currentLevel: 'warn' })),
+  overviewStatusSample,
+  'Runtime resolvedOverviewStatus should match lib overview headline-status precedence',
+);
+const monitoringDeadlines = [
+  { label: 'Opposition period (third-party monitor)', date: new Date('2026-11-04T00:00:00Z'), resolved: false, superseded: false },
+];
+assert.deepStrictEqual(
+  plain(hooks.deadlinePresentationBuckets(monitoringDeadlines, false)),
+  plain(deadlinePresentationBuckets(monitoringDeadlines, false)),
+  'Runtime deadlinePresentationBuckets should match lib overview deadline bucketing',
+);
+assert.deepStrictEqual(
+  plain(hooks.selectNextDeadline(monitoringDeadlines, false, new Date('2026-03-01T00:00:00Z'))),
+  plain(selectNextDeadline(monitoringDeadlines, false, new Date('2026-03-01T00:00:00Z'))),
+  'Runtime selectNextDeadline should match lib overview next-deadline selection for monitoring-only windows',
+);
+assert.strictEqual(
+  hooks.activeDeadlineNoteText(monitoringDeadlines, false),
+  activeDeadlineNoteText(monitoringDeadlines, false),
+  'Runtime activeDeadlineNoteText should match lib monitoring-only messaging',
+);
+const recoveryOverviewSample = {
+  recovered: true,
+  recoveredBeforeGrant: true,
+  latestLoss: { dateStr: '01.10.2025', title: 'Application deemed to be withdrawn ( translations of claims/payment missing)', detail: 'Search / examination' },
+  latestRecovery: { dateStr: '15.11.2025', title: 'Decision on request for further processing', detail: '' },
+  latestGrantDecision: { dateStr: '01.01.2026', title: '(Expected) grant', detail: 'published on 04.02.2026 [2026/06]' },
+};
+assert.deepStrictEqual(
+  plain(hooks.recoveryActionModel(recoveryOverviewSample, 'Applicant', null, null)),
+  plain(recoveryActionModel(recoveryOverviewSample, 'Applicant', null, null)),
+  'Runtime recoveryActionModel should match lib recovery-path modeling',
+);
+assert.deepStrictEqual(
+  plain(buildActionableOverviewState({
+    mainSourceStatus: 'ok',
+    statusSummary: { simple: 'Published', level: 'info' },
+    posture: { currentLabel: 'Granted', currentLevel: 'ok', currentClosed: false, recovered: false },
+    deadlines: monitoringDeadlines,
+    waitingOn: '',
+    waitingDays: null,
+    latestApplicant: null,
+  })),
+  plain({
+    status: { simple: 'Granted', level: 'ok' },
+    deadlineBuckets: { active: [], monitoring: monitoringDeadlines, historical: [] },
+    nextDeadline: null,
+    nextDeadlineNote: 'No active applicant/EPO deadline detected; remaining clocks are third-party monitoring windows.',
+    recoveryAction: null,
+  }),
+  'Lib overview composition helper should produce the expected monitoring-only actionable state',
 );
 
 const pdfR71Text = loadFixtureText('pdf', 'r71_communication.txt');
