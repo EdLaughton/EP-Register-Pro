@@ -7483,16 +7483,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         ? Math.floor((Date.now() - latestApplicantDate.getTime()) / 86400000)
         : null;
 
-    let recoveryOptions = '';
-    if (posture.currentClosed) {
-      recoveryOptions = applicantAfterLatestEpo
-        ? 'Adverse posture detected. Applicant appears to have responded; monitor the EPO recovery outcome.'
-        : 'Adverse posture detected. Check further processing first; if unavailable, consider Rule 136 re-establishment.';
-    } else if (posture.recovered) {
-      recoveryOptions = posture.recoveredBeforeGrant
-        ? 'Recovery path completed: an earlier adverse posture was cured before grant.'
-        : 'Recovery path visible: the case appears to have been revived after an earlier adverse posture.';
-    }
+    const recoveryAction = recoveryActionModel(posture, waitingOn, waitingDays, latestApplicant);
+    const recoveryOptions = recoveryAction?.note || '';
 
     const nextDeadline = selectNextDeadline(deadlines, posture.currentClosed);
     const nextDeadlineNote = activeDeadlineNoteText(deadlines, posture.currentClosed, posture);
@@ -7541,6 +7533,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       partialState,
       waitingOn,
       waitingDays,
+      recoveryAction,
       recoveryOptions,
       nextDeadline,
       nextDeadlineNote,
@@ -7881,6 +7874,64 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return `${doc.dateStr} · ${compactOverviewTitle(doc.title || '')}`;
   }
 
+  function recoveryActionModel(posture = {}, waitingOn = '', waitingDays = null, latestApplicant = null) {
+    const loss = posture?.latestLoss || null;
+    const recovery = posture?.latestRecovery || null;
+    const grant = posture?.latestGrantDecision || null;
+    const cap = (text = '') => text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : '';
+    const lossText = loss ? cap(postureLossLabel(loss)) : 'Adverse posture';
+    const recoveryText = recovery
+      ? (compactOverviewTitle(recovery.title || recovery.detail || '') || cap(postureRecoveryLabel(recovery)))
+      : '';
+    const grantText = grant ? (compactOverviewTitle(grant.title || grant.detail || '') || 'Grant decision') : '';
+    const applicantText = latestApplicant
+      ? `${latestApplicant.dateStr || '—'} · ${compactOverviewTitle(latestApplicant.title || '')}`
+      : '';
+
+    if (posture?.recovered && recovery) {
+      const summaryBits = [
+        loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
+        recovery?.dateStr ? `${recovery.dateStr} · ${recoveryText}` : recoveryText,
+        posture?.recoveredBeforeGrant && grant?.dateStr ? `${grant.dateStr} · ${grantText}` : '',
+      ].filter(Boolean);
+      return {
+        label: 'Recovery path',
+        badge: posture.recoveredBeforeGrant ? 'Recovered before grant' : 'Recovered',
+        level: 'ok',
+        summary: summaryBits.join(' → '),
+        note: posture.recoveredBeforeGrant
+          ? 'Earlier adverse posture was cured before the file returned to grant.'
+          : 'Earlier adverse posture was cured and the file later returned to the active track.',
+      };
+    }
+
+    if (waitingOn === 'EPO recovery outcome') {
+      const summaryBits = [
+        loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
+        applicantText,
+      ].filter(Boolean);
+      return {
+        label: 'Recovery path',
+        badge: 'Recovery pending',
+        level: 'warn',
+        summary: summaryBits.join(' → '),
+        note: `Applicant appears to have responded after the adverse posture; monitor the EPO recovery outcome${waitingDays != null ? ` (${formatDaysHuman(waitingDays)} since applicant reply)` : ''}.`,
+      };
+    }
+
+    if (posture?.currentClosed && loss) {
+      return {
+        label: 'Recovery path',
+        badge: 'Recovery options',
+        level: 'bad',
+        summary: loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
+        note: 'Adverse posture detected. Check further processing first; if unavailable, consider Rule 136 re-establishment.',
+      };
+    }
+
+    return null;
+  }
+
   function renderOverviewHeaderCard(m) {
     const termReference = m.deadlines.find((d) => d.reference && /20-year term from filing/i.test(String(d.label || '')));
     const termReferenceDate = termReference?.date ? formatDate(termReference.date) : '';
@@ -7996,11 +8047,15 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         : 'No active step';
     const postureBadge = `<span class="epoRP-bdg ${esc(m.posture?.level || m.statusLevel || 'info')}">${esc(m.posture?.label || m.statusSimple || 'Unknown')}</span>`;
 
+    const recoveryHtml = m.recoveryAction
+      ? `<div class="epoRP-l">${esc(m.recoveryAction.label || 'Recovery')}</div><div class="epoRP-v"><div><span class="epoRP-bdg ${esc(m.recoveryAction.level || 'info')}">${esc(m.recoveryAction.badge || 'Recovery')}</span></div>${m.recoveryAction.summary ? `<div class="epoRP-m">${esc(m.recoveryAction.summary)}</div>` : ''}${m.recoveryAction.note ? `<div class="epoRP-m">${esc(m.recoveryAction.note)}</div>` : ''}</div>`
+      : '';
+
     return `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
       <div class="epoRP-l">Current posture</div><div class="epoRP-v">${postureBadge}${m.posture?.note ? `<div class="epoRP-m">${esc(m.posture.note)}</div>` : ''}</div>
       <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : (m.nextDeadlineNote ? `<div>—</div><div class="epoRP-m">${esc(m.nextDeadlineNote)}</div>` : '—')}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
-      ${m.recoveryOptions ? `<div class="epoRP-l">Recovery</div><div class="epoRP-v"><div class="epoRP-m">${esc(m.recoveryOptions)}</div></div>` : ''}
+      ${recoveryHtml}
       <div class="epoRP-l">Waiting on</div><div class="epoRP-v">${waitingSummary}</div>
     </div>${detailedDeadlinesHtml}</div>`;
   }

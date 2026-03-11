@@ -183,6 +183,9 @@ const conflictPosture = hooks.proceduralPostureModel(conflictMain, conflictDocli
 assert.strictEqual(conflictPosture.label, 'Granted', 'Procedural posture should keep the current granted state after further processing cures an earlier adverse event');
 assert.strictEqual(conflictPosture.recoveredBeforeGrant, true, 'Procedural posture should detect that the case recovered from an adverse posture before grant');
 assert(/Recovered from earlier grant-formalities failure via further processing before grant\./.test(conflictPosture.note), 'Procedural posture note should explain the recovery path in plain language for conflict-history cases');
+const conflictRecoveryAction = hooks.recoveryActionModel(conflictPosture, 'Applicant', null, null);
+assert.strictEqual(conflictRecoveryAction.badge, 'Recovered before grant', 'Recovery-action model should promote pre-grant cures as a first-class recovered-before-grant state');
+assert(/01\.10\.2025/.test(conflictRecoveryAction.summary) && /15\.11\.2025/.test(conflictRecoveryAction.summary) && /01\.01\.2026/.test(conflictRecoveryAction.summary), 'Recovery-action model should link the loss, recovery step, and later grant return in one summary line');
 const recoveryMain = hooks.parseMain(loadFixtureDocument(['cases', 'EP23758527', 'main.html'], 'https://register.epo.org/application?number=EP23758527&tab=main&lng=en'), 'EP23758527');
 const recoveryDoclist = hooks.parseDoclist(loadFixtureDocument(['cases', 'EP23758527', 'doclist.html'], 'https://register.epo.org/application?number=EP23758527&tab=doclist&lng=en'));
 const recoveryEvent = hooks.parseEventHistory(loadFixtureDocument(['cases', 'EP23758527', 'event.html'], 'https://register.epo.org/application?number=EP23758527&tab=event&lng=en'), 'EP23758527');
@@ -190,6 +193,17 @@ const recoveryLegal = hooks.parseLegal(loadFixtureDocument(['cases', 'EP23758527
 const recoveryPosture = hooks.proceduralPostureModel(recoveryMain, recoveryDoclist.docs, recoveryEvent, recoveryLegal);
 assert.strictEqual(recoveryPosture.recovered, true, 'Procedural posture should detect recovery from deemed-withdrawn non-reply cases after further processing');
 assert(/Recovered from earlier no reply to the written opinion via further processing\./.test(recoveryPosture.note), 'Procedural posture note should explain the recovery path for revived written-opinion loss cases');
+const recoveryAction = hooks.recoveryActionModel(recoveryPosture, 'Applicant', null, null);
+assert.strictEqual(recoveryAction.badge, 'Recovered', 'Recovery-action model should expose post-loss further-processing cures as a first-class recovered state');
+assert(/06\.10\.2025/.test(recoveryAction.summary) && /13\.12\.2025/.test(recoveryAction.summary), 'Recovery-action model should link the loss and recovery events in one summary line for revived examination files');
+const pendingRecoveryAction = hooks.recoveryActionModel({
+  currentClosed: true,
+  recovered: false,
+  latestLoss: { dateStr: '25.06.2024', title: 'Application deemed to be withdrawn (non-entry into European phase)', detail: 'Search / examination' },
+}, 'EPO recovery outcome', 12, { dateStr: '10.07.2024', title: 'Request for further processing' });
+assert.strictEqual(pendingRecoveryAction.badge, 'Recovery pending', 'Recovery-action model should distinguish pending recovery windows from completed cures');
+assert(/10\.07\.2024/.test(pendingRecoveryAction.summary), 'Pending recovery summaries should surface the post-loss applicant response that now needs an EPO outcome');
+assert(/monitor the EPO recovery outcome/i.test(pendingRecoveryAction.note), 'Pending recovery note should tell the user that the file is waiting on an EPO recovery outcome');
 const grantTextClassification = hooks.classifyDocument('Text intended for grant (version for approval)', 'Search / examination');
 assert.strictEqual(grantTextClassification.bundle, 'Grant package', 'Grant-text communication rows should remain in the grant-package bucket');
 assert.strictEqual(grantTextClassification.level, 'warn', 'Grant-text communication rows should retain the expected grant-package severity');

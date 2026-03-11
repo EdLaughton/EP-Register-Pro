@@ -51,6 +51,7 @@ function loadUserscriptHooks() {
     'selectNextDeadline',
     'activeDeadlineNoteText',
     'proceduralPostureModel',
+    'recoveryActionModel',
     'docPacketExplanation',
     'familyRoleSummary',
     'upcUePresentationModel',

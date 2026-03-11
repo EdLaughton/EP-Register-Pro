@@ -237,7 +237,9 @@ has(/function\s+resolvedOverviewStatus\s*\(/, 'Overview model should centralize 
 has(/posture\?\.currentLabel\s*\|\|\s*statusSummary\?\.simple|posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview status helper should prefer normalized posture labels over raw status summaries when both exist');
 has(/posture\?\.currentLevel\s*\|\|\s*statusSummary\?\.level|posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview status helper should prefer normalized posture severity over raw status-summary severity when both exist');
 hasText('Current posture', 'Actionable status should surface the current controlling procedural posture explicitly');
+hasText('Recovery path', 'Actionable status should surface recovery windows as a first-class row rather than burying them in generic notes');
 has(/function\s+proceduralPostureModel\s*\(/, 'Overview/timeline posture narrative should be derived from a dedicated procedural-posture helper');
+has(/function\s+recoveryActionModel\s*\(/, 'Actionable status should derive recovery windows from a dedicated recovery-action helper');
 has(/const\s+termReference\s*=\s*m\.deadlines\.find\(/, 'Overview should compute 20-year term reference from deadline model');
 has(/const\s+filingSummary\s*=\s*normalize\(\[/, 'Overview should build a condensed filing summary line');
 hasText("termReferenceDate ? `20-year term ${termReferenceDate}` : ''", 'Overview filing summary should include the 20-year term reference inline without extra years-remaining noise');
@@ -247,7 +249,10 @@ has(/buckets\.historical\.push\(deadline\);/, 'Deadline bucketing should preserv
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
 hasText('Adverse posture detected.', 'Actionable status should expose concise recovery guidance for adverse/loss-of-rights postures');
+hasText('Recovered before grant', 'Recovery-action state should distinguish completed pre-grant cures from generic recovery notes');
+hasText('Recovery pending', 'Recovery-action state should distinguish pending EPO recovery outcomes from completed cures');
 has(/const\s+posture\s*=\s*proceduralPostureModel\(/, 'Overview model should derive the current controlling posture from a dedicated posture helper');
+has(/const\s+recoveryAction\s*=\s*recoveryActionModel\(/, 'Overview model should derive a dedicated recovery-action state from posture plus waiting context');
 has(/const\s+waitingOn\s*=\s*posture\.currentClosed/, 'Waiting-on allocation should use the dedicated posture model instead of ad-hoc latest-row checks');
 has(/const\s+nextDeadlineMetaLines\s*=\s*\[\];/, 'Actionable status should build tidy next-deadline metadata lines');
 hasText('Basis: ${nextDeadlineMethod}', 'Actionable status should render method evidence as a dedicated Basis line');
