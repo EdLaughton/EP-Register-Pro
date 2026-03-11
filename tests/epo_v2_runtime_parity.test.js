@@ -12,6 +12,7 @@ const { parseFamilyFromDocument, parseCitationsFromDocument } = require('../lib/
 const { parseUeFromDocument, parseFederatedFromDocument } = require('../lib/epo_v2_territorial_parser');
 const { parseMainRawFromDocument } = require('../lib/epo_v2_main_parser');
 const { parsePdfDeadlineHints } = require('../lib/epo_v2_pdf_parser');
+const { parseUpcOptOutResult } = require('../lib/epo_v2_upc_parser');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -120,6 +121,20 @@ assert.deepStrictEqual(
   })),
   'Runtime parsePdfDeadlineHints should match lib PDF parsing for the generic Art. 94 fixture',
 );
+
+assert.deepStrictEqual(
+  plain(hooks.parseUpcOptOutResult('<div>EP3816364 Opted-out application registered</div>', 'EP3816364')),
+  plain(parseUpcOptOutResult('<div>EP3816364 Opted-out application registered</div>', 'EP3816364')),
+  'Runtime parseUpcOptOutResult should match lib UPC parsing for a positive opt-out signal',
+);
+for (const [patentNumber, fixtureName] of [['EP3816364', 'EP3816364.html'], ['EP4438108', 'EP4438108.html']]) {
+  const upcHtml = loadFixtureText('upc', fixtureName);
+  assert.deepStrictEqual(
+    plain(hooks.parseUpcOptOutResult(upcHtml, patentNumber)),
+    plain(parseUpcOptOutResult(upcHtml, patentNumber)),
+    `Runtime parseUpcOptOutResult should match lib UPC parsing for ${fixtureName}`,
+  );
+}
 
 for (const caseNo of ['EP19871250', 'EP23182542', 'EP19205846']) {
   const mainDoc = loadFixtureDocument(['cases', caseNo, 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`);
