@@ -3371,6 +3371,8 @@
     return dedupe(out, (i) => `${i.no}|${i.dateStr}`);
   }
 
+  const CITATION_PHASE_ORDER = ['Search', 'International search', 'Examination', 'Opposition', 'Appeal', 'by applicant'];
+
   function normalizePublicationNumber(raw) {
     return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
@@ -3409,17 +3411,31 @@
     };
 
     const text = String(textBlock || '');
-    const numberPattern = '((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)(?:[\\s.\\-\\/]*[A-Z0-9]){5,24})';
-
-    const reNumberBeforeDate = new RegExp(`\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?[\\s\\S]{0,50}?\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b`, 'gi');
+    const numberPattern = '((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)(?:[\\s.\\-\\/]*[A-Z0-9]){5,18})';
     let m;
-    while ((m = reNumberBeforeDate.exec(text)) !== null) {
+
+    const strictNumberBeforeDate = new RegExp(`\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?\\s+(\\d{2}\\.\\d{2}\\.\\d{4})\\b`, 'gi');
+    while ((m = strictNumberBeforeDate.exec(text)) !== null) {
       push(m[1], m[2], m[3]);
     }
 
-    const reDateBeforeNumber = new RegExp(`\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b[\\s\\S]{0,50}?\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?`, 'gi');
-    while ((m = reDateBeforeNumber.exec(text)) !== null) {
-      push(m[2], m[3], m[1]);
+    if (!out.length) {
+      const strictDateBeforeNumber = new RegExp(`\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b\\s+${numberPattern}\\b(?:\\s+([A-Z]\\d))?`, 'gi');
+      while ((m = strictDateBeforeNumber.exec(text)) !== null) {
+        push(m[2], m[3], m[1]);
+      }
+    }
+
+    if (!out.length) {
+      const reNumberBeforeDate = new RegExp(`\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?[\\s\\S]{0,50}?\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b`, 'gi');
+      while ((m = reNumberBeforeDate.exec(text)) !== null) {
+        push(m[1], m[2], m[3]);
+      }
+
+      const reDateBeforeNumber = new RegExp(`\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b[\\s\\S]{0,50}?\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?`, 'gi');
+      while ((m = reDateBeforeNumber.exec(text)) !== null) {
+        push(m[2], m[3], m[1]);
+      }
     }
 
     return dedupe(out, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
@@ -4679,7 +4695,6 @@
     for (const row of rows) {
       const cells = [...row.querySelectorAll('td,th')].map((cell) => normalize(text(cell)));
       if (!cells.length) continue;
-      const rowText = cells.join(' | ');
 
       if (/^publication no\.?$/i.test(cells[0] || '')) {
         inPublicationBlock = true;
@@ -4699,7 +4714,11 @@
       publications.push({ no: parsed.no, kind: parsed.kind, dateStr: dateStr.match(DATE_RE)?.[1] || '', role: 'Family' });
     }
 
-    return { publications: publications.length ? dedupe(publications, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`) : parsePublications(bodyText(doc), 'Family') };
+    return {
+      publications: publications.length
+        ? dedupe(publications, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`)
+        : parsePublications(bodyText(doc), 'Family'),
+    };
   }
 
   function parseLegal(doc, caseNo) {
@@ -4836,14 +4855,13 @@
       });
     }
 
-    const phaseOrder = ['Search', 'International search', 'Examination', 'Opposition', 'Appeal', 'by applicant'];
     const byPhase = {};
     for (const entry of entries) {
       (byPhase[entry.phase] ||= []).push(entry);
     }
     const phases = Object.keys(byPhase).sort((a, b) => {
-      const ai = phaseOrder.indexOf(a);
-      const bi = phaseOrder.indexOf(b);
+      const ai = CITATION_PHASE_ORDER.indexOf(a);
+      const bi = CITATION_PHASE_ORDER.indexOf(b);
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.localeCompare(b);
     }).map((name) => ({ name, entries: byPhase[name] }));
 

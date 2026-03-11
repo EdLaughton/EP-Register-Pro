@@ -8,6 +8,7 @@ const { inferProceduralDeadlinesFromSources } = require('../lib/epo_v2_deadline_
 const { classifyTimelineImportance, docPacketExplanation, timelineSubtitle, shouldAppendSingleRunLabel, compactOverviewTitle } = require('../lib/epo_v2_timeline_signals');
 const { parseDoclistFromDocument } = require('../lib/epo_v2_doclist_parser');
 const { parseEventHistoryFromDocument, parseLegalFromDocument } = require('../lib/epo_v2_procedural_parser');
+const { parseFamilyFromDocument, parseCitationsFromDocument } = require('../lib/epo_v2_reference_parsers');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -76,12 +77,22 @@ assert.strictEqual(hooks.docPacketExplanation('Further processing'), docPacketEx
 assert.strictEqual(hooks.compactOverviewTitle('Communication about intention to grant a European patent'), compactOverviewTitle('Communication about intention to grant a European patent'), 'Runtime compact-title helper should match lib title compaction');
 assert.strictEqual(hooks.shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), 'Runtime single-run-label policy should match lib timeline helper');
 
+const citationsCaseNo = 'EP19871250';
+const citationsDoc = loadFixtureDocument(['cases', citationsCaseNo, 'citations.html'], `https://register.epo.org/application?number=${citationsCaseNo}&tab=citations&lng=en`);
+const runtimeCitations = plain(hooks.parseCitations(citationsDoc));
+const libCitations = plain(parseCitationsFromDocument(citationsDoc));
+assert.deepStrictEqual(runtimeCitations, libCitations, `Runtime parseCitations raw extraction should match lib reference parsing for ${citationsCaseNo}`);
+
 for (const caseNo of ['EP22809254', 'EP23182542', 'EP23758527']) {
   const doclistUrl = `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en`;
+  const familyUrl = `https://register.epo.org/application?number=${caseNo}&tab=family&lng=en`;
   const main = hooks.parseMain(loadFixtureDocument(['cases', caseNo, 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`), caseNo);
   const doclistDoc = loadFixtureDocument(['cases', caseNo, 'doclist.html'], doclistUrl);
+  const familyDoc = loadFixtureDocument(['cases', caseNo, 'family.html'], familyUrl);
   const doclist = hooks.parseDoclist(doclistDoc);
+  const family = hooks.parseFamily(familyDoc);
   const libDoclist = parseDoclistFromDocument(doclistDoc, { fallbackUrl: doclistUrl });
+  const libFamily = parseFamilyFromDocument(familyDoc);
   assert.deepStrictEqual(
     plain(doclist.docs).map((doc) => ({
       dateStr: doc.dateStr,
@@ -102,6 +113,11 @@ for (const caseNo of ['EP22809254', 'EP23182542', 'EP23758527']) {
       source: doc.source,
     })),
     `Runtime parseDoclist raw extraction should match lib doclist parsing for ${caseNo}`,
+  );
+  assert.deepStrictEqual(
+    plain(family.publications),
+    plain(libFamily.publications),
+    `Runtime parseFamily raw extraction should match lib reference parsing for ${caseNo}`,
   );
   const eventUrl = `https://register.epo.org/application?number=${caseNo}&tab=event&lng=en`;
   const legalUrl = `https://register.epo.org/application?number=${caseNo}&tab=legal&lng=en`;
