@@ -102,9 +102,11 @@ function caseDoc(caseNo, tab) {
   const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
   const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
   const preview = hooks.doclistGroupingPreview(doclistDoc);
+  const posture = hooks.proceduralPostureModel(main, doclist.docs, eventHistory, legal);
 
   assert.strictEqual(main.applicationType, 'E/PCT regional phase', 'Euro-PCT non-entry control should remain classified as Euro-PCT regional phase');
   assert(/deemed to be withdrawn/i.test(main.statusRaw || ''), 'Euro-PCT non-entry control should preserve deemed-withdrawn wording in the main status');
+  assert.strictEqual(posture.currentLabel, 'Deemed withdrawn (non-entry)', 'Euro-PCT non-entry control should resolve to the sharper normalized current posture');
   assert(eventHistory.events.some((e) => e.codexKey && /LOSS_OF_RIGHTS/i.test(e.codexKey)), 'Euro-PCT non-entry control should normalize its event-history loss-of-rights row into a codex key even without a visible legal ORIGINAL CODE');
   assert(preview.some((g) => g.label === 'International search / IPRP' && g.dateStr === '18.04.2023' && g.size === 4), 'Euro-PCT non-entry control should keep the full ISA/IPRP packet together under the PCT-aware search label');
   assert(preview.some((g) => g.label === 'Partial international search' && g.dateStr === '21.02.2023' && g.size === 2), 'Euro-PCT non-entry control should keep the partial-ISR packet together under the partial-search label');
@@ -124,9 +126,11 @@ function caseDoc(caseNo, tab) {
   const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
   const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
   const preview = hooks.doclistGroupingPreview(doclistDoc);
+  const posture = hooks.proceduralPostureModel(main, doclist.docs, eventHistory, legal);
 
   assert.strictEqual(main.applicationType, 'Divisional', 'Grant-intended control should remain classified as divisional');
   assert.strictEqual(main.parentCase, 'EP3440098', 'Grant-intended control should expose its parent case number');
+  assert.strictEqual(posture.currentLabel, 'Grant intended (R71(3))', 'Grant-intended control should resolve to the normalized R71 posture');
   assert.strictEqual(main.statusSimple, 'Grant intended (R71(3))', 'Grant-intended control should condense the raw R71 status into the clearer grant-intended badge text');
   assert(/Grant of patent is intended/i.test(main.statusRaw || ''), 'Grant-intended control should preserve the R71/grant-intended status text');
   assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '07.11.2025' && g.size === 6), 'Grant-intended control should keep the full R71 packet together under the intention-to-grant label');
@@ -148,8 +152,11 @@ function caseDoc(caseNo, tab) {
   const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
   const family = hooks.parseFamily(caseDoc(caseNo, 'family'));
   const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
+  const posture = hooks.proceduralPostureModel(main, doclist.docs, eventHistory, legal);
 
   assert.strictEqual(main.applicationType, 'Divisional', 'Conflict-history control should remain classified as divisional');
+  assert.strictEqual(posture.currentLabel, 'Granted', 'Conflict-history control should resolve to a granted current posture after recovery');
+  assert.strictEqual(!!posture.recovered, true, 'Conflict-history control should preserve the loss-of-rights → recovery arc in the posture model');
   assert.strictEqual(main.parentCase, 'EP4070092', 'Conflict-history control should expose its parent case number');
   assert.strictEqual(Array.from(main.divisionalChildren || []).join(','), 'EP25215625', 'Conflict-history control should keep downstream divisional links to application numbers only, not publication numbers');
   assert.strictEqual(main.statusSimple, 'Granted', 'Conflict-history control should condense the final top-level status to Granted despite earlier loss-of-rights detours');
@@ -279,8 +286,10 @@ function caseDoc(caseNo, tab) {
   const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
   const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
   const preview = hooks.doclistGroupingPreview(doclistDoc);
+  const posture = hooks.proceduralPostureModel(main, doclist.docs, eventHistory, legal);
 
   assert.strictEqual(main.applicationType, 'Divisional', 'Clean no-opposition divisional control should remain classified as divisional');
+  assert.strictEqual(posture.currentLabel, 'Granted (no opposition)', 'Clean no-opposition divisional control should resolve to the normalized no-opposition posture');
   assert.strictEqual(main.parentCase, 'EP3942381', 'Clean no-opposition divisional control should expose its parent case number');
   assert(/No opposition filed within time limit/i.test(main.statusRaw || ''), 'Clean no-opposition divisional control should preserve the post-grant no-opposition status');
   assert(preview.some((g) => g.label === 'Opposition' && g.dateStr === '10.03.2025' && g.size === 1), 'Clean no-opposition divisional control should surface the opposition-expiry communication as its own packet');
