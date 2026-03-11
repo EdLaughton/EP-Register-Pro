@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { loadUserscriptHooks, loadFixtureDocument } = require('./userscript_fixture_utils');
+const { loadUserscriptHooks, loadFixtureDocument, loadFixtureText } = require('./userscript_fixture_utils');
 const { summarizeStatusText, inferStatusStageFromText } = require('../lib/epo_v2_status_signals');
 const { classifyDocSignal } = require('../lib/epo_v2_doc_signals');
 const { classifyPacketSignal, standalonePacketBundle } = require('../lib/epo_v2_packet_signals');
@@ -11,6 +11,7 @@ const { parseEventHistoryFromDocument, parseLegalFromDocument } = require('../li
 const { parseFamilyFromDocument, parseCitationsFromDocument } = require('../lib/epo_v2_reference_parsers');
 const { parseUeFromDocument, parseFederatedFromDocument } = require('../lib/epo_v2_territorial_parser');
 const { parseMainRawFromDocument } = require('../lib/epo_v2_main_parser');
+const { parsePdfDeadlineHints } = require('../lib/epo_v2_pdf_parser');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -36,6 +37,7 @@ assert.strictEqual(typeof hooks.timelineAttorneyImportance, 'function', 'Runtime
 assert.strictEqual(typeof hooks.timelineSubtitleText, 'function', 'Runtime hook surface should expose timelineSubtitleText');
 assert.strictEqual(typeof hooks.docPacketExplanation, 'function', 'Runtime hook surface should expose docPacketExplanation');
 assert.strictEqual(typeof hooks.compactOverviewTitle, 'function', 'Runtime hook surface should expose compactOverviewTitle');
+assert.strictEqual(typeof hooks.parsePdfDeadlineHints, 'function', 'Runtime hook surface should expose parsePdfDeadlineHints');
 
 const statusSample = 'No opposition filed within time limit';
 assert.deepStrictEqual(
@@ -88,6 +90,36 @@ assert.strictEqual(hooks.timelineSubtitleText(timelineSubtitleSample), timelineS
 assert.strictEqual(hooks.docPacketExplanation('Further processing'), docPacketExplanation('Further processing'), 'Runtime packet explanation helper should match lib timeline explanation text');
 assert.strictEqual(hooks.compactOverviewTitle('Communication about intention to grant a European patent'), compactOverviewTitle('Communication about intention to grant a European patent'), 'Runtime compact-title helper should match lib title compaction');
 assert.strictEqual(hooks.shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), 'Runtime single-run-label policy should match lib timeline helper');
+
+const pdfR71Text = loadFixtureText('pdf', 'r71_communication.txt');
+assert.deepStrictEqual(
+  plain(hooks.parsePdfDeadlineHints(pdfR71Text, {
+    docDateStr: '10.01.2026',
+    docTitle: 'Communication about intention to grant',
+    docProcedure: 'Examining division',
+  })),
+  plain(parsePdfDeadlineHints(pdfR71Text, {
+    docDateStr: '10.01.2026',
+    docTitle: 'Communication about intention to grant',
+    docProcedure: 'Examining division',
+  })),
+  'Runtime parsePdfDeadlineHints should match lib PDF parsing for the Rule 71 communication fixture',
+);
+
+const pdfArt94Text = loadFixtureText('pdf', 'art94_generic.txt');
+assert.deepStrictEqual(
+  plain(hooks.parsePdfDeadlineHints(pdfArt94Text, {
+    docDateStr: '01.09.2025',
+    docTitle: 'Communication from the Examining Division pursuant to Article 94(3) EPC',
+    docProcedure: 'Examining division',
+  })),
+  plain(parsePdfDeadlineHints(pdfArt94Text, {
+    docDateStr: '01.09.2025',
+    docTitle: 'Communication from the Examining Division pursuant to Article 94(3) EPC',
+    docProcedure: 'Examining division',
+  })),
+  'Runtime parsePdfDeadlineHints should match lib PDF parsing for the generic Art. 94 fixture',
+);
 
 for (const caseNo of ['EP19871250', 'EP23182542', 'EP19205846']) {
   const mainDoc = loadFixtureDocument(['cases', caseNo, 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`);
