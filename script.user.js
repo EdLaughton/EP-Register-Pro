@@ -7333,11 +7333,35 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     };
   }
 
-  function selectNextDeadline(deadlines = [], currentClosedPosture = false, now = new Date()) {
-    const actionable = (deadlines || [])
-      .filter((d) => !d.reference && !d.resolved && !d.superseded)
-      .sort((a, b) => a.date - b.date);
+  function isMonitoringDeadline(deadline = {}) {
+    const label = normalize(deadline?.label || '').toLowerCase();
+    return /opposition period/.test(label) || /third-party monitor/.test(label);
+  }
 
+  function deadlinePresentationBuckets(deadlines = [], currentClosedPosture = false) {
+    const buckets = { active: [], monitoring: [], historical: [] };
+    for (const deadline of (deadlines || [])) {
+      if (deadline?.reference) continue;
+      if (currentClosedPosture) {
+        buckets.historical.push(deadline);
+        continue;
+      }
+      if (deadline?.resolved || deadline?.superseded) {
+        buckets.historical.push(deadline);
+        continue;
+      }
+      if (isMonitoringDeadline(deadline)) {
+        buckets.monitoring.push(deadline);
+        continue;
+      }
+      buckets.active.push(deadline);
+    }
+    for (const key of Object.keys(buckets)) buckets[key].sort((a, b) => a.date - b.date);
+    return buckets;
+  }
+
+  function selectNextDeadline(deadlines = [], currentClosedPosture = false, now = new Date()) {
+    const actionable = deadlinePresentationBuckets(deadlines, currentClosedPosture).active;
     if (!actionable.length) return null;
     const upcoming = actionable.find((d) => d.date > now);
     if (upcoming) return upcoming;
@@ -7346,15 +7370,18 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function activeDeadlineNoteText(deadlines = [], currentClosedPosture = false, posture = null) {
-    const actionable = (deadlines || []).filter((d) => !d.reference && !d.resolved && !d.superseded);
-    if (actionable.length && currentClosedPosture) {
+    const buckets = deadlinePresentationBuckets(deadlines, currentClosedPosture);
+    if (buckets.active.length && currentClosedPosture) {
       return 'No active procedural deadline detected on the current withdrawn/closed posture; remaining clocks are historical, appellate, or low-confidence.';
     }
-    if (actionable.length) return '';
-    if ((deadlines || []).some((d) => d.superseded) && currentClosedPosture) {
+    if (buckets.active.length) return '';
+    if (buckets.monitoring.length) {
+      return 'No active applicant/EPO deadline detected; remaining clocks are third-party monitoring windows.';
+    }
+    if (buckets.historical.some((d) => d.superseded) && currentClosedPosture) {
       return 'No active procedural deadline detected; later loss-of-rights events superseded earlier response periods.';
     }
-    if ((deadlines || []).some((d) => d.resolved)) {
+    if (buckets.historical.some((d) => d.resolved)) {
       return posture?.recovered
         ? 'No active procedural deadline detected; earlier response periods appear answered and the case later recovered from an adverse posture.'
         : 'No active procedural deadline detected; earlier response periods appear already answered.';
@@ -7880,35 +7907,54 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function renderOverviewDetailedDeadlines(m) {
-    const detailedDeadlines = m.deadlines.filter((d) => {
-      if (d.reference && /20-year term from filing/i.test(String(d.label || ''))) return false;
-      if (d.resolved || d.superseded) return false;
-      if (!m.nextDeadline) return true;
+    const buckets = deadlinePresentationBuckets(m.deadlines, !!m.posture?.currentClosed);
+    const sameAsNextDeadline = (d) => {
+      if (!m.nextDeadline) return false;
       const sameLabel = d.label === m.nextDeadline.label;
       const sameDate = formatDate(d.date) === formatDate(m.nextDeadline.date);
       const sameSource = String(d.sourceDate || '') === String(m.nextDeadline.sourceDate || '');
-      return !(sameLabel && sameDate && sameSource);
-    });
+      return sameLabel && sameDate && sameSource;
+    };
 
-    let detailedDeadlinesHtml = '';
-    if (detailedDeadlines.length) {
+    const renderBucket = (title, deadlines, bucketKind) => {
+      if (!deadlines.length) return '';
       let rows = '';
-      for (const d of detailedDeadlines) {
+      for (const d of deadlines) {
         const ds = formatDate(d.date);
         const dd = Math.ceil((d.date.getTime() - Date.now()) / 86400000);
-        const proximity = dd < 0 ? 'bad' : dd <= 14 ? 'bad' : dd <= 45 ? 'warn' : 'ok';
+        const proximity = bucketKind === 'historical'
+          ? 'info'
+          : bucketKind === 'monitoring'
+            ? (dd < 0 ? 'info' : dd <= 45 ? 'warn' : 'info')
+            : (dd < 0 ? 'bad' : dd <= 14 ? 'bad' : dd <= 45 ? 'warn' : 'ok');
+        const badgeText = bucketKind === 'historical'
+          ? `${ds} · historical`
+          : `${ds}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}`;
         const metaParts = [
+          bucketKind === 'monitoring' ? 'third-party monitoring window' : '',
+          bucketKind === 'historical' ? (d.superseded ? 'superseded context' : d.resolved ? 'responded / historical context' : 'historical context') : '',
           `From ${d.sourceDate || 'procedural event'}`,
           d.confidence ? `${d.confidence} confidence` : '',
           d.method || '',
           d.rolledOver ? `rolled over${d.rolloverNote ? ` (${d.rolloverNote})` : ''}` : '',
-          d.resolved ? 'responded' : '',
+          d.supersededBy?.dateStr ? `later EPO outcome on ${d.supersededBy.dateStr}` : '',
+          d.resolved && bucketKind !== 'historical' ? 'responded' : '',
         ].filter(Boolean);
-        rows += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(ds)}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}</span>${!d.reference ? `<div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div>` : ''}</div></div>`;
+        rows += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(badgeText)}</span><div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div></div></div>`;
       }
-      detailedDeadlinesHtml = `<div class="epoRP-m">Detailed clocks</div><div class="epoRP-dl">${rows}</div><div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.</div>`;
-    }
-    return detailedDeadlinesHtml;
+      return `<div class="epoRP-m">${esc(title)}</div><div class="epoRP-dl">${rows}</div>`;
+    };
+
+    const activeDeadlines = buckets.active.filter((d) => !sameAsNextDeadline(d));
+    const sections = [
+      renderBucket('Active clocks', activeDeadlines, 'active'),
+      renderBucket('Monitoring windows', buckets.monitoring, 'monitoring'),
+      renderBucket('Historical / superseded clocks', buckets.historical, 'historical'),
+    ].filter(Boolean);
+
+    return sections.length
+      ? `<div class="epoRP-m">Detailed clocks</div>${sections.join('')}<div class="epoRP-m">Procedural due dates are heuristic unless the Register provides explicit legal due dates.</div>`
+      : '';
   }
 
   function overviewNextDeadlineState(m) {

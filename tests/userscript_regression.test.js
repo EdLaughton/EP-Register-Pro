@@ -224,8 +224,10 @@ notHas(/<div class="epoRP-l">Latest renewal<\/div>/, 'Renewals overview should n
 notHas(/<div class="epoRP-l">Grace period until<\/div>/, 'Renewals overview should not render a separate Grace period row');
 has(/value:\s*'Post-publication'|return 'Post-publication';/, 'Stage mapping should avoid using "Published" as a stage label');
 has(/value:\s*'Closed'|return 'Closed';/, 'Stage mapping should classify withdrawn/refused/revoked outcomes as Closed');
-has(/const\s+detailedDeadlines\s*=\s*m\.deadlines\.filter\(/, 'Overview should compute detailed deadlines separately from the active next deadline summary');
+has(/const\s+buckets\s*=\s*deadlinePresentationBuckets\(m\.deadlines,\s*!!m\.posture\?\.currentClosed\);/, 'Overview should bucket deadlines separately from the active next-deadline summary');
 hasText('Detailed clocks', 'Overview should embed detailed/reference clocks inside actionable status');
+hasText('Monitoring windows', 'Detailed clocks should separate third-party monitoring windows from live applicant/EPO response deadlines');
+hasText('Historical / superseded clocks', 'Detailed clocks should preserve old/resolved/superseded periods as historical context instead of flattening them away');
 notHas(/Deadlines & clocks \(detailed\)/, 'Overview should no longer render a separate Deadlines & clocks section');
 hasText('Type / stage', 'Overview should combine type and stage in a single summary row');
 hasText('Family role', 'Overview should surface explicit family/divisional role in the top summary card');
@@ -240,8 +242,8 @@ has(/const\s+termReference\s*=\s*m\.deadlines\.find\(/, 'Overview should compute
 has(/const\s+filingSummary\s*=\s*normalize\(\[/, 'Overview should build a condensed filing summary line');
 hasText("termReferenceDate ? `20-year term ${termReferenceDate}` : ''", 'Overview filing summary should include the 20-year term reference inline without extra years-remaining noise');
 notHas(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Overview should not render a separate 20-year term row after condensing filing metadata');
-has(/if \(d\.reference && \/20-year term from filing\/i\.test\(String\(d\.label \|\| ''\)\)\) return false;/, 'Detailed clocks should avoid duplicating 20-year term reference row already shown in top summary');
-has(/if \(d\.resolved \|\| d\.superseded\) return false;/, 'Detailed clocks should hide deadlines already resolved or superseded by later activity/outcomes');
+has(/if \(deadline\?\.reference\) continue;/, 'Deadline bucketing should still drop reference-only rows from the detailed actionable clock sections');
+has(/buckets\.historical\.push\(deadline\);/, 'Deadline bucketing should preserve resolved/superseded/closed-posture clocks as historical context instead of dropping them');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
 hasText('Adverse posture detected.', 'Actionable status should expose concise recovery guidance for adverse/loss-of-rights postures');

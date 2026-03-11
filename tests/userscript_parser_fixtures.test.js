@@ -210,6 +210,12 @@ assert.strictEqual(supersededDeadline, null, 'Closed/loss-of-rights cases should
 assert.strictEqual(hooks.activeDeadlineNoteText([
   { label: 'R71(3) response period', date: new Date('2024-02-10T00:00:00Z'), resolved: false, superseded: true },
 ], true), 'No active procedural deadline detected; later loss-of-rights events superseded earlier response periods.', 'Actionable status should explain why no active deadline is shown after terminal EPO events');
+assert.strictEqual(hooks.selectNextDeadline([
+  { label: 'Opposition period (third-party monitor)', date: new Date('2026-11-04T00:00:00Z'), resolved: false, superseded: false },
+], false, new Date('2026-03-01T00:00:00Z')), null, 'Third-party monitoring windows should not be promoted as the active next applicant/EPO deadline');
+assert.strictEqual(hooks.activeDeadlineNoteText([
+  { label: 'Opposition period (third-party monitor)', date: new Date('2026-11-04T00:00:00Z'), resolved: false, superseded: false },
+], false), 'No active applicant/EPO deadline detected; remaining clocks are third-party monitoring windows.', 'Actionable status should distinguish monitoring windows from live applicant/EPO response deadlines');
 
 const pdfR71 = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'r71_communication.txt'), {
   docDateStr: '10.01.2026',
