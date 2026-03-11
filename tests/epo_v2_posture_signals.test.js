@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { postureLossLabel, postureRecoveryLabel, deriveProceduralPosture } = require('../lib/epo_v2_posture_signals');
+const { buildProceduralRecords, postureLossLabel, postureRecoveryLabel, deriveProceduralPosture, deriveProceduralPostureFromSources } = require('../lib/epo_v2_posture_signals');
 
 assert.strictEqual(
   postureLossLabel({ title: 'Application deemed to be withdrawn (non-entry into European phase)', detail: 'Search / examination' }),
@@ -19,13 +19,34 @@ assert.strictEqual(
   'Posture recovery labeling should recognize further-processing cures',
 );
 
-const recoveredBeforeGrant = deriveProceduralPosture({
-  statusRaw: 'The patent has been granted',
-  records: [
-    { dateStr: '01.10.2025', title: 'Application deemed to be withdrawn ( translations of claims/payment missing)', detail: 'Search / examination', actor: 'EPO', source: 'Documents' },
-    { dateStr: '15.11.2025', title: 'Decision on request for further processing', detail: '', actor: 'EPO', source: 'Event', codexKey: 'FURTHER_PROCESSING_DECISION' },
-    { dateStr: '01.01.2026', title: '(Expected) grant', detail: 'published on 04.02.2026 [2026/06]', actor: 'EPO', source: 'Event', codexKey: 'EXPECTED_GRANT' },
+const builtRecords = buildProceduralRecords(
+  [
+    { dateStr: '01.10.2025', title: 'Application deemed to be withdrawn ( translations of claims/payment missing)', procedure: 'Search / examination', actor: 'EPO' },
   ],
+  { events: [{ dateStr: '15.11.2025', title: 'Decision on request for further processing', detail: '' }] },
+  { events: [{ dateStr: '15.11.2025', title: 'Decision on request for further processing', detail: '' }], codedEvents: [{ dateStr: '01.01.2026', title: '(Expected) grant', detail: 'published on 04.02.2026 [2026/06]', codexKey: 'EXPECTED_GRANT' }] },
+);
+assert.deepStrictEqual(builtRecords.map((record) => `${record.dateStr}|${record.source}`), [
+  '01.01.2026|Coded legal event',
+  '15.11.2025|Event',
+  '01.10.2025|Documents',
+], 'Shared procedural record building should dedupe duplicate event/legal rows and keep reverse-chronological source records');
+
+const recoveredBeforeGrant = deriveProceduralPostureFromSources({
+  statusRaw: 'The patent has been granted',
+  docs: [
+    { dateStr: '01.10.2025', title: 'Application deemed to be withdrawn ( translations of claims/payment missing)', procedure: 'Search / examination', actor: 'EPO' },
+  ],
+  eventHistory: {
+    events: [
+      { dateStr: '15.11.2025', title: 'Decision on request for further processing', detail: '' },
+    ],
+  },
+  legal: {
+    codedEvents: [
+      { dateStr: '01.01.2026', title: '(Expected) grant', detail: 'published on 04.02.2026 [2026/06]', codexKey: 'EXPECTED_GRANT' },
+    ],
+  },
 });
 assert.strictEqual(recoveredBeforeGrant.currentLabel, 'Granted', 'Posture derivation should keep the current granted state after a cured adverse event');
 assert.strictEqual(recoveredBeforeGrant.recoveredBeforeGrant, true, 'Posture derivation should detect recovery before grant');
