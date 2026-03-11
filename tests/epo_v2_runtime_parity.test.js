@@ -9,6 +9,7 @@ const { classifyTimelineImportance, docPacketExplanation, timelineSubtitle, shou
 const { parseDoclistFromDocument } = require('../lib/epo_v2_doclist_parser');
 const { parseEventHistoryFromDocument, parseLegalFromDocument } = require('../lib/epo_v2_procedural_parser');
 const { parseFamilyFromDocument, parseCitationsFromDocument } = require('../lib/epo_v2_reference_parsers');
+const { parseUeFromDocument, parseFederatedFromDocument } = require('../lib/epo_v2_territorial_parser');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -82,6 +83,35 @@ const citationsDoc = loadFixtureDocument(['cases', citationsCaseNo, 'citations.h
 const runtimeCitations = plain(hooks.parseCitations(citationsDoc));
 const libCitations = plain(parseCitationsFromDocument(citationsDoc));
 assert.deepStrictEqual(runtimeCitations, libCitations, `Runtime parseCitations raw extraction should match lib reference parsing for ${citationsCaseNo}`);
+
+for (const caseNo of ['EP19871250', 'EP24837586']) {
+  const ueDoc = loadFixtureDocument(['cases', caseNo, 'ueMain.html'], `https://register.epo.org/application?number=${caseNo}&tab=ueMain&lng=en`);
+  assert.deepStrictEqual(
+    ((ue) => ({
+      statusRaw: compactText(ue.statusRaw),
+      ueStatus: compactText(ue.ueStatus),
+      upcOptOut: compactText(ue.upcOptOut),
+      memberStates: compactText(ue.memberStates),
+      text: compactText(ue.text),
+    }))(plain(hooks.parseUe(ueDoc))),
+    ((ue) => ({
+      statusRaw: compactText(ue.statusRaw),
+      ueStatus: compactText(ue.ueStatus),
+      upcOptOut: compactText(ue.upcOptOut),
+      memberStates: compactText(ue.memberStates),
+      text: compactText(ue.text),
+    }))(plain(parseUeFromDocument(ueDoc))),
+    `Runtime parseUe raw extraction should match lib territorial parsing for ${caseNo}`,
+  );
+}
+
+const federatedCaseNo = 'EP19871250';
+const federatedDoc = loadFixtureDocument(['cases', federatedCaseNo, 'federated.html'], `https://register.epo.org/application?number=${federatedCaseNo}&tab=federated&lng=en`);
+assert.deepStrictEqual(
+  plain(hooks.parseFederated(federatedDoc, federatedCaseNo)),
+  plain(parseFederatedFromDocument(federatedDoc, federatedCaseNo)),
+  `Runtime parseFederated raw extraction should match lib territorial parsing for ${federatedCaseNo}`,
+);
 
 for (const caseNo of ['EP22809254', 'EP23182542', 'EP23758527']) {
   const doclistUrl = `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en`;
