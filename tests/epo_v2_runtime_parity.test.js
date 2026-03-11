@@ -5,6 +5,7 @@ const { classifyDocSignal } = require('../lib/epo_v2_doc_signals');
 const { classifyPacketSignal, standalonePacketBundle } = require('../lib/epo_v2_packet_signals');
 const { buildProceduralRecords, deriveProceduralPostureFromSources } = require('../lib/epo_v2_posture_signals');
 const { inferProceduralDeadlinesFromSources } = require('../lib/epo_v2_deadline_signals');
+const { classifyTimelineImportance, docPacketExplanation, timelineSubtitle, shouldAppendSingleRunLabel, compactOverviewTitle } = require('../lib/epo_v2_timeline_signals');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -15,6 +16,10 @@ assert.strictEqual(typeof hooks.normalizedDocSignal, 'function', 'Runtime hook s
 assert.strictEqual(typeof hooks.normalizedPacketSignal, 'function', 'Runtime hook surface should expose normalizedPacketSignal');
 assert.strictEqual(typeof hooks.buildDeadlineRecords, 'function', 'Runtime hook surface should expose buildDeadlineRecords for parity checks');
 assert.strictEqual(typeof hooks.proceduralPostureModel, 'function', 'Runtime hook surface should expose proceduralPostureModel');
+assert.strictEqual(typeof hooks.timelineAttorneyImportance, 'function', 'Runtime hook surface should expose timelineAttorneyImportance');
+assert.strictEqual(typeof hooks.timelineSubtitleText, 'function', 'Runtime hook surface should expose timelineSubtitleText');
+assert.strictEqual(typeof hooks.docPacketExplanation, 'function', 'Runtime hook surface should expose docPacketExplanation');
+assert.strictEqual(typeof hooks.compactOverviewTitle, 'function', 'Runtime hook surface should expose compactOverviewTitle');
 
 const statusSample = 'No opposition filed within time limit';
 assert.deepStrictEqual(
@@ -48,6 +53,25 @@ assert.strictEqual(
   standalonePacketBundle(libPacketSignal),
   'Runtime standalone packet policy should match lib packet policy for an extended-ESR packet',
 );
+
+const timelineImportanceSamples = [
+  ['Application deemed to be withdrawn (non-entry into European phase)', 'Search / examination', 'Legal status', 'EPO', 'info'],
+  ['Communication about intention to grant a European patent', 'Examination', 'Documents', 'EPO', 'info'],
+  ['Mention of grant', 'Publication', 'Legal status', 'EPO', 'info'],
+];
+for (const sample of timelineImportanceSamples) {
+  assert.strictEqual(
+    hooks.timelineAttorneyImportance(...sample),
+    classifyTimelineImportance(...sample),
+    `Runtime timeline importance should match lib helper for: ${sample[0]}`,
+  );
+}
+
+const timelineSubtitleSample = { detail: 'published on 17.07.2024 [2024/29]\nEvent history', source: 'Event history', actor: 'EPO' };
+assert.strictEqual(hooks.timelineSubtitleText(timelineSubtitleSample), timelineSubtitle(timelineSubtitleSample), 'Runtime timeline subtitle helper should match lib subtitle deduping');
+assert.strictEqual(hooks.docPacketExplanation('Further processing'), docPacketExplanation('Further processing'), 'Runtime packet explanation helper should match lib timeline explanation text');
+assert.strictEqual(hooks.compactOverviewTitle('Communication about intention to grant a European patent'), compactOverviewTitle('Communication about intention to grant a European patent'), 'Runtime compact-title helper should match lib title compaction');
+assert.strictEqual(hooks.shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), 'Runtime single-run-label policy should match lib timeline helper');
 
 for (const caseNo of ['EP22809254', 'EP23182542', 'EP23758527']) {
   const main = hooks.parseMain(loadFixtureDocument(['cases', caseNo, 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`), caseNo);

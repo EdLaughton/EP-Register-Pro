@@ -7,7 +7,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node tests/userscript_smoke.test.js && node tests/userscript_regression.test.js && node tests/userscript_lifecycle.test.js && node tests/userscript_parser_fixtures.test.js && node tests/userscript_real_fixtures.test.js && node tests/userscript_live_case_matrix.test.js && node tests/epo_codex_prototype.test.js && node tests/epo_v2_normalized.test.js && node tests/epo_v2_doc_signals.test.js && node tests/epo_v2_packet_signals.test.js && node tests/epo_v2_status_signals.test.js && node tests/epo_v2_posture_signals.test.js && node tests/epo_v2_deadline_signals.test.js && node tests/epo_v2_runtime_parity.test.js"
+    "test": "node tests/userscript_smoke.test.js && node tests/userscript_regression.test.js && node tests/userscript_lifecycle.test.js && node tests/userscript_parser_fixtures.test.js && node tests/userscript_real_fixtures.test.js && node tests/userscript_live_case_matrix.test.js && node tests/epo_codex_prototype.test.js && node tests/epo_v2_normalized.test.js && node tests/epo_v2_doc_signals.test.js && node tests/epo_v2_packet_signals.test.js && node tests/epo_v2_status_signals.test.js && node tests/epo_v2_posture_signals.test.js && node tests/epo_v2_deadline_signals.test.js && node tests/epo_v2_timeline_signals.test.js && node tests/epo_v2_runtime_parity.test.js"
   },
   "repository": {
     "type": "git",

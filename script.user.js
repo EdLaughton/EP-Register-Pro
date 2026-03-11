@@ -7568,22 +7568,28 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return 'info';
   }
 
+  const TIMELINE_LEVEL_RULES = Object.freeze([
+    {
+      level: 'bad',
+      test: (low) => /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|revocation|lapsed|not maintained|request for re-establishment.*rejected|rights restored refused|withdrawn by applicant|deemed withdrawn/.test(low),
+    },
+    {
+      level: 'warn',
+      test: (low) => /deadline|time limit|final date|summons to oral proceedings|rule\s*116|article\s*94\(3\)|art\.?\s*94\(3\)|rule\s*71\(3\)|intention to grant|communication from the examining|communication under|opposition|third party observations|request for re-establishment|further processing/.test(low),
+    },
+    {
+      level: 'ok',
+      test: (low) => /mention of grant|patent granted|grant decision|fee paid|renewal paid|annual fee paid|validation|registered|recorded/.test(low),
+    },
+  ]);
+
   function timelineAttorneyImportance(title, detail = '', source = '', actor = 'Other', baseLevel = 'info') {
     const base = ['bad', 'warn', 'ok', 'info'].includes(baseLevel) ? baseLevel : 'info';
-    const t = normalize(`${title || ''}\n${detail || ''}\n${source || ''}\n${actor || ''}`).toLowerCase();
-
-    const badSignals = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|revocation|lapsed|not maintained|request for re-establishment.*rejected|rights restored refused|withdrawn by applicant|deemed withdrawn/;
-    if (badSignals.test(t)) return 'bad';
-    if (base === 'bad') return 'bad';
-
-    const warnSignals = /deadline|time limit|final date|summons to oral proceedings|rule\s*116|article\s*94\(3\)|art\.?\s*94\(3\)|rule\s*71\(3\)|intention to grant|communication from the examining|communication under|opposition|third party observations|request for re-establishment|further processing/;
-    if (warnSignals.test(t)) return 'warn';
-    if (base === 'warn') return 'warn';
-
-    const okSignals = /mention of grant|patent granted|grant decision|fee paid|renewal paid|annual fee paid|validation|registered|recorded/;
-    if (okSignals.test(t)) return 'ok';
-    if (base === 'ok') return 'ok';
-
+    const low = normalize(`${title || ''}\n${detail || ''}\n${source || ''}\n${actor || ''}`).toLowerCase();
+    for (const rule of TIMELINE_LEVEL_RULES) {
+      if (rule.test(low)) return rule.level;
+      if (base === rule.level) return rule.level;
+    }
     return 'info';
   }
 
@@ -7648,23 +7654,24 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return bits[0] || procedure || 'All documents';
   }
 
+  const PACKET_EXPLANATION_MAP = Object.freeze({
+    'international search / iprp': 'ISA/IPRP packet from the international phase.',
+    'partial international search': 'Partial international search packet with the provisional opinion/search results.',
+    'european search package': 'European search report packet, including ESR opinion/strategy where present.',
+    'extended european search package': 'European search packet including an extended-ESR annex.',
+    'supplementary european search package': 'Supplementary European search packet for Euro-PCT regional phase entry.',
+    'intention to grant (r71(3) epc)': 'Rule 71(3) grant-intention packet, including text-for-grant documents.',
+    'response to intention to grant': 'Applicant response packet to the Rule 71(3) / grant-intention communication.',
+    'grant decision': 'Formal grant decision from the EPO.',
+    'further processing': 'Recovery packet showing further processing after a missed time limit.',
+    'euro-pct non-entry failure': 'Loss-of-rights packet showing failure to complete Euro-PCT entry acts in time.',
+    'grant-formalities failure': 'Loss-of-rights packet caused by missing grant-formality acts or payments.',
+    'fees / written-opinion failure': 'Loss-of-rights packet caused by fee non-payment and/or no reply to the written opinion.',
+    'written-opinion loss': 'Loss-of-rights packet caused by no reply to the written opinion.',
+  });
+
   function docPacketExplanation(label = '') {
-    const normalized = normalize(label).toLowerCase();
-    if (!normalized) return '';
-    if (normalized === 'international search / iprp') return 'ISA/IPRP packet from the international phase.';
-    if (normalized === 'partial international search') return 'Partial international search packet with the provisional opinion/search results.';
-    if (normalized === 'european search package') return 'European search report packet, including ESR opinion/strategy where present.';
-    if (normalized === 'extended european search package') return 'European search packet including an extended-ESR annex.';
-    if (normalized === 'supplementary european search package') return 'Supplementary European search packet for Euro-PCT regional phase entry.';
-    if (normalized === 'intention to grant (r71(3) epc)') return 'Rule 71(3) grant-intention packet, including text-for-grant documents.';
-    if (normalized === 'response to intention to grant') return 'Applicant response packet to the Rule 71(3) / grant-intention communication.';
-    if (normalized === 'grant decision') return 'Formal grant decision from the EPO.';
-    if (normalized === 'further processing') return 'Recovery packet showing further processing after a missed time limit.';
-    if (normalized === 'euro-pct non-entry failure') return 'Loss-of-rights packet showing failure to complete Euro-PCT entry acts in time.';
-    if (normalized === 'grant-formalities failure') return 'Loss-of-rights packet caused by missing grant-formality acts or payments.';
-    if (normalized === 'fees / written-opinion failure') return 'Loss-of-rights packet caused by fee non-payment and/or no reply to the written opinion.';
-    if (normalized === 'written-opinion loss') return 'Loss-of-rights packet caused by no reply to the written opinion.';
-    return '';
+    return PACKET_EXPLANATION_MAP[normalize(label).toLowerCase()] || '';
   }
 
   function timelineSubtitleText(item = {}) {
@@ -7844,29 +7851,30 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return built;
   }
 
+  const COMPACT_TITLE_EXACT_MAP = new Map([
+    ['Text intended for grant (version for approval)', 'Grant text for approval'],
+    ['Text intended for grant (clean copy)', 'Grant text (clean copy)'],
+    ['Communication about intention to grant a European patent', 'Intention to grant'],
+    ['Annex to the communication about intention to grant a European patent', 'Grant communication annex'],
+    ['Bibliographic data of the European patent application', 'Bibliographic data'],
+    ['Request for correction/amendment of the text proposed for grant sent from 01.04.2012', 'Grant text correction request'],
+    ['Reminder period for payment of examination fee/designation fee and correction of deficiencies in Written Opinion/amendment', 'Exam / designation fee reminder'],
+    ['Communication regarding the transmission of the European search report', 'Search report transmission'],
+    ['Amendments received before examination', 'Amendments before examination'],
+  ]);
+
+  const COMPACT_TITLE_REPLACEMENTS = Object.freeze([
+    [/\s+a European patent$/i, ''],
+    [/^New entry:\s*/i, ''],
+    [/^Deletion\s+-\s*/i, ''],
+    [/\s+sent from 01\.04\.2012$/i, ''],
+  ]);
+
   function compactOverviewTitle(title = '') {
     const normalized = normalize(title);
     if (!normalized) return '—';
-
-    const exactMap = new Map([
-      ['Text intended for grant (version for approval)', 'Grant text for approval'],
-      ['Text intended for grant (clean copy)', 'Grant text (clean copy)'],
-      ['Communication about intention to grant a European patent', 'Intention to grant'],
-      ['Annex to the communication about intention to grant a European patent', 'Grant communication annex'],
-      ['Bibliographic data of the European patent application', 'Bibliographic data'],
-      ['Request for correction/amendment of the text proposed for grant sent from 01.04.2012', 'Grant text correction request'],
-      ['Reminder period for payment of examination fee/designation fee and correction of deficiencies in Written Opinion/amendment', 'Exam / designation fee reminder'],
-      ['Communication regarding the transmission of the European search report', 'Search report transmission'],
-      ['Amendments received before examination', 'Amendments before examination'],
-    ]);
-    if (exactMap.has(normalized)) return exactMap.get(normalized);
-
-    return normalized
-      .replace(/\s+a European patent$/i, '')
-      .replace(/^New entry:\s*/i, '')
-      .replace(/^Deletion\s+-\s*/i, '')
-      .replace(/\s+sent from 01\.04\.2012$/i, '')
-      .trim();
+    if (COMPACT_TITLE_EXACT_MAP.has(normalized)) return COMPACT_TITLE_EXACT_MAP.get(normalized);
+    return COMPACT_TITLE_REPLACEMENTS.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), normalized).trim();
   }
 
   function overviewLatestActionText(doc) {
