@@ -5,6 +5,7 @@ const {
   codexDescriptionRecord,
   extractLegalEventBlocksFromHtml,
   deriveCurrentPosture,
+  buildNormalizedCaseFromDocuments,
 } = require('../lib/epo_v2_normalized');
 const { loadFixtureDocument, loadFixtureText, loadUserscriptHooks } = require('./userscript_fixture_utils');
 
@@ -41,5 +42,19 @@ for (const caseNo of ['EP24163939', 'EP23182542', 'EP25193159', 'EP22809254', 'E
     assert.strictEqual(posture.currentPosture, 'Granted (no opposition)', 'v2 normalized core should classify the no-opposition control correctly');
   }
 }
+
+const normalizedCase = buildNormalizedCaseFromDocuments({
+  caseNo: 'EP23182542',
+  mainDoc: loadFixtureDocument(['cases', 'EP23182542', 'main.html'], 'https://register.epo.org/application?number=EP23182542&tab=main&lng=en'),
+  doclistDoc: loadFixtureDocument(['cases', 'EP23182542', 'doclist.html'], 'https://register.epo.org/application?number=EP23182542&tab=doclist&lng=en'),
+  eventDoc: loadFixtureDocument(['cases', 'EP23182542', 'event.html'], 'https://register.epo.org/application?number=EP23182542&tab=event&lng=en'),
+  legalDoc: loadFixtureDocument(['cases', 'EP23182542', 'legal.html'], 'https://register.epo.org/application?number=EP23182542&tab=legal&lng=en'),
+  familyDoc: loadFixtureDocument(['cases', 'EP23182542', 'family.html'], 'https://register.epo.org/application?number=EP23182542&tab=family&lng=en'),
+});
+assert.strictEqual(normalizedCase.main.applicationType, 'Divisional', 'v2 normalized core should compose the shared main parser and classification helper into a divisional application type');
+assert.strictEqual(normalizedCase.currentPosture.currentPosture, 'Granted', 'v2 normalized core should compose the shared posture helper into the normalized case pipeline');
+assert.strictEqual(normalizedCase.posture.recoveredBeforeGrant, true, 'v2 normalized core should preserve recovered-before-grant posture state in the composed pipeline');
+assert(normalizedCase.doclist.docs.some((doc) => doc.bundle === 'Further processing'), 'v2 normalized core should compose shared doc classification into the normalized case pipeline');
+assert(normalizedCase.family.publications.some((publication) => publication.no === 'EP4070092'), 'v2 normalized core should preserve shared family parsing inside the normalized case pipeline');
 
 console.log('epo_v2_normalized.test.js passed');
