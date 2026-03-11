@@ -1,8 +1,9 @@
 const assert = require('assert');
-const { loadUserscriptHooks } = require('./userscript_fixture_utils');
+const { loadUserscriptHooks, loadFixtureDocument } = require('./userscript_fixture_utils');
 const { summarizeStatusText, inferStatusStageFromText } = require('../lib/epo_v2_status_signals');
 const { classifyDocSignal } = require('../lib/epo_v2_doc_signals');
 const { classifyPacketSignal, standalonePacketBundle } = require('../lib/epo_v2_packet_signals');
+const { deriveProceduralPosture } = require('../lib/epo_v2_posture_signals');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -11,6 +12,8 @@ assert.strictEqual(typeof hooks.summarizeStatus, 'function', 'Runtime hook surfa
 assert.strictEqual(typeof hooks.inferStatusStage, 'function', 'Runtime hook surface should expose inferStatusStage');
 assert.strictEqual(typeof hooks.normalizedDocSignal, 'function', 'Runtime hook surface should expose normalizedDocSignal');
 assert.strictEqual(typeof hooks.normalizedPacketSignal, 'function', 'Runtime hook surface should expose normalizedPacketSignal');
+assert.strictEqual(typeof hooks.buildDeadlineRecords, 'function', 'Runtime hook surface should expose buildDeadlineRecords for parity checks');
+assert.strictEqual(typeof hooks.proceduralPostureModel, 'function', 'Runtime hook surface should expose proceduralPostureModel');
 
 const statusSample = 'No opposition filed within time limit';
 assert.deepStrictEqual(
@@ -44,5 +47,22 @@ assert.strictEqual(
   standalonePacketBundle(libPacketSignal),
   'Runtime standalone packet policy should match lib packet policy for an extended-ESR packet',
 );
+
+for (const caseNo of ['EP22809254', 'EP23182542', 'EP23758527']) {
+  const main = hooks.parseMain(loadFixtureDocument(['cases', caseNo, 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`), caseNo);
+  const doclist = hooks.parseDoclist(loadFixtureDocument(['cases', caseNo, 'doclist.html'], `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en`));
+  const eventHistory = hooks.parseEventHistory(loadFixtureDocument(['cases', caseNo, 'event.html'], `https://register.epo.org/application?number=${caseNo}&tab=event&lng=en`), caseNo);
+  const legal = hooks.parseLegal(loadFixtureDocument(['cases', caseNo, 'legal.html'], `https://register.epo.org/application?number=${caseNo}&tab=legal&lng=en`), caseNo);
+  const runtimePosture = plain(hooks.proceduralPostureModel(main, doclist.docs, eventHistory, legal));
+  const libPosture = deriveProceduralPosture({
+    statusRaw: main.statusRaw || '',
+    records: plain(hooks.buildDeadlineRecords(doclist.docs, eventHistory, legal)),
+  });
+  assert.strictEqual(runtimePosture.currentLabel, libPosture.currentLabel, `Runtime posture label should match lib posture derivation for ${caseNo}`);
+  assert.strictEqual(runtimePosture.currentLevel, libPosture.currentLevel, `Runtime posture level should match lib posture derivation for ${caseNo}`);
+  assert.strictEqual(!!runtimePosture.recovered, !!libPosture.recovered, `Runtime recovered flag should match lib posture derivation for ${caseNo}`);
+  assert.strictEqual(!!runtimePosture.recoveredBeforeGrant, !!libPosture.recoveredBeforeGrant, `Runtime recovered-before-grant flag should match lib posture derivation for ${caseNo}`);
+  assert.strictEqual(runtimePosture.note, libPosture.note, `Runtime posture note should match lib posture derivation for ${caseNo}`);
+}
 
 console.log('epo_v2_runtime_parity.test.js passed');

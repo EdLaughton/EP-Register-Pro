@@ -50,6 +50,7 @@ function loadUserscriptHooks() {
     'upcRegistryNoteText',
     'selectNextDeadline',
     'activeDeadlineNoteText',
+    'buildDeadlineRecords',
     'proceduralPostureModel',
     'recoveryActionModel',
     'docPacketExplanation',
