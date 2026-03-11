@@ -1,3 +1,26 @@
+## 2026-03-11 progress snapshot
+
+### What is now on shared/extracted helpers
+- Main page parsing → `lib/epo_v2_main_parser.js`
+- Doclist parsing → `lib/epo_v2_doclist_parser.js`
+- Event/legal parsing → `lib/epo_v2_procedural_parser.js`
+- Family/citations parsing → `lib/epo_v2_reference_parsers.js`
+- UE/federated parsing → `lib/epo_v2_territorial_parser.js`
+- PDF deadline parsing → `lib/epo_v2_pdf_parser.js`
+- UPC opt-out parsing → `lib/epo_v2_upc_parser.js`
+- Doc/status/packet/posture/deadline/timeline/overview semantics → shared `lib/` helpers
+- `lib/epo_v2_normalized.js` now composes the extracted helpers instead of carrying older standalone logic
+- Runtime/lib parity covers the extracted parser/helper surface across real fixtures
+
+### What is still meaningfully open
+- Remaining runtime-only orchestration glue, especially timeline/render composition and some territorial presentation/UI composition
+- Live browser validation after the recent extraction wave (reload extension/userscript, spot-check control cases in the attached browser)
+- Read and understand `/Users/el326/Downloads/epo_bundle.zip`, then reassess whether rewrite/new script still makes sense
+- Final closeout pass on this backlog: verify each remaining item is actually satisfied, then delete this file only once the work is truly done
+
+### Current recommendation
+- Treat the codebase as being in the “shared parser/helper extraction mostly done; runtime orchestration cleanup + live validation still open” phase.
+
 # Sidebar Improvement Backlog
 
 _Discovered during live portfolio sweeps on 2026-03-10 (`The Toro Company`, `Oxford Nanopore`) and grounded in newly captured real fixtures._
