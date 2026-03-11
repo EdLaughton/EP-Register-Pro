@@ -1,5 +1,17 @@
 const assert = require('assert');
-const { classifyPacketSignal } = require('../lib/epo_v2_packet_signals');
+const {
+  PACKET_SIGNAL_PRECEDENCE,
+  STANDALONE_PACKET_BUNDLES,
+  packetSignalBundle,
+  standalonePacketBundle,
+  classifyPacketSignal,
+} = require('../lib/epo_v2_packet_signals');
+
+assert(PACKET_SIGNAL_PRECEDENCE.includes('Extended European search package'), 'packet-signal core should expose packet precedence data explicitly');
+assert(STANDALONE_PACKET_BUNDLES.has('Further processing'), 'packet-signal core should expose the standalone packet bundle allowlist explicitly');
+assert.strictEqual(packetSignalBundle({ bundle: 'Further processing' }), 'Further processing', 'packet-signal core should expose bundle extraction helper');
+assert.strictEqual(standalonePacketBundle({ bundle: 'Further processing' }), 'Further processing', 'packet-signal core should preserve standalone packet bundles');
+assert.strictEqual(standalonePacketBundle({ bundle: 'European search package' }), '', 'packet-signal core should not treat grouped search packets as standalone singleton bundles');
 
 assert.strictEqual(classifyPacketSignal([
   { title: 'Communication regarding the transmission of the European search report' },
