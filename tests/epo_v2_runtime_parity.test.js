@@ -7,9 +7,11 @@ const { buildProceduralRecords, deriveProceduralPostureFromSources } = require('
 const { inferProceduralDeadlinesFromSources } = require('../lib/epo_v2_deadline_signals');
 const { classifyTimelineImportance, docPacketExplanation, timelineSubtitle, shouldAppendSingleRunLabel, compactOverviewTitle } = require('../lib/epo_v2_timeline_signals');
 const { parseDoclistFromDocument } = require('../lib/epo_v2_doclist_parser');
+const { parseEventHistoryFromDocument, parseLegalFromDocument } = require('../lib/epo_v2_procedural_parser');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
+const compactText = (value) => String(value || '').replace(/\s+/g, ' ').trim();
 
 assert.strictEqual(typeof hooks.summarizeStatus, 'function', 'Runtime hook surface should expose summarizeStatus');
 assert.strictEqual(typeof hooks.inferStatusStage, 'function', 'Runtime hook surface should expose inferStatusStage');
@@ -101,8 +103,76 @@ for (const caseNo of ['EP22809254', 'EP23182542', 'EP23758527']) {
     })),
     `Runtime parseDoclist raw extraction should match lib doclist parsing for ${caseNo}`,
   );
-  const eventHistory = hooks.parseEventHistory(loadFixtureDocument(['cases', caseNo, 'event.html'], `https://register.epo.org/application?number=${caseNo}&tab=event&lng=en`), caseNo);
-  const legal = hooks.parseLegal(loadFixtureDocument(['cases', caseNo, 'legal.html'], `https://register.epo.org/application?number=${caseNo}&tab=legal&lng=en`), caseNo);
+  const eventUrl = `https://register.epo.org/application?number=${caseNo}&tab=event&lng=en`;
+  const legalUrl = `https://register.epo.org/application?number=${caseNo}&tab=legal&lng=en`;
+  const eventDoc = loadFixtureDocument(['cases', caseNo, 'event.html'], eventUrl);
+  const legalDoc = loadFixtureDocument(['cases', caseNo, 'legal.html'], legalUrl);
+  const eventHistory = hooks.parseEventHistory(eventDoc, caseNo);
+  const legal = hooks.parseLegal(legalDoc, caseNo);
+  const libEventHistory = parseEventHistoryFromDocument(eventDoc, eventUrl);
+  const libLegal = parseLegalFromDocument(legalDoc, legalUrl);
+  assert.deepStrictEqual(
+    plain(eventHistory.events).map((event) => ({
+      dateStr: event.dateStr,
+      title: compactText(event.title),
+      detail: compactText(event.detail),
+      codexKey: event.codexKey || '',
+      codexPhase: event.codexPhase || '',
+      codexClass: event.codexClass || '',
+      matchStrategy: event.matchStrategy || '',
+    })),
+    plain(libEventHistory.events).map((event) => ({
+      dateStr: event.dateStr,
+      title: compactText(event.title),
+      detail: compactText(event.detail),
+      codexKey: event.codexKey || '',
+      codexPhase: event.codexPhase || '',
+      codexClass: event.codexClass || '',
+      matchStrategy: event.matchStrategy || '',
+    })),
+    `Runtime parseEventHistory raw extraction should match lib procedural parsing for ${caseNo}`,
+  );
+  assert.deepStrictEqual(
+    plain(legal.events).map((event) => ({
+      dateStr: event.dateStr,
+      title: compactText(event.title),
+      detail: compactText(event.detail),
+    })),
+    plain(libLegal.events).map((event) => ({
+      dateStr: event.dateStr,
+      title: compactText(event.title),
+      detail: compactText(event.detail),
+    })),
+    `Runtime parseLegal dated-row extraction should match lib procedural parsing for ${caseNo}`,
+  );
+  assert.deepStrictEqual(
+    plain(legal.codedEvents).map((event) => ({
+      dateStr: event.dateStr,
+      title: compactText(event.title),
+      detail: compactText(event.detail),
+      freeFormatText: compactText(event.freeFormatText || ''),
+      effectiveDate: compactText(event.effectiveDate || ''),
+      originalCode: event.originalCode || '',
+      codexKey: event.codexKey || '',
+      codexPhase: event.codexPhase || '',
+      codexClass: event.codexClass || '',
+      matchStrategy: event.matchStrategy || '',
+    })),
+    plain(libLegal.codedEvents).map((event) => ({
+      dateStr: event.dateStr,
+      title: compactText(event.title),
+      detail: compactText(event.detail),
+      freeFormatText: compactText(event.freeFormatText || ''),
+      effectiveDate: compactText(event.effectiveDate || ''),
+      originalCode: event.originalCode || '',
+      codexKey: event.codexKey || '',
+      codexPhase: event.codexPhase || '',
+      codexClass: event.codexClass || '',
+      matchStrategy: event.matchStrategy || '',
+    })),
+    `Runtime parseLegal coded-event extraction should match lib procedural parsing for ${caseNo}`,
+  );
+  assert.deepStrictEqual(plain(legal.renewals), plain(libLegal.renewals), `Runtime parseLegal renewal extraction should match lib procedural parsing for ${caseNo}`);
   const runtimeRecords = plain(hooks.buildDeadlineRecords(doclist.docs, eventHistory, legal));
   const libRecords = buildProceduralRecords(doclist.docs, eventHistory, legal);
   assert.deepStrictEqual(runtimeRecords, libRecords, `Runtime buildDeadlineRecords should match lib procedural record building for ${caseNo}`);
