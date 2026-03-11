@@ -222,8 +222,8 @@ hasText("terminalPosture ? 'Historical grace until' : 'Grace until'", 'Renewals 
 hasText('Last payment', 'Renewals overview should surface latest renewal inside the compact status row');
 notHas(/<div class="epoRP-l">Latest renewal<\/div>/, 'Renewals overview should not render a separate Latest renewal row');
 notHas(/<div class="epoRP-l">Grace period until<\/div>/, 'Renewals overview should not render a separate Grace period row');
-has(/return 'Post-publication';/, 'Stage mapping should avoid using "Published" as a stage label');
-has(/return 'Closed';/, 'Stage mapping should classify withdrawn/refused/revoked outcomes as Closed');
+has(/value:\s*'Post-publication'|return 'Post-publication';/, 'Stage mapping should avoid using "Published" as a stage label');
+has(/value:\s*'Closed'|return 'Closed';/, 'Stage mapping should classify withdrawn/refused/revoked outcomes as Closed');
 has(/const\s+detailedDeadlines\s*=\s*m\.deadlines\.filter\(/, 'Overview should compute detailed deadlines separately from the active next deadline summary');
 hasText('Detailed clocks', 'Overview should embed detailed/reference clocks inside actionable status');
 notHas(/Deadlines & clocks \(detailed\)/, 'Overview should no longer render a separate Deadlines & clocks section');
@@ -232,8 +232,8 @@ hasText('Family role', 'Overview should surface explicit family/divisional role 
 has(/const\s+STATUS_STAGE_RULES\s*=\s*Object\.freeze\(/, 'Userscript runtime should express status-stage detection as a rule table');
 has(/const\s+STATUS_SUMMARY_RULES\s*=\s*Object\.freeze\(/, 'Userscript runtime should express status-summary detection as a rule table');
 has(/function\s+resolvedOverviewStatus\s*\(/, 'Overview model should centralize headline-status resolution instead of inlining the same precedence repeatedly');
-has(/posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview status helper should prefer normalized posture labels over raw status summaries when both exist');
-has(/posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview status helper should prefer normalized posture severity over raw status-summary severity when both exist');
+has(/posture\?\.currentLabel\s*\|\|\s*statusSummary\?\.simple|posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview status helper should prefer normalized posture labels over raw status summaries when both exist');
+has(/posture\?\.currentLevel\s*\|\|\s*statusSummary\?\.level|posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview status helper should prefer normalized posture severity over raw status-summary severity when both exist');
 hasText('Current posture', 'Actionable status should surface the current controlling procedural posture explicitly');
 has(/function\s+proceduralPostureModel\s*\(/, 'Overview/timeline posture narrative should be derived from a dedicated procedural-posture helper');
 has(/const\s+termReference\s*=\s*m\.deadlines\.find\(/, 'Overview should compute 20-year term reference from deadline model');

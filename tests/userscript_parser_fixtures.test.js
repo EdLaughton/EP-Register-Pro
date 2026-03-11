@@ -7,6 +7,7 @@ const {
 } = require('./userscript_fixture_utils');
 
 const hooks = loadUserscriptHooks();
+const plain = (value) => JSON.parse(JSON.stringify(value));
 
 const caseNo = 'EP24837586';
 const docs = {
@@ -158,11 +159,11 @@ assert.strictEqual(hooks.upcUePresentationModel({ ueStatus: 'The application is 
 assert.strictEqual(hooks.pdfCategoryBundleLabel('Art. 94(3) response period', 'Examination communication'), 'Art. 94(3) communication', 'PDF-derived categories should be able to upgrade generic examination communication labels');
 assert.strictEqual(hooks.timelineSubtitleText({ detail: 'published on 17.07.2024 [2024/29]\nEvent history', source: 'Event history', actor: 'EPO' }), 'published on 17.07.2024 [2024/29] · Event history · EPO', 'Timeline subtitle rendering should dedupe repeated source/detail labels even when the duplicate source tag arrives on a new line');
 assert.strictEqual(hooks.timelineSubtitleText({ detail: 'Formalities / other', source: 'Documents', actor: 'Other' }), 'Formalities / other · Documents', 'Timeline subtitle rendering should omit the useless actor=Other tail for generic document items');
-assert.deepStrictEqual(hooks.normalizedDocSignal('Request for further processing', 'Examination'), { family: 'remedial', bundle: 'Further processing', actor: 'EPO', level: 'warn', reason: 'codex remedial event' }, 'Normalized doc-signal helper should resolve further-processing requests via codex description fallback');
-assert.deepStrictEqual(hooks.classifyDocument('Request for further processing', 'Examination'), { bundle: 'Further processing', actor: 'EPO', level: 'warn' }, 'Document classification should use the codex-backed normalized doc-signal path for further-processing requests as well as decisions');
-assert.deepStrictEqual(hooks.classifyDocument('Decision to allow further processing', 'Examination'), { bundle: 'Further processing', actor: 'EPO', level: 'warn' }, 'Document classification should use the normalized doc-signal path for further-processing decisions');
-assert.deepStrictEqual(hooks.classifyDocument('Decision to grant a European patent', 'Examination'), { bundle: 'Grant decision', actor: 'EPO', level: 'ok' }, 'Document classification should use the normalized doc-signal path for grant decisions');
-assert.deepStrictEqual(hooks.classifyDocument('Application deemed to be withdrawn (non-entry into European phase)', 'Examination'), { bundle: 'Euro-PCT non-entry failure', actor: 'EPO', level: 'bad' }, 'Document classification should use the normalized doc-signal path for Euro-PCT non-entry losses');
+assert.deepStrictEqual(plain(hooks.normalizedDocSignal('Request for further processing', 'Examination')), { family: 'remedial', bundle: 'Further processing', actor: 'EPO', level: 'warn', reason: 'codex remedial event' }, 'Normalized doc-signal helper should resolve further-processing requests via codex description fallback');
+assert.deepStrictEqual(plain(hooks.classifyDocument('Request for further processing', 'Examination')), { bundle: 'Further processing', actor: 'EPO', level: 'warn' }, 'Document classification should use the codex-backed normalized doc-signal path for further-processing requests as well as decisions');
+assert.deepStrictEqual(plain(hooks.classifyDocument('Decision to allow further processing', 'Examination')), { bundle: 'Further processing', actor: 'EPO', level: 'warn' }, 'Document classification should use the normalized doc-signal path for further-processing decisions');
+assert.deepStrictEqual(plain(hooks.classifyDocument('Decision to grant a European patent', 'Examination')), { bundle: 'Grant decision', actor: 'EPO', level: 'ok' }, 'Document classification should use the normalized doc-signal path for grant decisions');
+assert.deepStrictEqual(plain(hooks.classifyDocument('Application deemed to be withdrawn (non-entry into European phase)', 'Examination')), { bundle: 'Euro-PCT non-entry failure', actor: 'EPO', level: 'bad' }, 'Document classification should use the normalized doc-signal path for Euro-PCT non-entry losses');
 assert.strictEqual(hooks.normalizedPacketSignal([
   { title: 'Communication regarding the transmission of the European search report', procedure: 'Search / examination' },
   { title: 'Document annexed to the Extended European Search Report', procedure: 'Search / examination' },

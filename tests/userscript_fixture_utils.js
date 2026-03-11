@@ -59,6 +59,8 @@ function loadUserscriptHooks() {
     'genericDocLabel',
     'normalizedDocSignal',
     'normalizedPacketSignal',
+    'inferStatusStage',
+    'summarizeStatus',
     'proceduralPostureModel',
     'shouldAppendSingleRunLabel',
     'overviewPartialState',
