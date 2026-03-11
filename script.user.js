@@ -3774,6 +3774,19 @@
     return score > 0 ? best : null;
   }
 
+  const DOCLIST_TABLE_HINT_SETS = Object.freeze([
+    ['date', 'document'],
+    ['document type'],
+  ]);
+
+  function doclistTable(doc) {
+    for (const hints of DOCLIST_TABLE_HINT_SETS) {
+      const table = bestTable(doc, hints);
+      if (table) return table;
+    }
+    return null;
+  }
+
   function tableColumnMap(table) {
     const map = {};
     const headerRow = table.querySelector('thead tr') || table.querySelector('tr');
@@ -3873,40 +3886,42 @@
     return bundle;
   }
 
+  function doclistEntryFromRow(row, map = {}, fallbackUrl = '', rowOrder = 0) {
+    const cells = [...row.querySelectorAll('td')];
+    if (!cells.length || !row.querySelector("input[type='checkbox']")) return null;
+    const rowText = cells.map(text).filter(Boolean).join(' ') || text(row);
+    const dm = rowText.match(DATE_RE);
+    if (!dm) return null;
+    const dateStr = dm[1];
+
+    const getCell = (i) => (i != null && i < cells.length ? text(cells[i]) : '');
+    let title = getCell(map.document);
+    if (!title) title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || '';
+    if (!title) return null;
+
+    const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || fallbackUrl;
+    const procedure = getCell(map.procedure);
+    const pages = getCell(map.pages);
+    return { dateStr, title, procedure, pages, rowOrder, url, source: 'All documents' };
+  }
+
   function parseDoclist(doc) {
-    const table = bestTable(doc, ['date', 'document']) || bestTable(doc, ['document type']);
+    const table = doclistTable(doc);
     if (!table) return { docs: [] };
     const map = tableColumnMap(table);
     const docs = [];
     const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();
+    const fallbackUrl = sourceUrl(fallbackCaseNo, 'doclist');
 
     let rowOrder = 0;
     for (const row of table.querySelectorAll('tr')) {
-      const cells = [...row.querySelectorAll('td')];
-      if (!cells.length || !row.querySelector("input[type='checkbox']")) continue;
-      const rowText = text(row);
-      const dm = rowText.match(DATE_RE);
-      if (!dm) continue;
-      const dateStr = dm[1];
-
-      const getCell = (i) => (i != null && i < cells.length ? text(cells[i]) : '');
-      let title = getCell(map.document);
-      if (!title) title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || '';
-      if (!title) continue;
-
-      const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || sourceUrl(fallbackCaseNo, 'doclist');
-      const procedure = getCell(map.procedure);
-      const pages = getCell(map.pages);
-      const cls = refineDocumentClassification(title, procedure, classifyDocument(title, procedure));
+      const entry = doclistEntryFromRow(row, map, fallbackUrl, rowOrder);
+      if (!entry) continue;
+      rowOrder += 1;
+      const cls = refineDocumentClassification(entry.title, entry.procedure, classifyDocument(entry.title, entry.procedure));
       docs.push({
-        dateStr,
-        title,
-        procedure,
-        pages,
-        rowOrder: rowOrder++,
-        url,
+        ...entry,
         ...cls,
-        source: 'All documents',
       });
     }
 

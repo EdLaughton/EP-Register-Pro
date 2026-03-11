@@ -6,6 +6,7 @@ const { classifyPacketSignal, standalonePacketBundle } = require('../lib/epo_v2_
 const { buildProceduralRecords, deriveProceduralPostureFromSources } = require('../lib/epo_v2_posture_signals');
 const { inferProceduralDeadlinesFromSources } = require('../lib/epo_v2_deadline_signals');
 const { classifyTimelineImportance, docPacketExplanation, timelineSubtitle, shouldAppendSingleRunLabel, compactOverviewTitle } = require('../lib/epo_v2_timeline_signals');
+const { parseDoclistFromDocument } = require('../lib/epo_v2_doclist_parser');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -74,8 +75,32 @@ assert.strictEqual(hooks.compactOverviewTitle('Communication about intention to 
 assert.strictEqual(hooks.shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), 'Runtime single-run-label policy should match lib timeline helper');
 
 for (const caseNo of ['EP22809254', 'EP23182542', 'EP23758527']) {
+  const doclistUrl = `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en`;
   const main = hooks.parseMain(loadFixtureDocument(['cases', caseNo, 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`), caseNo);
-  const doclist = hooks.parseDoclist(loadFixtureDocument(['cases', caseNo, 'doclist.html'], `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en`));
+  const doclistDoc = loadFixtureDocument(['cases', caseNo, 'doclist.html'], doclistUrl);
+  const doclist = hooks.parseDoclist(doclistDoc);
+  const libDoclist = parseDoclistFromDocument(doclistDoc, { fallbackUrl: doclistUrl });
+  assert.deepStrictEqual(
+    plain(doclist.docs).map((doc) => ({
+      dateStr: doc.dateStr,
+      title: doc.title,
+      procedure: doc.procedure,
+      pages: doc.pages,
+      rowOrder: doc.rowOrder,
+      url: doc.url,
+      source: doc.source,
+    })),
+    plain(libDoclist.docs).map((doc) => ({
+      dateStr: doc.dateStr,
+      title: doc.title,
+      procedure: doc.procedure,
+      pages: doc.pages,
+      rowOrder: doc.rowOrder,
+      url: doc.url,
+      source: doc.source,
+    })),
+    `Runtime parseDoclist raw extraction should match lib doclist parsing for ${caseNo}`,
+  );
   const eventHistory = hooks.parseEventHistory(loadFixtureDocument(['cases', caseNo, 'event.html'], `https://register.epo.org/application?number=${caseNo}&tab=event&lng=en`), caseNo);
   const legal = hooks.parseLegal(loadFixtureDocument(['cases', caseNo, 'legal.html'], `https://register.epo.org/application?number=${caseNo}&tab=legal&lng=en`), caseNo);
   const runtimeRecords = plain(hooks.buildDeadlineRecords(doclist.docs, eventHistory, legal));
