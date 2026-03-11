@@ -3583,6 +3583,15 @@
     };
   }
 
+  function resolvedOverviewStatus(mainSourceStatus, statusSummary, posture) {
+    if (mainSourceStatus === 'notfound') return { simple: 'Not found', level: 'bad' };
+    if (mainSourceStatus === 'empty') return { simple: 'No main data', level: 'warn' };
+    return {
+      simple: posture?.currentLabel || statusSummary?.simple || 'Unknown',
+      level: posture?.currentLevel || statusSummary?.level || 'warn',
+    };
+  }
+
   function parseApplicationType(mainData) {
     const appNo = mainData.appNo || '';
     const priorities = Array.isArray(mainData.priorities) ? mainData.priorities : [];

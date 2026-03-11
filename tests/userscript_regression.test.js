@@ -229,8 +229,9 @@ hasText('Detailed clocks', 'Overview should embed detailed/reference clocks insi
 notHas(/Deadlines & clocks \(detailed\)/, 'Overview should no longer render a separate Deadlines & clocks section');
 hasText('Type / stage', 'Overview should combine type and stage in a single summary row');
 hasText('Family role', 'Overview should surface explicit family/divisional role in the top summary card');
-has(/posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview model should prefer normalized posture labels over raw status summaries when both exist');
-has(/posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview model should prefer normalized posture severity over raw status-summary severity when both exist');
+has(/function\s+resolvedOverviewStatus\s*\(/, 'Overview model should centralize headline-status resolution instead of inlining the same precedence repeatedly');
+has(/posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview status helper should prefer normalized posture labels over raw status summaries when both exist');
+has(/posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview status helper should prefer normalized posture severity over raw status-summary severity when both exist');
 hasText('Current posture', 'Actionable status should surface the current controlling procedural posture explicitly');
 has(/function\s+proceduralPostureModel\s*\(/, 'Overview/timeline posture narrative should be derived from a dedicated procedural-posture helper');
 has(/const\s+termReference\s*=\s*m\.deadlines\.find\(/, 'Overview should compute 20-year term reference from deadline model');
