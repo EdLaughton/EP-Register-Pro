@@ -3535,18 +3535,52 @@
     return { simple: oneLine || 'Unknown', level: 'info' };
   }
 
+  function matchStatusRule(text, rules, fallback) {
+    const normalizedText = normalize(text);
+    const low = normalizedText.toLowerCase();
+    for (const rule of rules) {
+      if (rule.test(low, normalizedText)) return typeof rule.value === 'function' ? rule.value(normalizedText, low) : rule.value;
+    }
+    return typeof fallback === 'function' ? fallback(normalizedText, low) : fallback;
+  }
+
+  const STATUS_STAGE_RULES = Object.freeze([
+    { test: (low) => /revoked|refused|withdrawn|deemed to be withdrawn|lapsed|expired|closed/.test(low), value: 'Closed' },
+    { test: (low) => /no opposition filed within time limit/.test(low), value: 'Post-grant' },
+    { test: (low) => /patent has been granted|the patent has been granted|grant decision|decision to grant/.test(low), value: 'Granted' },
+    { test: (low) => /grant of patent is intended|rule\s*71\(3\)|intention to grant/.test(low), value: 'R71 / grant intended' },
+    { test: (low) => /article\s*94\(3\)|art\.\s*94\(3\)|examining division|request for examination was made|examination/.test(low), value: 'Examination' },
+    { test: (low) => /search report|search opinion|written opinion|\bsearch\b/.test(low), value: 'Search' },
+    { test: (low) => /filing/.test(low), value: 'Filing' },
+    { test: (low) => /published|publication/.test(low), value: 'Post-publication' },
+  ]);
+
+  const STATUS_SUMMARY_RULES = Object.freeze([
+    { test: (low) => !low, value: { simple: 'Unknown', level: 'warn' } },
+    { test: (low) => /no opposition filed within time limit/.test(low), value: { simple: 'Granted (no opposition)', level: 'ok' } },
+    { test: (low, raw) => /grant of patent is intended|rule\s*71\(3\)/i.test(raw), value: { simple: 'Grant intended (R71(3))', level: 'warn' } },
+    { test: (low) => /patent has been granted|the patent has been granted/.test(low), value: { simple: 'Granted', level: 'ok' } },
+    { test: (low) => /application deemed to be withdrawn.*non-entry into european phase/.test(low), value: { simple: 'Deemed withdrawn (non-entry)', level: 'bad' } },
+    { test: (low) => /application deemed to be withdrawn.*translations of claims\/payment missing/.test(low), value: { simple: 'Deemed withdrawn (grant formalities)', level: 'bad' } },
+    { test: (low) => /application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(low), value: { simple: 'Deemed withdrawn (fees / no WO reply)', level: 'bad' } },
+    { test: (low) => /application deemed to be withdrawn.*non-reply to written opinion/.test(low), value: { simple: 'Deemed withdrawn (no WO reply)', level: 'bad' } },
+    { test: (low) => /deemed to be withdrawn/.test(low), value: { simple: 'Deemed withdrawn', level: 'bad' } },
+    { test: (low) => /withdrawn by applicant|application withdrawn/.test(low), value: { simple: 'Withdrawn', level: 'bad' } },
+    { test: (low) => /revoked|refused|expired|lapsed/.test(low), value: { simple: 'Closed', level: 'bad' } },
+    { test: (low) => /application has been published|has been published/.test(low), value: { simple: 'Published', level: 'info' } },
+    { test: (low) => /request for examination was made|examination/.test(low), value: { simple: 'Examination', level: 'info' } },
+    { test: (low) => /search/.test(low), value: { simple: 'Search', level: 'info' } },
+  ]);
+
   function inferStatusStage(statusRaw) {
-    const t = normalize(statusRaw || '').toLowerCase();
-    if (!t) return '';
-    if (/revoked|refused|withdrawn|deemed to be withdrawn|lapsed|expired|closed/.test(t)) return 'Closed';
-    if (/no opposition filed within time limit/.test(t)) return 'Post-grant';
-    if (/patent has been granted|the patent has been granted|grant decision|decision to grant/.test(t)) return 'Granted';
-    if (/grant of patent is intended|rule\s*71\(3\)|intention to grant/.test(t)) return 'R71 / grant intended';
-    if (/article\s*94\(3\)|art\.\s*94\(3\)|examining division|request for examination was made|examination/.test(t)) return 'Examination';
-    if (/search report|search opinion|written opinion|\bsearch\b/.test(t)) return 'Search';
-    if (/filing/.test(t)) return 'Filing';
-    if (/published|publication/.test(t)) return 'Post-publication';
-    return '';
+    return matchStatusRule(statusRaw, STATUS_STAGE_RULES, '');
+  }
+
+  function summarizeStatus(raw) {
+    return matchStatusRule(raw, STATUS_SUMMARY_RULES, (normalizedRaw) => {
+      const oneLine = normalize(String(normalizedRaw || '').split('\n')[0] || normalizedRaw);
+      return { simple: oneLine || 'Unknown', level: 'info' };
+    });
   }
 
   function familyRoleSummary(mainData = {}) {

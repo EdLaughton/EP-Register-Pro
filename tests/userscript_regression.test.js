@@ -229,6 +229,8 @@ hasText('Detailed clocks', 'Overview should embed detailed/reference clocks insi
 notHas(/Deadlines & clocks \(detailed\)/, 'Overview should no longer render a separate Deadlines & clocks section');
 hasText('Type / stage', 'Overview should combine type and stage in a single summary row');
 hasText('Family role', 'Overview should surface explicit family/divisional role in the top summary card');
+has(/const\s+STATUS_STAGE_RULES\s*=\s*Object\.freeze\(/, 'Userscript runtime should express status-stage detection as a rule table');
+has(/const\s+STATUS_SUMMARY_RULES\s*=\s*Object\.freeze\(/, 'Userscript runtime should express status-summary detection as a rule table');
 has(/function\s+resolvedOverviewStatus\s*\(/, 'Overview model should centralize headline-status resolution instead of inlining the same precedence repeatedly');
 has(/posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview status helper should prefer normalized posture labels over raw status summaries when both exist');
 has(/posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview status helper should prefer normalized posture severity over raw status-summary severity when both exist');
