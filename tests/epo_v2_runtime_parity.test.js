@@ -4,6 +4,7 @@ const { summarizeStatusText, inferStatusStageFromText } = require('../lib/epo_v2
 const { classifyDocSignal } = require('../lib/epo_v2_doc_signals');
 const { classifyPacketSignal, standalonePacketBundle } = require('../lib/epo_v2_packet_signals');
 const { buildProceduralRecords, deriveProceduralPostureFromSources } = require('../lib/epo_v2_posture_signals');
+const { inferProceduralDeadlinesFromSources } = require('../lib/epo_v2_deadline_signals');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -68,6 +69,42 @@ for (const caseNo of ['EP22809254', 'EP23182542', 'EP23758527']) {
   assert.strictEqual(!!runtimePosture.recovered, !!libPosture.recovered, `Runtime recovered flag should match lib posture derivation for ${caseNo}`);
   assert.strictEqual(!!runtimePosture.recoveredBeforeGrant, !!libPosture.recoveredBeforeGrant, `Runtime recovered-before-grant flag should match lib posture derivation for ${caseNo}`);
   assert.strictEqual(runtimePosture.note, libPosture.note, `Runtime posture note should match lib posture derivation for ${caseNo}`);
+
+  const runtimeDeadlines = plain(hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {})).map((deadline) => ({
+    label: deadline.label,
+    date: deadline.date,
+    level: deadline.level,
+    confidence: deadline.confidence,
+    sourceDate: deadline.sourceDate || '',
+    resolved: !!deadline.resolved,
+    superseded: !!deadline.superseded,
+    supersededBy: deadline.supersededBy || null,
+    reference: !!deadline.reference,
+    method: deadline.method || '',
+    rolledOver: !!deadline.rolledOver,
+    rolloverNote: deadline.rolloverNote || '',
+  }));
+  const libDeadlines = plain(inferProceduralDeadlinesFromSources({
+    main,
+    docs: doclist.docs,
+    eventHistory,
+    legal,
+    pdfData: {},
+  })).map((deadline) => ({
+    label: deadline.label,
+    date: deadline.date,
+    level: deadline.level,
+    confidence: deadline.confidence,
+    sourceDate: deadline.sourceDate || '',
+    resolved: !!deadline.resolved,
+    superseded: !!deadline.superseded,
+    supersededBy: deadline.supersededBy || null,
+    reference: !!deadline.reference,
+    method: deadline.method || '',
+    rolledOver: !!deadline.rolledOver,
+    rolloverNote: deadline.rolloverNote || '',
+  }));
+  assert.deepStrictEqual(runtimeDeadlines, libDeadlines, `Runtime deadline inference should match lib deadline inference for ${caseNo}`);
 }
 
 console.log('epo_v2_runtime_parity.test.js passed');
