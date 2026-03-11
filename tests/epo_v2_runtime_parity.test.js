@@ -10,10 +10,21 @@ const { parseDoclistFromDocument } = require('../lib/epo_v2_doclist_parser');
 const { parseEventHistoryFromDocument, parseLegalFromDocument } = require('../lib/epo_v2_procedural_parser');
 const { parseFamilyFromDocument, parseCitationsFromDocument } = require('../lib/epo_v2_reference_parsers');
 const { parseUeFromDocument, parseFederatedFromDocument } = require('../lib/epo_v2_territorial_parser');
+const { parseMainRawFromDocument } = require('../lib/epo_v2_main_parser');
 
 const hooks = loadUserscriptHooks();
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const compactText = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+const partyHead = (value) => {
+  const text = compactText(value).replace(/^for all designated states\b[:\s-]*/i, '').trim();
+  const entityMatch = text.match(/^(.*?(?:Inc\.?|LLP|PLC|LLC|Ltd\.?|Limited|GmbH|S\.A\.?|B\.V\.?|Corp\.?|Corporation|Company|Co\.?|AG|AB|A\/S|SAS|SRL|S\.r\.l\.|KG|KGaA))(?=\s|$)/i);
+  if (entityMatch?.[1]) return entityMatch[1].trim();
+  const addressCue = text.match(/\s+\d{1,5}[A-Z]?(?:-\d+)?\s+[A-Z]/);
+  if (addressCue && addressCue.index > 6) return text.slice(0, addressCue.index).trim();
+  const placeCue = text.match(/\s+(?:Parc|Square|Suite|Building|Street|Road|Avenue|Boulevard|Lane|Way|Campus)\b/i);
+  if (placeCue && placeCue.index > 6) return text.slice(0, placeCue.index).trim();
+  return text;
+};
 
 assert.strictEqual(typeof hooks.summarizeStatus, 'function', 'Runtime hook surface should expose summarizeStatus');
 assert.strictEqual(typeof hooks.inferStatusStage, 'function', 'Runtime hook surface should expose inferStatusStage');
@@ -77,6 +88,49 @@ assert.strictEqual(hooks.timelineSubtitleText(timelineSubtitleSample), timelineS
 assert.strictEqual(hooks.docPacketExplanation('Further processing'), docPacketExplanation('Further processing'), 'Runtime packet explanation helper should match lib timeline explanation text');
 assert.strictEqual(hooks.compactOverviewTitle('Communication about intention to grant a European patent'), compactOverviewTitle('Communication about intention to grant a European patent'), 'Runtime compact-title helper should match lib title compaction');
 assert.strictEqual(hooks.shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), shouldAppendSingleRunLabel('Loss-of-rights communication', 'Examination'), 'Runtime single-run-label policy should match lib timeline helper');
+
+for (const caseNo of ['EP19871250', 'EP23182542', 'EP19205846']) {
+  const mainDoc = loadFixtureDocument(['cases', caseNo, 'main.html'], `https://register.epo.org/application?number=${caseNo}&tab=main&lng=en`);
+  const runtimeMain = plain(hooks.parseMain(mainDoc, caseNo));
+  const libMain = plain(parseMainRawFromDocument(mainDoc, caseNo));
+  assert.deepStrictEqual(
+    {
+      appNo: runtimeMain.appNo,
+      title: compactText(runtimeMain.title),
+      applicant: partyHead(runtimeMain.applicant),
+      representative: partyHead(runtimeMain.representative),
+      filingDate: runtimeMain.filingDate,
+      priorities: runtimeMain.priorities,
+      priorityText: compactText(runtimeMain.priorityText),
+      statusRaw: compactText(runtimeMain.statusRaw),
+      recentEvents: runtimeMain.recentEvents,
+      publications: runtimeMain.publications,
+      internationalAppNo: runtimeMain.internationalAppNo,
+      isEuroPct: !!runtimeMain.isEuroPct,
+      isDivisional: !!runtimeMain.isDivisional,
+      parentCase: runtimeMain.parentCase,
+      divisionalChildren: runtimeMain.divisionalChildren,
+    },
+    {
+      appNo: libMain.appNo,
+      title: compactText(libMain.title),
+      applicant: partyHead(libMain.applicant),
+      representative: partyHead(libMain.representative),
+      filingDate: libMain.filingDate,
+      priorities: libMain.priorities,
+      priorityText: compactText(libMain.priorityText),
+      statusRaw: compactText(libMain.statusRaw),
+      recentEvents: libMain.recentEvents,
+      publications: libMain.publications,
+      internationalAppNo: libMain.internationalAppNo,
+      isEuroPct: !!libMain.isEuroPct,
+      isDivisional: !!libMain.isDivisional,
+      parentCase: libMain.parentCase,
+      divisionalChildren: libMain.divisionalChildren,
+    },
+    `Runtime parseMain raw extraction should match lib main parsing for ${caseNo}`,
+  );
+}
 
 const citationsCaseNo = 'EP19871250';
 const citationsDoc = loadFixtureDocument(['cases', citationsCaseNo, 'citations.html'], `https://register.epo.org/application?number=${citationsCaseNo}&tab=citations&lng=en`);

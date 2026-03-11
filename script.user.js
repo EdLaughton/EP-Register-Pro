@@ -3516,7 +3516,7 @@
     const out = [];
     let current = null;
     for (const line of lines) {
-      const dm = line.match(DATE_RE);
+      const dm = line.match(/^\s*(\d{2}\.\d{2}\.\d{4})\b/);
       if (dm) {
         if (current?.dateStr && current?.title) out.push(current);
         current = { dateStr: dm[1], title: '', detail: '', source: 'Main page' };
