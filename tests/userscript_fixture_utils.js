@@ -59,6 +59,7 @@ function loadUserscriptHooks() {
     'docPacketExplanation',
     'familyRoleSummary',
     'upcUePresentationModel',
+    'renderOverviewUpcUeCard',
     'timelineAttorneyImportance',
     'timelineSubtitleText',
     'compactOverviewTitle',

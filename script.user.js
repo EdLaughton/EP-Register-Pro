@@ -7459,6 +7459,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return {
       unitaryEffect,
       upcRegistryStatus,
+      coverageStates,
       note: upcRegistryNoteText(upcRegistry, ue),
     };
   }
@@ -8182,7 +8183,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function renderOverviewUpcUeCard(m) {
-    const upStates = normalize(m.federated?.upMemberStates || '');
+    const upStates = normalize(m.upcUe?.coverageStates || m.federated?.upMemberStates || '');
     const upCount = upStates ? upStates.split(/,\s*/).filter(Boolean).length : 0;
     const trackedStates = Number(m.federated?.trackedStates || 0) || 0;
     const notableStates = Array.isArray(m.federated?.notableStates) ? m.federated.notableStates : [];
