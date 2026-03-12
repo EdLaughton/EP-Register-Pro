@@ -47,6 +47,8 @@ assert(family.publications.some((p) => p.no === 'EP4623169' && p.kind === 'A1'),
 
 const ue = hooks.parseUe(docs.ueMain);
 assert((ue.ueStatus || ue.statusRaw || '').length > 0, 'UE parser should parse the live ueMain capture without crashing');
+assert.strictEqual(ue.ueStatus, 'Request for examination was made', 'UE parser should strip status/database-update metadata from fallback UE status text on real captures');
+assert.strictEqual(ue.statusRaw, 'Request for examination was made', 'UE parser should normalize the raw UE status field down to the actual status text on real captures');
 const grantedUpUe = hooks.parseUe(loadFixtureDocument(['cases', 'EP19871250', 'ueMain.html'], 'https://register.epo.org/application?number=EP19871250&tab=ueMain&lng=en'));
 assert.strictEqual(grantedUpUe.memberStates, 'AT, BE, BG, DE, DK, EE, FI, FR, IT, LT, LU, LV, MT, NL, PT, RO, SE, SI', 'UE parser should strip the leading registration date and trailing bulletin reference from the covered-member-state row on real UP fixtures');
 

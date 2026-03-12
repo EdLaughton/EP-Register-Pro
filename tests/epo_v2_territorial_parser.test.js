@@ -28,7 +28,8 @@ assert.deepStrictEqual(ue19871250.renewalPaidYears, [7, 6], 'Territorial parser 
 assert.strictEqual(ue19871250.highestRenewalPaidYear, 7, 'Territorial parser should preserve the latest UP renewal-fee year from ueMain fixtures');
 
 const ue24837586 = parseUeFromDocument(loadFixtureDocument(['cases', 'EP24837586', 'ueMain.html'], 'https://register.epo.org/application?number=EP24837586&tab=ueMain&lng=en'));
-assert(/Request for examination was made/.test(ue24837586.ueStatus), 'Territorial parser should fall back to the visible status text when no positive UE registration/request state is present');
+assert.strictEqual(ue24837586.ueStatus, 'Request for examination was made', 'Territorial parser should fall back to the actual visible UE status text without trailing status/database-update metadata when no positive UE registration/request state is present');
+assert.strictEqual(ue24837586.statusRaw, 'Request for examination was made', 'Territorial parser should strip administrative update metadata from the raw UE status field as well');
 
 const federated = parseFederatedFromDocument(loadFixtureDocument(['cases', 'EP19871250', 'federated.html'], 'https://register.epo.org/application?number=EP19871250&tab=federated&lng=en'), 'EP19871250');
 assert.strictEqual(federated.fullPublicationNo, 'EP3863511B1', 'Territorial parser should preserve the federated-register summary publication number');

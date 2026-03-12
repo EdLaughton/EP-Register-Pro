@@ -3276,6 +3276,12 @@
     return stripBulletinRef(String(value || '').replace(/^\s*\d{2}\.\d{2}\.\d{4}\s*/i, ' '));
   }
 
+  function cleanUeStatusValue(value = '') {
+    return normalize(String(value || '')
+      .replace(/\bStatus updated on\b\s*\d{2}\.\d{2}\.\d{4}\b/gi, ' ')
+      .replace(/\bDatabase last updated on\b\s*\d{2}\.\d{2}\.\d{4}\b/gi, ' '));
+  }
+
   function parseApplicationField(raw) {
     const m = normalize(raw).match(/(\d{6,10}\.\d)[\s\S]{0,70}?(\d{2}\.\d{2}\.\d{4})\b/);
     return { filingDate: m?.[2] || '' };
@@ -4772,7 +4778,7 @@
 
   function parseUe(doc) {
     const pageText = bodyText(doc);
-    const status = normalize(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
+    const status = cleanUeStatusValue(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
     const renewalPaidYears = [...new Set([...doc.querySelectorAll('tr')]
       .map((row) => {
         const match = normalize(text(row)).match(/renewal fee unitary effect year\s*0*(\d{1,2})\b/i);
