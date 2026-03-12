@@ -8143,13 +8143,18 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       ? `${terminalPosture ? 'Historical grace until' : 'Grace until'} ${esc(formatDate(m.renewal.graceUntil))}${m.renewal.dueState === 'grace' && !terminalPosture ? ' (surcharge period active)' : ''}`
       : '';
     const federatedPaidYear = Number(String(m.federated?.renewalFeesPaidUntil || '').match(/Year\s+(\d+)/i)?.[1] || 0) || null;
-    const effectivePaidYear = Math.max(Number(m.renewal.highestYear || 0) || 0, Number(federatedPaidYear || 0) || 0) || null;
+    const highestLegalPaidYear = Number(m.renewal.highestYear || 0) || null;
+    const effectivePaidYear = Math.max(Number(highestLegalPaidYear || 0) || 0, Number(federatedPaidYear || 0) || 0) || null;
     const patentYearStatus = effectivePaidYear
       ? `Paid through Year ${effectivePaidYear}${patentYearFromFiling ? ` · current year ${patentYearFromFiling}` : ''}`
       : (patentYearFromFiling ? `Current year ${patentYearFromFiling}` : 'No renewal payment captured yet');
-    const latestRenewalNote = m.renewal.latest
-      ? `Last payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}`
-      : (federatedPaidYear ? `Federated register reports payments through Year ${federatedPaidYear}` : 'No renewal payment event cached.');
+    const latestRenewalNote = federatedPaidYear && (!highestLegalPaidYear || federatedPaidYear > highestLegalPaidYear)
+      ? (m.renewal.latest
+          ? `Legal events show latest payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}; federated register reports payments through Year ${federatedPaidYear}`
+          : `Federated register reports payments through Year ${federatedPaidYear}`)
+      : m.renewal.latest
+        ? `Last payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}`
+        : (federatedPaidYear ? `Federated register reports payments through Year ${federatedPaidYear}` : 'No renewal payment event cached.');
     const confidenceBadge = `<span class="epoRP-bdg info">${esc(`${m.renewal.confidence || 'low'} confidence`)}</span>`;
     const postureNote = terminalPosture ? 'Shown as historical fee context because the case appears closed/withdrawn.' : '';
 
