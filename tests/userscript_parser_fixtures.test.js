@@ -47,6 +47,8 @@ assert(family.publications.some((p) => p.no === 'EP4623169' && p.kind === 'A1'),
 
 const ue = hooks.parseUe(docs.ueMain);
 assert((ue.ueStatus || ue.statusRaw || '').length > 0, 'UE parser should parse the live ueMain capture without crashing');
+const grantedUpUe = hooks.parseUe(loadFixtureDocument(['cases', 'EP19871250', 'ueMain.html'], 'https://register.epo.org/application?number=EP19871250&tab=ueMain&lng=en'));
+assert.strictEqual(grantedUpUe.memberStates, 'AT, BE, BG, DE, DK, EE, FI, FR, IT, LT, LU, LV, MT, NL, PT, RO, SE, SI', 'UE parser should strip the leading registration date and trailing bulletin reference from the covered-member-state row on real UP fixtures');
 
 const placeholderMainDoc = new JSDOM('<!doctype html><html><body><div>No files were found for your search terms.</div></body></html>', {
   url: 'https://register.epo.org/application?number=EP19205846&tab=main&lng=en',

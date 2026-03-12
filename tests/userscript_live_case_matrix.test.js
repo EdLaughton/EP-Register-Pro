@@ -101,7 +101,7 @@ function caseLegal(caseNo) {
   assert(citations.phases.some((p) => p.name === 'Search') && citations.phases.some((p) => p.name === 'International search'), 'Granted baseline should parse citations grouped by real phases');
   assert(citations.entries.some((e) => e.publicationNo === 'WO2017035502'), 'Granted baseline should parse real citation publication numbers');
   assert.strictEqual(ue.ueStatus, 'Unitary effect registered', 'Granted baseline should parse real unitary-effect registration status');
-  assert(/AT, BE, BG, DE/.test(ue.memberStates || ''), 'Granted baseline should retain covered UP member states');
+  assert.strictEqual(ue.memberStates, 'AT, BE, BG, DE, DK, EE, FI, FR, IT, LT, LU, LV, MT, NL, PT, RO, SE, SI', 'Granted baseline should retain a clean covered-member-state list from ueMain without the registration date or bulletin tag');
   assert.strictEqual(ue.highestRenewalPaidYear, 7, 'Granted baseline should retain the latest UP renewal-fee year from ueMain data');
 }
 

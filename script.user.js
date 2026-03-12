@@ -3255,6 +3255,27 @@
     return '';
   }
 
+  function fieldTailByLabel(doc, regexes) {
+    for (const row of doc.querySelectorAll('tr')) {
+      const cells = [...row.querySelectorAll('th,td')];
+      if (cells.length < 2) continue;
+      for (let i = 0; i < cells.length - 1; i++) {
+        if (!regexes.some((re) => re.test(text(cells[i]) || ''))) continue;
+        const value = text(cells[cells.length - 1]);
+        if (value) return value;
+      }
+    }
+    return '';
+  }
+
+  function stripBulletinRef(value = '') {
+    return normalize(String(value || '').replace(/\s*\[\d{4}\/\d{2}\]\s*/g, ' '));
+  }
+
+  function cleanMemberStatesValue(value = '') {
+    return stripBulletinRef(String(value || '').replace(/^\s*\d{2}\.\d{2}\.\d{4}\s*/i, ' '));
+  }
+
   function parseApplicationField(raw) {
     const m = normalize(raw).match(/(\d{6,10}\.\d)[\s\S]{0,70}?(\d{2}\.\d{2}\.\d{4})\b/);
     return { filingDate: m?.[2] || '' };
@@ -4769,11 +4790,16 @@
     else if (/opt[\s-]*out.*withdrawn|opt[\s-]*out.*removed/i.test(pageText)) upcOptOut = 'Opt-out withdrawn';
     else if (/no\s*opt[\s-]*out|not\s*opted/i.test(pageText)) upcOptOut = 'No opt-out';
 
+    const memberStates = cleanMemberStatesValue(
+      fieldTailByLabel(doc, [/^Member State/i, /^Participating/i, /^Designated/i])
+      || fieldByLabel(doc, [/^Member State/i, /^Participating/i, /^Designated/i])
+    );
+
     return {
       statusRaw: status,
       ueStatus,
       upcOptOut,
-      memberStates: normalize(fieldByLabel(doc, [/^Member State/i, /^Participating/i, /^Designated/i])),
+      memberStates,
       renewalPaidYears,
       highestRenewalPaidYear: renewalPaidYears[0] || null,
       text: pageText,
