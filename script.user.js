@@ -7432,12 +7432,20 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   function upcUePresentationModel(ue = {}, upcRegistry = null, federated = {}) {
     const ueStatusRaw = normalize(ue.ueStatus || ue.statusRaw || '');
     const federatedStatus = normalize(federated.status || '');
-    const hasUpCoverage = !!normalize(federated.upMemberStates || '');
-    const hasUnitaryEffectRecord = /unitary effect registered|request for unitary effect|unitary patent/i.test(ueStatusRaw);
+    const coverageStates = normalize(ue.memberStates || federated.upMemberStates || '');
+    const hasUpCoverage = !!coverageStates;
+    const hasUnitaryEffectRecord = hasUpCoverage || /unitary effect|request for unitary effect|ue requested|unitary patent|unitary protection/i.test(ueStatusRaw);
     const mirrorsFederatedStatus = ueStatusRaw && federatedStatus && ueStatusRaw === federatedStatus;
+    const looksLikeOverallStatus = ueStatusRaw && !hasUnitaryEffectRecord && (
+      /^(the )?(application|patent)\b/i.test(ueStatusRaw)
+      || /request for examination was made/i.test(ueStatusRaw)
+      || /grant of patent is intended/i.test(ueStatusRaw)
+      || /decision to grant/i.test(ueStatusRaw)
+      || /no opposition filed within time limit/i.test(ueStatusRaw)
+    );
     const unitaryEffect = hasUnitaryEffectRecord
       ? ueStatusRaw
-      : mirrorsFederatedStatus && !hasUpCoverage
+      : (mirrorsFederatedStatus || looksLikeOverallStatus)
         ? 'No unitary effect record'
         : (ueStatusRaw || 'Unknown');
     const upcRegistryStatus = upcRegistry
