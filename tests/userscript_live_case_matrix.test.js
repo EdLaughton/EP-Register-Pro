@@ -300,9 +300,11 @@ function caseLegal(caseNo) {
   const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
   const preview = hooks.doclistGroupingPreview(doclistDoc);
   const posture = hooks.proceduralPostureModel(main, doclist.docs, eventHistory, legal);
+  const buckets = hooks.deadlinePresentationBuckets(deadlines, posture.currentClosed);
 
   assert.strictEqual(main.applicationType, 'Divisional', 'Clean no-opposition divisional control should remain classified as divisional');
   assert.strictEqual(posture.currentLabel, 'Granted (no opposition)', 'Clean no-opposition divisional control should resolve to the normalized no-opposition posture');
+  assert.strictEqual(posture.note, 'Current controlling posture is granted with the opposition period closed.', 'Clean no-opposition divisional control should prefer the post-grant closed note over stale historical R71 wording');
   assert.strictEqual(main.parentCase, 'EP3942381', 'Clean no-opposition divisional control should expose its parent case number');
   assert(/No opposition filed within time limit/i.test(main.statusRaw || ''), 'Clean no-opposition divisional control should preserve the post-grant no-opposition status');
   assert(preview.some((g) => g.label === 'Opposition' && g.dateStr === '10.03.2025' && g.size === 1), 'Clean no-opposition divisional control should surface the opposition-expiry communication as its own packet');
@@ -313,6 +315,11 @@ function caseLegal(caseNo) {
   assert(eventHistory.events.some((e) => /Lapse of the patent in a contracting state/i.test(e.title)), 'Clean no-opposition divisional control should retain post-grant lapse signals');
   assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Clean no-opposition divisional control should derive the opposition monitoring window');
   assert(deadlines.some((d) => d.label === 'Unitary effect request window'), 'Clean no-opposition divisional control should derive the post-grant unitary-effect window');
+  assert.strictEqual(hooks.selectNextDeadline(deadlines, posture.currentClosed), null, 'Clean no-opposition divisional control should not keep stale post-grant appeal or UE clocks active once the opposition period is closed');
+  assert.strictEqual(buckets.active.length, 0, 'Clean no-opposition divisional control should move post-grant appeal / UE clocks out of the active bucket after no-opposition closure');
+  assert.strictEqual(buckets.monitoring.length, 0, 'Clean no-opposition divisional control should not keep the opposition monitor active once the no-opposition event has landed');
+  assert(buckets.historical.some((d) => d.label === 'Opposition period (third-party monitor)' && d.resolved), 'Clean no-opposition divisional control should retain the opposition window only as resolved historical context after closure');
+  assert(buckets.historical.some((d) => d.label === 'Appeal notice + fee' && d.resolved), 'Clean no-opposition divisional control should retain grant-decision appeal clocks only as resolved historical context after closure');
   assert(legal.renewals.some((r) => r.year === 5), 'Clean no-opposition divisional control should retain renewal-fee history through year 5');
   assert(family.publications.some((p) => p.no === 'EP3942381' && p.kind === 'B1'), 'Clean no-opposition divisional control should retain the parent-family grant publication');
   assert(family.publications.some((p) => p.no === 'EP4163756' && p.kind === 'B1'), 'Clean no-opposition divisional control should retain its own B1 publication');
@@ -329,8 +336,12 @@ function caseLegal(caseNo) {
   const legal = hooks.parseLegal(caseDoc(caseNo, 'legal'), caseNo);
   const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, {});
   const preview = hooks.doclistGroupingPreview(doclistDoc);
+  const posture = hooks.proceduralPostureModel(main, doclist.docs, eventHistory, legal);
+  const buckets = hooks.deadlinePresentationBuckets(deadlines, posture.currentClosed);
 
   assert.strictEqual(main.applicationType, 'E/PCT regional phase', 'Clean Euro-PCT no-opposition control should remain classified as Euro-PCT regional phase');
+  assert.strictEqual(posture.currentLabel, 'Granted (no opposition)', 'Clean Euro-PCT no-opposition control should resolve to the normalized no-opposition posture');
+  assert.strictEqual(posture.note, 'Current controlling posture is granted with the opposition period closed.', 'Clean Euro-PCT no-opposition control should prefer the post-grant closed note over stale historical R71 wording');
   assert(/No opposition filed within time limit/i.test(main.statusRaw || ''), 'Clean Euro-PCT no-opposition control should preserve the post-grant no-opposition status');
   assert(preview.some((g) => g.label === 'Opposition' && g.dateStr === '06.02.2026' && g.size === 1), 'Clean Euro-PCT no-opposition control should surface the opposition-expiry communication as its own packet');
   assert(preview.some((g) => g.label === 'Intention to grant (R71(3) EPC)' && g.dateStr === '06.12.2024' && g.size === 6), 'Clean Euro-PCT no-opposition control should keep the R71 packet together');
@@ -338,6 +349,11 @@ function caseLegal(caseNo) {
   assert(eventHistory.events.some((e) => /Lapse of the patent in a contracting state/i.test(e.title)), 'Clean Euro-PCT no-opposition control should retain post-grant lapse signals');
   assert(deadlines.some((d) => d.label === 'Euro-PCT entry acts (31-month stop)'), 'Clean Euro-PCT no-opposition control should preserve its Euro-PCT entry-stop reference in the deadline model');
   assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Clean Euro-PCT no-opposition control should derive the opposition monitoring window');
+  assert.strictEqual(hooks.selectNextDeadline(deadlines, posture.currentClosed), null, 'Clean Euro-PCT no-opposition control should not keep stale post-grant appeal or UE clocks active once the opposition period is closed');
+  assert.strictEqual(buckets.active.length, 0, 'Clean Euro-PCT no-opposition control should move post-grant appeal / UE clocks out of the active bucket after no-opposition closure');
+  assert.strictEqual(buckets.monitoring.length, 0, 'Clean Euro-PCT no-opposition control should not keep the opposition monitor active once the no-opposition event has landed');
+  assert(buckets.historical.some((d) => d.label === 'Unitary effect request window' && d.resolved), 'Clean Euro-PCT no-opposition control should retain the unitary-effect request window only as resolved historical context after closure');
+  assert(buckets.historical.some((d) => d.label === 'Appeal grounds' && d.resolved), 'Clean Euro-PCT no-opposition control should retain grant-decision appeal clocks only as resolved historical context after closure');
   assert(legal.renewals.some((r) => r.year === 5), 'Clean Euro-PCT no-opposition control should retain renewal-fee history through year 5');
   assert(family.publications.some((p) => p.no === 'WO2021091972' && p.kind === 'A1'), 'Clean Euro-PCT no-opposition control should retain the WO publication');
   assert(family.publications.some((p) => p.no === 'EP4054309' && p.kind === 'B1'), 'Clean Euro-PCT no-opposition control should retain its own B1 publication');

@@ -6886,12 +6886,12 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecovery)}.`;
     } else if (currentClosed && effectiveLoss) {
       note = `Current controlling posture is ${postureLossLabel(effectiveLoss)}.`;
-    } else if (currentGrantIntended && latestR71) {
-      note = 'Current controlling posture is Rule 71(3) / intention-to-grant.';
     } else if (currentNoOpposition) {
       note = 'Current controlling posture is granted with the opposition period closed.';
     } else if (currentGranted) {
       note = 'Current controlling posture is granted / post-grant.';
+    } else if (currentGrantIntended && latestR71) {
+      note = 'Current controlling posture is Rule 71(3) / intention-to-grant.';
     } else if (currentExamination) {
       note = 'Current controlling posture is active examination.';
     } else if (currentSearch) {
@@ -7194,6 +7194,10 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function appendPostGrantDeadlines(ctx) {
+    const noOpposition = ctx.latestRecord(/no opposition filed within time limit/i);
+    const noOppositionDate = parseDateString(noOpposition?.dateStr || '');
+    const closedByNoOpposition = (dueDate) => !!(noOppositionDate && dueDate && noOppositionDate.getTime() >= dueDate.getTime());
+
     const grantMention = ctx.records.find((record) => isActualGrantMentionText(`${record.title || ''} ${record.detail || ''}`));
     if (grantMention) {
       const anchor = parseDateString(grantMention.dateStr);
@@ -7205,7 +7209,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           level: 'warn',
           confidence: 'high',
           sourceDate: grantMention.dateStr,
-          resolved: false,
+          resolved: closedByNoOpposition(calcOpp.date),
           method: 'Rule-based: grant mention +9 months',
           rolledOver: calcOpp.rolledOver,
           rolloverNote: calcOpp.rolledOver ? `day ${calcOpp.fromDay}→${calcOpp.toDay}` : '',
@@ -7217,7 +7221,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           level: 'warn',
           confidence: 'high',
           sourceDate: grantMention.dateStr,
-          resolved: ctx.hasAfter(anchor, (r) => /unitary effect/i.test(`${r.title} ${r.detail}`)),
+          resolved: ctx.hasAfter(anchor, (r) => /unitary effect/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcUe.date),
           method: 'Rule-based: grant mention +1 month',
           rolledOver: calcUe.rolledOver,
           rolloverNote: calcUe.rolledOver ? `day ${calcUe.fromDay}→${calcUe.toDay}` : '',
@@ -7236,7 +7240,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           level: 'bad',
           confidence: 'high',
           sourceDate: decision.dateStr,
-          resolved: ctx.hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)),
+          resolved: ctx.hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcNotice.date),
           method: 'Rule-based: decision date +2 months',
           rolledOver: calcNotice.rolledOver,
           rolloverNote: calcNotice.rolledOver ? `day ${calcNotice.fromDay}→${calcNotice.toDay}` : '',
@@ -7248,7 +7252,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           level: 'bad',
           confidence: 'high',
           sourceDate: decision.dateStr,
-          resolved: ctx.hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)),
+          resolved: ctx.hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcGrounds.date),
           method: 'Rule-based: decision date +4 months',
           rolledOver: calcGrounds.rolledOver,
           rolloverNote: calcGrounds.rolledOver ? `day ${calcGrounds.fromDay}→${calcGrounds.toDay}` : '',
