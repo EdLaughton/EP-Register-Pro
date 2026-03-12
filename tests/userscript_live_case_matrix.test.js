@@ -102,6 +102,7 @@ function caseLegal(caseNo) {
   assert(citations.entries.some((e) => e.publicationNo === 'WO2017035502'), 'Granted baseline should parse real citation publication numbers');
   assert.strictEqual(ue.ueStatus, 'Unitary effect registered', 'Granted baseline should parse real unitary-effect registration status');
   assert(/AT, BE, BG, DE/.test(ue.memberStates || ''), 'Granted baseline should retain covered UP member states');
+  assert.strictEqual(ue.highestRenewalPaidYear, 7, 'Granted baseline should retain the latest UP renewal-fee year from ueMain data');
 }
 
 // EP22809254 — Euro-PCT non-entry withdrawal + partial/final international-search packet mix

@@ -278,6 +278,8 @@ for (const caseNo of ['EP19871250', 'EP24837586']) {
       ueStatus: compactText(ue.ueStatus),
       upcOptOut: compactText(ue.upcOptOut),
       memberStates: compactText(ue.memberStates),
+      renewalPaidYears: Array.isArray(ue.renewalPaidYears) ? ue.renewalPaidYears : [],
+      highestRenewalPaidYear: ue.highestRenewalPaidYear || null,
       text: compactText(ue.text),
     }))(plain(hooks.parseUe(ueDoc))),
     ((ue) => ({
@@ -285,6 +287,8 @@ for (const caseNo of ['EP19871250', 'EP24837586']) {
       ueStatus: compactText(ue.ueStatus),
       upcOptOut: compactText(ue.upcOptOut),
       memberStates: compactText(ue.memberStates),
+      renewalPaidYears: Array.isArray(ue.renewalPaidYears) ? ue.renewalPaidYears : [],
+      highestRenewalPaidYear: ue.highestRenewalPaidYear || null,
       text: compactText(ue.text),
     }))(plain(parseUeFromDocument(ueDoc))),
     `Runtime parseUe raw extraction should match lib territorial parsing for ${caseNo}`,

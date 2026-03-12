@@ -4752,6 +4752,12 @@
   function parseUe(doc) {
     const pageText = bodyText(doc);
     const status = normalize(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
+    const renewalPaidYears = [...new Set([...doc.querySelectorAll('tr')]
+      .map((row) => {
+        const match = normalize(text(row)).match(/renewal fee unitary effect year\s*0*(\d{1,2})\b/i);
+        return match ? Number(match[1] || 0) : 0;
+      })
+      .filter(Boolean))].sort((a, b) => b - a);
     let ueStatus = '';
     let upcOptOut = '';
 
@@ -4768,6 +4774,8 @@
       ueStatus,
       upcOptOut,
       memberStates: normalize(fieldByLabel(doc, [/^Member State/i, /^Participating/i, /^Designated/i])),
+      renewalPaidYears,
+      highestRenewalPaidYear: renewalPaidYears[0] || null,
       text: pageText,
     };
   }
@@ -7314,9 +7322,10 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const ueRegistered = /unitary effect registered/i.test(ue.ueStatus || ue.statusRaw || '');
     const filingDate = parseDateString(main.filingDate);
     const highestYear = renewals.reduce((m, r) => (r.year && r.year > m ? r.year : m), 0) || null;
+    const uePaidYear = Number(ue?.highestRenewalPaidYear || 0) || null;
     const federatedPaidYear = Number(String(federated?.renewalFeesPaidUntil || '').match(/Year\s+(\d+)/i)?.[1] || 0) || null;
     const schedulePaidYear = ueRegistered
-      ? (Math.max(Number(highestYear || 0) || 0, Number(federatedPaidYear || 0) || 0) || null)
+      ? (Math.max(Number(highestYear || 0) || 0, Number(uePaidYear || 0) || 0) || null)
       : highestYear;
 
     let feeForum = 'Unknown';
@@ -7369,6 +7378,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       count: renewals.length,
       latest: renewals[0] || null,
       highestYear,
+      uePaidYear,
       schedulePaidYear,
       federatedPaidYear,
       explanatoryBasis: mode,
@@ -8144,17 +8154,18 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       : '';
     const federatedPaidYear = Number(String(m.federated?.renewalFeesPaidUntil || '').match(/Year\s+(\d+)/i)?.[1] || 0) || null;
     const highestLegalPaidYear = Number(m.renewal.highestYear || 0) || null;
-    const effectivePaidYear = Math.max(Number(highestLegalPaidYear || 0) || 0, Number(federatedPaidYear || 0) || 0) || null;
+    const uePaidYear = Number(m.renewal.uePaidYear || 0) || null;
+    const effectivePaidYear = Math.max(Number(highestLegalPaidYear || 0) || 0, Number(uePaidYear || 0) || 0) || null;
     const patentYearStatus = effectivePaidYear
       ? `Paid through Year ${effectivePaidYear}${patentYearFromFiling ? ` · current year ${patentYearFromFiling}` : ''}`
       : (patentYearFromFiling ? `Current year ${patentYearFromFiling}` : 'No renewal payment captured yet');
-    const latestRenewalNote = federatedPaidYear && (!highestLegalPaidYear || federatedPaidYear > highestLegalPaidYear)
+    const latestRenewalNote = uePaidYear && (!highestLegalPaidYear || uePaidYear > highestLegalPaidYear)
       ? (m.renewal.latest
-          ? `Legal events show latest payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}; federated register reports payments through Year ${federatedPaidYear}`
-          : `Federated register reports payments through Year ${federatedPaidYear}`)
+          ? `Legal events show latest payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}; UP register shows payments through Year ${uePaidYear}`
+          : `UP register shows payments through Year ${uePaidYear}`)
       : m.renewal.latest
         ? `Last payment ${m.renewal.latest.dateStr}${m.renewal.latest.year ? ` · Year ${m.renewal.latest.year}` : ''}`
-        : (federatedPaidYear ? `Federated register reports payments through Year ${federatedPaidYear}` : 'No renewal payment event cached.');
+        : (federatedPaidYear ? `Federated register reports payments through ${m.federated?.renewalFeesPaidUntil || `Year ${federatedPaidYear}`}` : 'No renewal payment event cached.');
     const confidenceBadge = `<span class="epoRP-bdg info">${esc(`${m.renewal.confidence || 'low'} confidence`)}</span>`;
     const postureNote = terminalPosture ? 'Shown as historical fee context because the case appears closed/withdrawn.' : '';
 
@@ -8204,12 +8215,16 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     if (trackedStates) noteParts.push(`Federated register tracks ${trackedStates} national/UP record${trackedStates === 1 ? '' : 's'}${m.federated?.recordUpdated ? ` (updated ${m.federated.recordUpdated})` : ''}.`);
     if (notableStates.length) noteParts.push(`Notable states: ${notableStates.map((s) => `${s.state}${s.notInForceSince ? ` (not in force since ${s.notInForceSince})` : ''}`).join(', ')}`);
 
+    const unitaryRenewalPaidTo = m.renewal?.isUnitary && (Number(m.renewal?.uePaidYear || 0) || 0) > 0
+      ? `Year ${Number(m.renewal.uePaidYear)}`
+      : (m.federated?.renewalFeesPaidUntil || '—');
+
     return `<div class="epoRP-c"><h4>UPC / UE</h4><div class="epoRP-g">
       <div class="epoRP-l">Unitary effect record</div><div class="epoRP-v">${esc(m.upcUe.unitaryEffect)}</div>
       <div class="epoRP-l">UPC registry</div><div class="epoRP-v">${esc(m.upcUe.upcRegistryStatus)}</div>
       <div class="epoRP-l">UP coverage</div><div class="epoRP-v">${upStates ? `${esc(upStates)} <span class="epoRP-bdg ok">${upCount} states</span>` : '—'}</div>
       <div class="epoRP-l">Federated status</div><div class="epoRP-v">${esc(m.federated?.status || '—')}</div>
-      <div class="epoRP-l">Renewals paid to</div><div class="epoRP-v">${esc(m.federated?.renewalFeesPaidUntil || '—')}</div>
+      <div class="epoRP-l">Renewals paid to</div><div class="epoRP-v">${esc(unitaryRenewalPaidTo)}</div>
       <div class="epoRP-l">Invalidation</div><div class="epoRP-v">${esc(m.federated?.invalidationDate || '—')}</div>
     </div><div class="epoRP-m">${esc(noteParts.filter(Boolean).join(' '))}</div></div>`;
   }
