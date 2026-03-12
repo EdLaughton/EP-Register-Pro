@@ -7307,13 +7307,17 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
 
-  function inferRenewalModel(main, legal, ue) {
+  function inferRenewalModel(main, legal, ue, federated = {}) {
     const now = new Date();
     const renewals = legal.renewals || [];
     const mentionGrant = (legal.events || []).find((e) => isActualGrantMentionText(`${e.title} ${e.detail}`));
     const ueRegistered = /unitary effect registered/i.test(ue.ueStatus || ue.statusRaw || '');
     const filingDate = parseDateString(main.filingDate);
     const highestYear = renewals.reduce((m, r) => (r.year && r.year > m ? r.year : m), 0) || null;
+    const federatedPaidYear = Number(String(federated?.renewalFeesPaidUntil || '').match(/Year\s+(\d+)/i)?.[1] || 0) || null;
+    const schedulePaidYear = ueRegistered
+      ? (Math.max(Number(highestYear || 0) || 0, Number(federatedPaidYear || 0) || 0) || null)
+      : highestYear;
 
     let feeForum = 'Unknown';
     if (ueRegistered) feeForum = 'EPO central (Unitary Patent)';
@@ -7328,8 +7332,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const canUseCentralEpSchedule = !!filingDate && (ueRegistered || !mentionGrant);
     if (canUseCentralEpSchedule) {
-      if (highestYear) {
-        nextYear = highestYear + 1;
+      if (schedulePaidYear) {
+        nextYear = schedulePaidYear + 1;
         confidence = 'high';
       } else {
         for (let y = 3; y <= 40; y++) {
@@ -7365,6 +7369,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       count: renewals.length,
       latest: renewals[0] || null,
       highestYear,
+      schedulePaidYear,
+      federatedPaidYear,
       explanatoryBasis: mode,
       mentionGrantDate: mentionGrant?.dateStr || '',
       isUnitary: ueRegistered,
@@ -7516,7 +7522,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const deadlines = inferProceduralDeadlines(main, docs, eventHistory, legal, pdfDeadlines);
     const posture = proceduralPostureModel(main, docs, eventHistory, legal);
 
-    const renewal = inferRenewalModel(main, legal, ue);
+    const renewal = inferRenewalModel(main, legal, ue, federated);
 
     const latestEpoDate = parseDateString(latestEpo?.dateStr);
     const latestApplicantDate = parseDateString(latestApplicant?.dateStr);

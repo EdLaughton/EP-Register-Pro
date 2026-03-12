@@ -54,6 +54,8 @@ function loadUserscriptHooks() {
     'selectNextDeadline',
     'activeDeadlineNoteText',
     'buildDeadlineRecords',
+    'inferRenewalModel',
+    'renderOverviewRenewalsCard',
     'proceduralPostureModel',
     'recoveryActionModel',
     'docPacketExplanation',
