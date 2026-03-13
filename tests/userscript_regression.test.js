@@ -236,7 +236,9 @@ has(/const\s+STATUS_SUMMARY_RULES\s*=\s*Object\.freeze\(/, 'Userscript runtime s
 has(/function\s+resolvedOverviewStatus\s*\(/, 'Overview model should centralize headline-status resolution instead of inlining the same precedence repeatedly');
 has(/posture\?\.currentLabel\s*\|\|\s*statusSummary\?\.simple|posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview status helper should prefer normalized posture labels over raw status summaries when both exist');
 has(/posture\?\.currentLevel\s*\|\|\s*statusSummary\?\.level|posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview status helper should prefer normalized posture severity over raw status-summary severity when both exist');
-hasText('Current posture', 'Actionable status should surface the current controlling procedural posture explicitly');
+hasText('Current posture', 'Actionable status should still preserve a posture row even when certainty-aware labels downgrade the wording');
+hasText('Likely current posture', 'Actionable status should downgrade posture wording when the underlying evidence is only medium confidence');
+hasText('Estimated next renewal fee', 'Overview should soften low-confidence renewal statements instead of sounding fully authoritative');
 hasText('Recovery path', 'Actionable status should surface recovery windows as a first-class row rather than burying them in generic notes');
 has(/function\s+proceduralPostureModel\s*\(/, 'Overview/timeline posture narrative should be derived from a dedicated procedural-posture helper');
 has(/function\s+recoveryActionModel\s*\(/, 'Actionable status should derive recovery windows from a dedicated recovery-action helper');
@@ -302,12 +304,18 @@ has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibil
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
 hasText("const casePage = /\\/application$/i.test(nextUrl.pathname) && !nextUrl.searchParams.has('documentId') && /^EP\\d+/i.test(caseNo);", 'Case-page detection should skip document-viewer URLs and require an EP application number through the centralized route snapshot');
 has(/function\s+routeSnapshot\s*\(/, 'Case-page detection should be centralized in the route snapshot helper');
+hasText('routeSnapshot(url, doc, { allowDomFallback: true }).caseNo', 'Only the explicit application-number helper should pay the DOM fallback cost');
+hasText('if (!allowDomFallback || !doc) return \'\';', 'Route snapshots should avoid DOM fallback work unless a caller explicitly opts in');
 has(/function\s+persistCurrentPanelScroll\s*\(/, 'Panel scroll persistence helper missing');
 has(/restorePanelScroll\(caseNo,\s*activeView,\s*scrollRestoreOverride\)/, 'Panel scroll should be restored after rerender with same-view scroll preservation');
 has(/function\s+panelScrollRestoreOverride\s*\(/, 'Panel scroll same-view override helper missing');
 has(/nextDeadlineBadge/, 'Actionable status should show next-deadline day delta inline');
 hasText('rolled over', 'Deadline metadata should include rollover indicator when applicable');
+hasText('if (runtime.abortController === controller) runtime.abortController = null;', 'All-fresh prefetch completions should explicitly clear the current abort controller before returning');
+hasText('await refreshDerivedPrefetchSources(caseNo, controller.signal, force);', 'All-fresh prefetch completions should still refresh derived sources before returning');
 notHas(/<div class="epoRP-l">Most recent event<\/div>/, 'Actionable status should not render a separate Most recent event row');
+hasText('Likely current posture', 'Overview should soften posture wording when the supporting evidence is not fully strong');
+hasText('Estimated next renewal fee', 'Overview should soften low-confidence renewal wording instead of overstating certainty');
 has(/el\.addEventListener\('input',\s*commit\)/, 'Options toggles should react on input events for reliable checkbox commits');
 
 console.log('userscript regression checks passed');

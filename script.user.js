@@ -3343,6 +3343,70 @@
     return { filingDate: m?.[2] || '' };
   }
 
+  function pairCandidates(doc) {
+    const out = [];
+    for (const row of doc.querySelectorAll('tr')) {
+      const cells = [...row.querySelectorAll('th,td')].map(text).map(normalize).filter(Boolean);
+      if (cells.length < 2) continue;
+      const label = cells[0];
+      const value = cells.slice(1).join('\n').trim();
+      if (!value) continue;
+      out.push({ label, value, lowLabel: label.toLowerCase(), lowValue: value.toLowerCase() });
+    }
+    for (const dl of doc.querySelectorAll('dl')) {
+      const children = [...dl.children];
+      for (let i = 0; i < children.length; i++) {
+        if (children[i]?.tagName !== 'DT') continue;
+        const label = normalize(text(children[i]));
+        const values = [];
+        for (let j = i + 1; j < children.length && children[j]?.tagName !== 'DT'; j++) {
+          if (children[j]?.tagName === 'DD') values.push(normalize(text(children[j])));
+        }
+        const value = values.filter(Boolean).join('\n').trim();
+        if (!value) continue;
+        out.push({ label, value, lowLabel: label.toLowerCase(), lowValue: value.toLowerCase() });
+      }
+    }
+    return out;
+  }
+
+  function firstPairValue(doc, predicate) {
+    return pairCandidates(doc).find((pair) => predicate(pair))?.value || '';
+  }
+
+  function fallbackAppField(doc, pageText = '') {
+    return firstPairValue(doc, ({ value }) => /(\d{6,10}\.\d)[\s\S]{0,70}?(\d{2}\.\d{2}\.\d{4})\b/.test(value))
+      || normalize(pageText).match(/(\d{6,10}\.\d[\s\S]{0,70}?\d{2}\.\d{2}\.\d{4})/)?.[1]
+      || '';
+  }
+
+  function fallbackPriorityField(doc, pageText = '') {
+    return firstPairValue(doc, ({ value, lowLabel }) => !/publication|event|status|title/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && /[A-Z]{2}\d+|PCT\/|WO\d{4}|priority/i.test(value))
+      || (String(pageText).match(/priority[\s\S]{0,320}/i)?.[0] || '');
+  }
+
+  function fallbackPublicationField(doc, pageText = '') {
+    return firstPairValue(doc, ({ value, lowLabel }) => !/priority|event/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && /(EP\s*\d+|WO\d{4}|[AB]\d\b|publication)/i.test(value))
+      || (String(pageText).match(/publication[\s\S]{0,360}/i)?.[0] || '');
+  }
+
+  function fallbackRecentEventField(doc) {
+    return firstPairValue(doc, ({ value, lowLabel }) => !/publication|priority|applic|represent|title/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && value.split(/\n+/).length >= 2);
+  }
+
+  function fallbackPartyField(doc, kind = 'applicant') {
+    const lowKind = String(kind || '').toLowerCase();
+    const lowBlock = lowKind === 'representative' ? /(representative|represent|attor|agent|mandat|vertreter|vertret|bevollm|avocat)/i : /(applicant|anmelder|demandeur|antragsteller|inhaber|proprietor)/i;
+    const labeled = firstPairValue(doc, ({ label, value }) => lowBlock.test(label) && value.length >= 3);
+    if (labeled) return labeled;
+    return firstPairValue(doc, ({ value, lowLabel }) => {
+      if (/date|priority|publication|event|status|title|number/.test(lowLabel)) return false;
+      if (/\d{2}\.\d{2}\.\d{4}/.test(value)) return false;
+      if (/\bep\d{6,10}|\d{6,10}\.\d\b/i.test(value)) return false;
+      return value.split(/\n+/).filter(Boolean).length >= 1 && value.length >= 8;
+    });
+  }
+
   function parseMainPublications(doc, role = 'EP (this file)') {
     const out = [];
 
@@ -3794,16 +3858,16 @@
   }
 
   function parseMain(doc, caseNo) {
+    const pageText = bodyText(doc);
     const appSections = sectionTextsByHeader(doc, /^Application number/i);
     const publicationSections = sectionTextsByHeader(doc, /^Publication\b/i);
-    const appField = appSections[0] || fieldByLabel(doc, [/^Application number/i]);
+    const appField = appSections[0] || fieldByLabel(doc, [/^Application number/i]) || fallbackAppField(doc, pageText);
     const statusField = dedupeMultiline(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
-    const priorityField = fieldByLabel(doc, [/^Priority\b/i]);
-    const publicationField = publicationSections.join('\n') || fieldByLabel(doc, [/^Publication\b/i]);
-    const recentEventField = fieldByLabel(doc, [/^Most recent event$/i]);
+    const priorityField = fieldByLabel(doc, [/^Priority\b/i]) || fallbackPriorityField(doc, pageText);
+    const publicationField = publicationSections.join('\n') || fieldByLabel(doc, [/^Publication\b/i]) || fallbackPublicationField(doc, pageText);
+    const recentEventField = fieldByLabel(doc, [/^Most recent event$/i]) || fallbackRecentEventField(doc);
 
     const appInfo = parseApplicationField(appField);
-    const pageText = bodyText(doc);
     const priorities = parsePriority(priorityField, pageText);
     const status = summarizeStatus(statusField);
 
@@ -3827,8 +3891,8 @@
     const isEuroPct = !!internationalAppNo;
 
     const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
-    const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]));
-    const representativeField = normalize(fieldByLabel(doc, [/^Representative/i]));
+    const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]) || fallbackPartyField(doc, 'applicant'));
+    const representativeField = normalize(fieldByLabel(doc, [/^Representative/i]) || fallbackPartyField(doc, 'representative'));
 
     const fallbackApplicant = normalize((pageText.match(/\bApplicant\s*(?:\n|:)\s*([^\n]+)/i)?.[1]) || '');
 
@@ -3858,13 +3922,42 @@
     return result;
   }
 
+  function structuralTableScore(table) {
+    const rows = [...table.querySelectorAll('tr')];
+    if (!rows.length) return 0;
+    let datedCells = 0;
+    let linkCells = 0;
+    let rowsWithDates = 0;
+    let rowsWithLinks = 0;
+    for (const row of rows.slice(0, 18)) {
+      const cells = [...row.querySelectorAll('th,td')];
+      if (!cells.length) continue;
+      let rowHasDate = false;
+      let rowHasLink = false;
+      for (const cell of cells) {
+        const cellText = text(cell);
+        if (DATE_RE.test(cellText)) {
+          datedCells += 1;
+          rowHasDate = true;
+        }
+        if (cell.querySelector('a')) {
+          linkCells += 1;
+          rowHasLink = true;
+        }
+      }
+      if (rowHasDate) rowsWithDates += 1;
+      if (rowHasLink) rowsWithLinks += 1;
+    }
+    return (rowsWithDates * 3) + (rowsWithLinks * 3) + datedCells + linkCells;
+  }
+
   function bestTable(doc, hints) {
     let best = null;
     let score = 0;
     for (const table of doc.querySelectorAll('table')) {
       const headerText = text(table.querySelector('thead') || table).toLowerCase();
-      let s = 0;
-      for (const hint of hints) if (headerText.includes(hint.toLowerCase())) s++;
+      let s = structuralTableScore(table);
+      for (const hint of hints) if (headerText.includes(hint.toLowerCase())) s += 5;
       if (s > score) {
         score = s;
         best = table;
@@ -3889,13 +3982,37 @@
   function tableColumnMap(table) {
     const map = {};
     const headerRow = table.querySelector('thead tr') || table.querySelector('tr');
-    [...(headerRow?.querySelectorAll('th,td') || [])].map(text).forEach((h, idx) => {
+    const headers = [...(headerRow?.querySelectorAll('th,td') || [])].map(text);
+    headers.forEach((h, idx) => {
       const low = h.toLowerCase();
       if (/^date$/.test(low)) map.date = idx;
       if (low.includes('document type') || low === 'document') map.document = idx;
       if (low.includes('procedure')) map.procedure = idx;
       if (low.includes('number') && low.includes('page')) map.pages = idx;
     });
+
+    const bodyRows = [...table.querySelectorAll('tbody tr, tr')].filter((row) => row.querySelector('td'));
+    const width = Math.max(0, ...bodyRows.map((row) => row.querySelectorAll('td').length));
+    const stats = Array.from({ length: width }, () => ({ dateHits: 0, linkHits: 0, textHits: 0 }));
+    for (const row of bodyRows.slice(0, 24)) {
+      [...row.querySelectorAll('td')].forEach((cell, idx) => {
+        const value = text(cell);
+        if (!value) return;
+        if (DATE_RE.test(value)) stats[idx].dateHits += 1;
+        if (cell.querySelector('a')) stats[idx].linkHits += 1;
+        if (value.length >= 12) stats[idx].textHits += 1;
+      });
+    }
+
+    if (map.date == null) {
+      map.date = stats.map((stat, idx) => ({ idx, score: stat.dateHits * 4 + stat.linkHits })).sort((a, b) => b.score - a.score)[0]?.idx;
+    }
+    if (map.document == null) {
+      map.document = stats.map((stat, idx) => ({ idx, score: stat.linkHits * 5 + stat.textHits * 2 - (idx === map.date ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
+    }
+    if (map.procedure == null) {
+      map.procedure = stats.map((stat, idx) => ({ idx, score: stat.textHits - (idx === map.date || idx === map.document ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
+    }
     return map;
   }
 
@@ -6982,6 +7099,9 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         addLog(caseNo, 'ok', 'Background prefetch complete (all fresh)');
         runtime.fetching = false;
         runtime.fetchLabel = 'Idle';
+        if (runtime.abortController === controller) runtime.abortController = null;
+        if (runtime.fetchCaseNo === caseNo) runtime.fetchCaseNo = null;
+        await refreshDerivedPrefetchSources(caseNo, controller.signal, force);
         scheduleRender();
         return;
       }
@@ -8832,6 +8952,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       publications,
       deadlines: deadlines.sort((a, b) => a.date - b.date),
       renewal,
+      presentationHints: overviewPresentationHints({ mainSourceStatus, posture, nextDeadline, renewal }),
       federated: {
         status: federated.status || '',
         upMemberStates: federated.upMemberStates || '',
@@ -9173,6 +9294,23 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return `${doc.dateStr} · ${compactOverviewTitle(doc.title || '')}`;
   }
 
+  function certaintyLabel(baseLabel, confidence = '') {
+    const low = String(confidence || '').toLowerCase();
+    if (!low || low === 'high') return baseLabel;
+    return low === 'medium' ? `Likely ${baseLabel.toLowerCase()}` : `Estimated ${baseLabel.toLowerCase()}`;
+  }
+
+  function overviewPresentationHints({ mainSourceStatus = '', posture = null, nextDeadline = null, renewal = null } = {}) {
+    const postureConfidence = String(mainSourceStatus || '').toLowerCase() === 'ok' && !posture?.partial ? 'high' : 'medium';
+    return {
+      postureLabel: certaintyLabel('Current posture', postureConfidence),
+      waitingLabel: certaintyLabel('Waiting on', nextDeadline?.confidence || postureConfidence),
+      nextDeadlineLabel: certaintyLabel('Next deadline', nextDeadline?.confidence || ''),
+      renewalLabel: certaintyLabel('Renewal status', renewal?.confidence || ''),
+      renewalNextFeeLabel: certaintyLabel('Next fee', renewal?.confidence || ''),
+    };
+  }
+
   function recoveryActionModel(posture = {}, waitingOn = '', waitingDays = null, latestApplicant = null) {
     const loss = posture?.latestLoss || null;
     const recovery = posture?.latestRecovery || null;
@@ -9350,12 +9488,15 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       ? `<div class="epoRP-l">${esc(m.recoveryAction.label || 'Recovery')}</div><div class="epoRP-v"><div><span class="epoRP-bdg ${esc(m.recoveryAction.level || 'info')}">${esc(m.recoveryAction.badge || 'Recovery')}</span></div>${m.recoveryAction.summary ? `<div class="epoRP-m">${esc(m.recoveryAction.summary)}</div>` : ''}${m.recoveryAction.note ? `<div class="epoRP-m">${esc(m.recoveryAction.note)}</div>` : ''}</div>`
       : '';
 
+    const postureLabel = esc(m.presentationHints?.postureLabel || 'Current posture');
+    const nextDeadlineLabel = esc(m.presentationHints?.nextDeadlineLabel || 'Next deadline');
+    const waitingLabel = esc(m.presentationHints?.waitingLabel || 'Waiting on');
     return `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
-      <div class="epoRP-l">Current posture</div><div class="epoRP-v">${postureBadge}${m.posture?.note ? `<div class="epoRP-m">${esc(m.posture.note)}</div>` : ''}</div>
-      <div class="epoRP-l">Next deadline</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : (m.nextDeadlineNote ? `<div>—</div><div class="epoRP-m">${esc(m.nextDeadlineNote)}</div>` : '—')}</div>
+      <div class="epoRP-l">${postureLabel}</div><div class="epoRP-v">${postureBadge}${m.posture?.note ? `<div class="epoRP-m">${esc(m.posture.note)}</div>` : ''}</div>
+      <div class="epoRP-l">${nextDeadlineLabel}</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : (m.nextDeadlineNote ? `<div>—</div><div class="epoRP-m">${esc(m.nextDeadlineNote)}</div>` : '—')}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
       ${recoveryHtml}
-      <div class="epoRP-l">Waiting on</div><div class="epoRP-v">${waitingSummary}</div>
+      <div class="epoRP-l">${waitingLabel}</div><div class="epoRP-v">${waitingSummary}</div>
     </div>${detailedDeadlinesHtml}</div>`;
   }
 
@@ -9390,11 +9531,13 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         : (federatedPaidYear ? `Federated register reports payments through ${m.federated?.renewalFeesPaidUntil || `Year ${federatedPaidYear}`}` : 'No renewal payment event cached.');
     const confidenceBadge = `<span class="epoRP-bdg info">${esc(`${m.renewal.confidence || 'low'} confidence`)}</span>`;
     const postureNote = terminalPosture ? 'Shown as historical fee context because the case appears closed/withdrawn.' : '';
+    const renewalLabel = esc(m.presentationHints?.renewalLabel || 'Renewals');
+    const renewalNextFeeLabel = esc(m.presentationHints?.renewalNextFeeLabel || 'Next fee');
 
-    return `<div class="epoRP-c"><h4>Renewals</h4><div class="epoRP-g">
+    return `<div class="epoRP-c"><h4>${renewalLabel}</h4><div class="epoRP-g">
       <div class="epoRP-l">Status</div><div class="epoRP-v">${esc(patentYearStatus)}<div class="epoRP-m">${esc(latestRenewalNote)}</div></div>
       <div class="epoRP-l">Forum</div><div class="epoRP-v">${esc(m.renewal.feeForum || 'Unknown')}</div>
-      <div class="epoRP-l">${terminalPosture ? 'Central-fee schedule' : 'Next fee'}</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}${graceText ? `<div class="epoRP-m">${graceText}</div>` : ''}</div>
+      <div class="epoRP-l">${terminalPosture ? 'Central-fee schedule' : renewalNextFeeLabel}</div><div class="epoRP-v">${m.renewal.nextYear ? `Year ${m.renewal.nextYear} · ` : ''}${m.renewal.nextDue ? `<span class="epoRP-bdg ${dueLevel}">${dueText}</span>` : dueText}${graceText ? `<div class="epoRP-m">${graceText}</div>` : ''}</div>
       ${m.renewal.mentionGrantDate ? `<div class="epoRP-l">Grant mention</div><div class="epoRP-v">${esc(m.renewal.mentionGrantDate)}</div>` : ''}
     </div><div class="epoRP-m">${esc(m.renewal.explanatoryBasis)}</div><div class="epoRP-m">${confidenceBadge}${postureNote ? ` <span>${esc(postureNote)}</span>` : ''}</div></div>`;
   }

@@ -5,6 +5,8 @@ const {
   selectNextDeadline,
   activeDeadlineNoteText,
   recoveryActionModel,
+  certaintyLabel,
+  overviewPresentationHints,
   buildActionableOverviewState,
 } = require('../lib/epo_v2_overview_signals');
 
@@ -61,6 +63,24 @@ assert.strictEqual(
   activeDeadlineNoteText(reviewOnly, false),
   'No auto-remindable deadline detected; 1 low-confidence or manual-review item remain.',
   'Overview helper should explain review-only states distinctly from actionable deadlines',
+);
+assert.strictEqual(certaintyLabel('Current posture', 'medium'), 'Likely current posture', 'Overview helper should downgrade medium-confidence UI labels to likely phrasing');
+assert.strictEqual(certaintyLabel('Next renewal fee', 'low'), 'Estimated next renewal fee', 'Overview helper should downgrade low-confidence UI labels to estimated phrasing');
+assert.deepStrictEqual(
+  overviewPresentationHints({
+    mainSourceStatus: 'partial',
+    posture: { partial: true },
+    nextDeadline: { confidence: 'medium' },
+    renewal: { confidence: 'low' },
+  }),
+  {
+    postureLabel: 'Likely current posture',
+    waitingLabel: 'Likely waiting on',
+    nextDeadlineLabel: 'Likely next deadline',
+    renewalLabel: 'Estimated renewal status',
+    renewalNextFeeLabel: 'Estimated next renewal fee',
+  },
+  'Overview helper should provide certainty-aware presentation labels for posture, deadlines, and renewals',
 );
 
 const anchorOnly = [

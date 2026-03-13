@@ -52,4 +52,21 @@ assert.deepStrictEqual(
   'Main parser should recover publication rows from the structured publication section',
 );
 
+const nonEnglishMainDoc = new (require('jsdom').JSDOM)(`<!doctype html><html><body>
+  <h1>Tragbares medizinisches Gerät mit wiederverwendbaren Komponenten</h1>
+  <table>
+    <tr><th>Anmeldenummer</th><td>EP19871250.6 10.10.2019</td></tr>
+    <tr><th>Anmelder</th><td>Acme Medical GmbH</td></tr>
+    <tr><th>Vertreter</th><td>Smith IP LLP</td></tr>
+    <tr><th>Priorität</th><td>US201862743963P 10.10.2018</td></tr>
+    <tr><th>Veröffentlichung</th><td>EP3863511 A1 12.05.2021</td></tr>
+    <tr><th>Letztes Ereignis</th><td>01.01.2026\n(Expected) grant\npublished on 04.02.2026 [2026/06]</td></tr>
+  </table>
+</body></html>`, { url: 'https://register.epo.org/application?number=EP19871250&tab=main&lng=de' }).window.document;
+const nonEnglishMain = parseMainRawFromDocument(nonEnglishMainDoc, 'EP19871250');
+assert.strictEqual(nonEnglishMain.filingDate, '10.10.2019', 'Main parser should recover the filing date from structurally identifiable non-English application rows');
+assert.strictEqual(nonEnglishMain.applicant, 'Acme Medical GmbH', 'Main parser should recover the applicant from non-English main-page rows instead of silently dropping party data');
+assert(nonEnglishMain.publications.some((publication) => publication.no === 'EP3863511' && publication.kind === 'A1'), 'Main parser should recover publications from structurally identifiable non-English publication rows');
+assert.strictEqual(nonEnglishMain.recentEvents.length, 1, 'Main parser should still recover recent events from structurally identifiable non-English rows');
+
 console.log('epo_v2_main_parser.test.js passed');

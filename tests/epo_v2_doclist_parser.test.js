@@ -29,6 +29,16 @@ assert.deepStrictEqual(
   'Doclist parser should extract ordered raw rows from the Register-style document table',
 );
 
+const nonEnglishDoc = new JSDOM(`<!doctype html><html><body>
+  <table id="real-non-en"><thead><tr><th><input type="checkbox"></th><th>Datum</th><th>Dokumenttyp</th><th>Verfahren</th><th>Seiten</th></tr></thead><tbody>
+    <tr><td><input type="checkbox"></td><td>03.03.2024</td><td><a href="/doc/c">Mitteilung der Prüfungsabteilung gemäß Artikel 94(3) EPÜ</a></td><td>Prüfung</td><td>6</td></tr>
+  </tbody></table>
+</body></html>`, { url: 'https://register.epo.org/application?number=EP00000000&tab=doclist&lng=de' }).window.document;
+const parsedNonEnglish = parseDoclistFromDocument(nonEnglishDoc, { fallbackUrl: 'https://register.epo.org/application?number=EP00000000&tab=doclist&lng=de' });
+assert.strictEqual(parsedNonEnglish.docs.length, 1, 'Doclist parser should still recover rows from non-English document tables via structural column inference');
+assert.strictEqual(parsedNonEnglish.docs[0].dateStr, '03.03.2024', 'Doclist parser should keep the date column even when the header is not English');
+assert.strictEqual(parsedNonEnglish.docs[0].pages, '6', 'Doclist parser should preserve page counts from structurally inferred non-English columns');
+
 const caseNo = 'EP23182542';
 const fixtureDoc = loadFixtureDocument(['cases', caseNo, 'doclist.html'], `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en`);
 const parsedFixture = parseDoclistFromDocument(fixtureDoc, { fallbackUrl: `https://register.epo.org/application?number=${caseNo}&tab=doclist&lng=en` });

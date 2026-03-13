@@ -300,6 +300,13 @@ npm test
   - and reversed/fragmented variants (e.g. `months ... 2` style ordering).
 - Keeps these targeted phrase detections lower-priority than explicit legal-wording matches.
 
+### 7.0.67
+- Addressed three higher-risk post-cleanup concerns:
+  - added structural main/doclist parser fallbacks so non-English Register labels are less likely to collapse the whole parse into empty data
+  - softened Overview wording when evidence is only medium/low confidence (for example posture / waiting / renewal phrasing)
+  - made the "all sources already fresh" prefetch path explicitly clear case fetch ownership before returning, while still refreshing derived sources
+  - extended parser/overview/regression coverage and rechecked live-case matrix + real fixtures after the pass
+
 ### 7.0.66
 - Follow-up runtime optimisation pass on cache/state and route hot paths:
   - case/session writes now skip persistence when a patch is a no-op, reducing avoidable `localStorage` / `sessionStorage` churn
