@@ -2290,12 +2290,13 @@
   ];
 
   const OPTION_DEFS_BY_KEY = Object.fromEntries(OPTION_DEFS.map((def) => [def.key, def]));
+  const initialUiState = loadJson(UI_KEY, {});
 
   const runtime = {
     appNo: '',
     href: location.href,
-    activeView: loadJson(UI_KEY, {}).activeView || 'overview',
-    collapsed: !!loadJson(UI_KEY, {}).collapsed,
+    activeView: initialUiState.activeView || 'overview',
+    collapsed: !!initialUiState.collapsed,
     panel: null,
     body: null,
     fetching: false,
@@ -2313,10 +2314,14 @@
     lastViewLogKey: '',
     routeTimer: null,
     pendingInitForce: false,
+    routeObserversInstalled: false,
+    lifecycleObserversInstalled: false,
+    routePollId: null,
   };
 
   let memory = null;
   let optionsShadow = null;
+  let uiShadow = (initialUiState && typeof initialUiState === 'object') ? initialUiState : { activeView: runtime.activeView, collapsed: runtime.collapsed };
   let sessionShadow = null;
   let dirty = false;
   let flushTimer = null;
@@ -2854,9 +2859,15 @@
       clearTimeout(runtime.routeTimer);
       runtime.routeTimer = null;
     }
+    if (runtime.scrollSaveTimer) {
+      clearTimeout(runtime.scrollSaveTimer);
+      runtime.scrollSaveTimer = null;
+    }
     runtime.pendingInitForce = false;
     runtime.appNo = '';
     runtime.fetchCaseNo = null;
+    runtime.fetching = false;
+    runtime.fetchLabel = 'Idle';
     runtime.lastViewLogKey = '';
     clearDerivedCaches();
   }
@@ -2887,6 +2898,24 @@
     return new URL(location.href);
   }
 
+  function routeSnapshot(url = currentUrl(), doc = document) {
+    const nextUrl = typeof url === 'string' ? new URL(url, location.origin) : url;
+    const fromUrl = appNoFromUrl(nextUrl);
+    const caseNo = /^EP\d+/i.test(fromUrl) ? fromUrl : (() => {
+      const fromDom = doc ? appNoFromDocument(doc) : '';
+      return /^EP\d+/i.test(fromDom) ? fromDom : '';
+    })();
+    const registerTab = normalize(nextUrl.searchParams.get('tab') || 'main');
+    const casePage = /\/application$/i.test(nextUrl.pathname) && !nextUrl.searchParams.has('documentId') && /^EP\d+/i.test(caseNo);
+    return {
+      href: nextUrl.toString(),
+      url: nextUrl,
+      caseNo: casePage ? caseNo : '',
+      registerTab,
+      isCasePage: casePage,
+    };
+  }
+
   function currentLang() {
     return currentUrl().searchParams.get('lng') || 'en';
   }
@@ -2901,20 +2930,15 @@
   }
 
   function detectAppNo(url = currentUrl(), doc = document) {
-    const fromUrl = appNoFromUrl(url);
-    if (/^EP\d+/i.test(fromUrl)) return fromUrl;
-    const fromDom = appNoFromDocument(doc);
-    return /^EP\d+/i.test(fromDom) ? fromDom : '';
+    return routeSnapshot(url, doc).caseNo;
   }
 
   function tabSlug(url = currentUrl()) {
-    return normalize(url.searchParams.get('tab') || 'main');
+    return routeSnapshot(url, document).registerTab;
   }
 
   function isCasePage(url = currentUrl()) {
-    if (!/\/application$/i.test(url.pathname)) return false;
-    if (url.searchParams.has('documentId')) return false;
-    return /^EP\d+/i.test(appNoFromUrl(url));
+    return routeSnapshot(url, document).isCasePage;
   }
 
   function sourceUrl(caseNo, slug) {
@@ -2975,14 +2999,23 @@
   }
 
   function uiState() {
-    return loadJson(UI_KEY, { activeView: runtime.activeView, collapsed: runtime.collapsed });
+    if (!uiShadow || typeof uiShadow !== 'object') {
+      uiShadow = loadJson(UI_KEY, { activeView: runtime.activeView, collapsed: runtime.collapsed }) || { activeView: runtime.activeView, collapsed: runtime.collapsed };
+    }
+    return uiShadow;
   }
 
   function setUiState(patch) {
-    const next = { ...uiState(), ...patch };
-    saveJson(UI_KEY, next);
+    const prev = uiState();
+    const next = { ...prev, ...patch };
+    const same = JSON.stringify(prev) === JSON.stringify(next);
+    if (!same) {
+      uiShadow = next;
+      saveJson(UI_KEY, next);
+    }
     runtime.activeView = next.activeView;
     runtime.collapsed = !!next.collapsed;
+    return next;
   }
 
   function sessionState() {
@@ -9733,6 +9766,23 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     restorePanelScroll(caseNo, activeView, scrollRestoreOverride);
   }
 
+  function routeTransitionState(previousCaseNo, nextCaseNo, previousRegisterTab, nextRegisterTab) {
+    const prevCase = String(previousCaseNo || '');
+    const nextCase = String(nextCaseNo || '');
+    const prevTab = String(previousRegisterTab || '');
+    const nextTab = String(nextRegisterTab || '');
+    const changedCase = !!(prevCase && nextCase && prevCase !== nextCase);
+    const sameCase = !!(prevCase && nextCase && prevCase === nextCase);
+    return {
+      changedCase,
+      sameCase,
+      enteredCase: !prevCase && !!nextCase,
+      leftCase: !!prevCase && !nextCase,
+      tabChangedWithinCase: sameCase && !!prevTab && prevTab !== nextTab,
+      sameTabReentryWithinCase: sameCase && !!prevTab && prevTab === nextTab,
+    };
+  }
+
   function prepareCaseInit(previousCaseNo, caseNo) {
     const changed = previousCaseNo !== caseNo;
     if (changed) {
@@ -9760,23 +9810,24 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     }, 1800);
   }
 
-  function prefetchGateState(caseNo, registerTab, changed) {
+  function prefetchGateState(previousCaseNo, caseNo, registerTab) {
     const caseSession = getCaseSession(caseNo);
     if (caseSession.prefetchDoneAt) runtime.autoPrefetchDoneByCase[caseNo] = Number(caseSession.prefetchDoneAt) || Date.now();
     if (caseSession.lastRegisterTab) runtime.lastRegisterTabByCase[caseNo] = String(caseSession.lastRegisterTab);
 
     const previousRegisterTab = String(runtime.lastRegisterTabByCase[caseNo] || caseSession.lastRegisterTab || '');
     const hasPreviousTab = !!previousRegisterTab;
-    const tabChangedWithinCase = hasPreviousTab && previousRegisterTab !== registerTab;
-    const sameTabReloadWithinCase = changed && hasPreviousTab && previousRegisterTab === registerTab;
+    const transition = routeTransitionState(previousCaseNo, caseNo, previousRegisterTab, registerTab);
     runtime.lastRegisterTabByCase[caseNo] = registerTab;
     patchCaseSession(caseNo, { lastRegisterTab: registerTab });
 
     return {
       previousRegisterTab,
       hasPreviousTab,
-      tabChangedWithinCase,
-      sameTabReloadWithinCase,
+      tabChangedWithinCase: transition.tabChangedWithinCase,
+      sameTabReloadWithinCase: transition.sameTabReentryWithinCase,
+      changedCase: transition.changedCase,
+      sameCase: transition.sameCase,
     };
   }
 
@@ -9826,7 +9877,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function init(force = false) {
-    if (!isCasePage()) {
+    const route = routeSnapshot();
+    if (!route.isCasePage) {
       cancelPrefetch();
       resetRouteRuntime();
       renderPanel();
@@ -9834,13 +9886,13 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     }
 
     const previousCaseNo = runtime.appNo;
-    const caseNo = detectAppNo();
+    const caseNo = route.caseNo;
     const changed = prepareCaseInit(previousCaseNo, caseNo);
 
     refreshLiveCaseView(caseNo);
 
-    const registerTab = tabSlug();
-    const gateState = prefetchGateState(caseNo, registerTab, changed);
+    const registerTab = route.registerTab;
+    const gateState = prefetchGateState(previousCaseNo, caseNo, registerTab);
 
     if (force) {
       handleForcedCaseReload(caseNo, registerTab);
@@ -9886,20 +9938,27 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function installRouteObservers() {
+    if (runtime.routeObserversInstalled) return;
+    runtime.routeObserversInstalled = true;
+
     const handleLocationChange = () => {
-      if (location.href === runtime.href) return;
-      runtime.href = location.href;
+      const route = routeSnapshot();
+      if (route.href === runtime.href) return;
+      runtime.href = route.href;
       scheduleInit(false);
     };
 
     for (const method of ['pushState', 'replaceState']) {
       const original = history[method];
       if (typeof original !== 'function') continue;
-      history[method] = function patchedHistoryState(...args) {
+      if (original.__epoRpPatched) continue;
+      const patched = function patchedHistoryState(...args) {
         const result = original.apply(this, args);
         handleLocationChange();
         return result;
       };
+      patched.__epoRpPatched = true;
+      history[method] = patched;
     }
 
     addEventListener('popstate', () => {
@@ -9912,7 +9971,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       scheduleInit(false);
     });
 
-    setInterval(handleLocationChange, 1500);
+    runtime.routePollId = setInterval(handleLocationChange, 1500);
   }
 
   GM_addStyle(`
@@ -10046,66 +10105,73 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     .epoRP-filter-hidden{display:none !important}
   `);
 
-  installRouteObservers();
+  function installLifecycleObservers() {
+    if (runtime.lifecycleObserversInstalled) return;
+    runtime.lifecycleObserversInstalled = true;
 
-  addEventListener('storage', (event) => {
-    if (![CACHE_KEY, OPTIONS_KEY, UI_KEY].includes(event.key)) return;
-    if (event.key === CACHE_KEY) {
-      memory = null;
-      clearDerivedCaches();
-    }
-    if (event.key === OPTIONS_KEY) {
-      optionsShadow = null;
-      clearDerivedCaches();
-    }
-    if (event.key === UI_KEY) {
-      const ui = uiState();
-      runtime.activeView = ui.activeView || runtime.activeView;
-      runtime.collapsed = !!ui.collapsed;
-    }
-    if (isCasePage()) renderPanel();
-  });
+    addEventListener('storage', (event) => {
+      if (![CACHE_KEY, OPTIONS_KEY, UI_KEY].includes(event.key)) return;
+      if (event.key === CACHE_KEY) {
+        memory = null;
+        clearDerivedCaches();
+      }
+      if (event.key === OPTIONS_KEY) {
+        optionsShadow = null;
+        clearDerivedCaches();
+      }
+      if (event.key === UI_KEY) {
+        uiShadow = null;
+        const ui = uiState();
+        runtime.activeView = ui.activeView || runtime.activeView;
+        runtime.collapsed = !!ui.collapsed;
+      }
+      if (isCasePage()) renderPanel();
+    });
 
-  addEventListener('focus', () => {
-    if (!isCasePage()) return;
-    runtime.href = location.href;
-    enhanceDoclistGrouping();
-    if (runtime.activeView !== 'timeline') renderPanel();
-  });
+    addEventListener('focus', () => {
+      if (!isCasePage()) return;
+      runtime.href = routeSnapshot().href;
+      enhanceDoclistGrouping();
+      if (runtime.activeView !== 'timeline') renderPanel();
+    });
 
-  document.addEventListener('visibilitychange', () => {
-    if (!isCasePage()) return;
+    document.addEventListener('visibilitychange', () => {
+      if (!isCasePage()) return;
 
-    if (document.visibilityState === 'hidden') {
+      if (document.visibilityState === 'hidden') {
+        persistCurrentPanelScroll();
+        if (runtime.appNo) persistLiveDoclistGroups(runtime.appNo);
+        return;
+      }
+
+      if (document.visibilityState !== 'visible') return;
+      runtime.href = routeSnapshot().href;
+      enhanceDoclistGrouping();
+      if (runtime.activeView !== 'timeline') renderPanel();
+    });
+
+    addEventListener('pageshow', () => {
+      runtime.href = routeSnapshot().href;
+      scheduleInit(false);
+    });
+
+    addEventListener('beforeunload', () => {
+      if (runtime.scrollSaveTimer) {
+        clearTimeout(runtime.scrollSaveTimer);
+        runtime.scrollSaveTimer = null;
+      }
+      if (runtime.routeTimer) {
+        clearTimeout(runtime.routeTimer);
+        runtime.routeTimer = null;
+      }
       persistCurrentPanelScroll();
       if (runtime.appNo) persistLiveDoclistGroups(runtime.appNo);
-      return;
-    }
+      flushNow();
+    });
+  }
 
-    if (document.visibilityState !== 'visible') return;
-    runtime.href = location.href;
-    enhanceDoclistGrouping();
-    if (runtime.activeView !== 'timeline') renderPanel();
-  });
-
-  addEventListener('pageshow', () => {
-    runtime.href = location.href;
-    scheduleInit(false);
-  });
-
-  addEventListener('beforeunload', () => {
-    if (runtime.scrollSaveTimer) {
-      clearTimeout(runtime.scrollSaveTimer);
-      runtime.scrollSaveTimer = null;
-    }
-    if (runtime.routeTimer) {
-      clearTimeout(runtime.routeTimer);
-      runtime.routeTimer = null;
-    }
-    persistCurrentPanelScroll();
-    if (runtime.appNo) persistLiveDoclistGroups(runtime.appNo);
-    flushNow();
-  });
+  installRouteObservers();
+  installLifecycleObservers();
 
   init(false);
 })();

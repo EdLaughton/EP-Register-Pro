@@ -137,7 +137,7 @@ hasText('Case tab/page changed; auto prefetch skipped for this page session', 'I
 hasText('Same-case tab switch detected: prefetch gate active', 'Init should log explicit same-case tab switch gate decisions');
 hasText('Same-case page reload detected: prefetch gate active', 'Init should log explicit same-case reload gate decisions');
 hasText('Initial case load: cache is fresh; no auto prefetch needed', 'Init should log fresh-cache reuse on first case load');
-has(/const\s+tabChangedWithinCase\s*=\s*hasPreviousTab\s*&&\s*previousRegisterTab\s*!==\s*registerTab;/, 'Init should detect same-case tab changes for gate logging across reloads');
+has(/tabChangedWithinCase:\s*transition\.tabChangedWithinCase/, 'Init should detect same-case tab changes through the centralized route-transition model for gate logging across reloads');
 notHas(/addEventListener\('focus',[\s\S]*prefetchCase\(/, 'Focus handler should not auto-reload all sources after same-case tab/page changes');
 has(/inferProceduralDeadlines\(main,\s*docs,\s*eventHistory,\s*legal,\s*pdfDeadlines\)/, 'Overview deadline model should include PDF-derived hints');
 
@@ -300,8 +300,8 @@ hasText("actor && actor !== 'Other' ? actor : ''", 'Timeline subtitle rendering 
 hasText('shouldAppendSingleRunLabel(item.detail, groupLabel)', 'Single-item document rows should skip broad run labels like Examination/Other when a stronger upgraded label already exists');
 has(/if \(runtime\.activeView !== 'timeline'\) renderPanel\(\);/, 'Focus/visibility refresh should avoid unnecessary timeline rerendering');
 has(/function\s+panelScrollKey\s*\(/, 'Panel scroll key helper missing');
-hasText("if (url.searchParams.has('documentId')) return false;", 'Case-page detection should skip document-viewer URLs');
-hasText('return /^EP\\d+/i.test(appNoFromUrl(url));', 'Case-page detection should require EP application number in URL query (number=...)');
+hasText("const casePage = /\\/application$/i.test(nextUrl.pathname) && !nextUrl.searchParams.has('documentId') && /^EP\\d+/i.test(caseNo);", 'Case-page detection should skip document-viewer URLs and require an EP application number through the centralized route snapshot');
+has(/function\s+routeSnapshot\s*\(/, 'Case-page detection should be centralized in the route snapshot helper');
 has(/function\s+persistCurrentPanelScroll\s*\(/, 'Panel scroll persistence helper missing');
 has(/restorePanelScroll\(caseNo,\s*activeView,\s*scrollRestoreOverride\)/, 'Panel scroll should be restored after rerender with same-view scroll preservation');
 has(/function\s+panelScrollRestoreOverride\s*\(/, 'Panel scroll same-view override helper missing');

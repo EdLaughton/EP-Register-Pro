@@ -16,16 +16,24 @@ has(/function\s+isFresh\(src,\s*refreshHours,\s*config\s*=\s*\{\}\)/, 'Freshness
 hasText("const reusableStatuses = allowEmpty ? new Set(['ok', 'empty']) : new Set(['ok']);", 'Error sources must not be treated as fresh');
 hasText("if (config.allowNotFound) reusableStatuses.add('notfound');", 'Freshness helper should optionally reuse cached notFound pages without treating them as errors');
 hasText("if (config.dependencyStamp != null && String(src?.dependencyStamp || '') !== String(config.dependencyStamp || '')) return false;", 'Freshness helper should invalidate derived cache when upstream dependency stamp changes');
+has(/function\s+uiState\s*\(/, 'UI-state access should be centralized');
+hasText('let uiShadow =', 'UI state should be shadowed in memory instead of reparsing localStorage on every read');
 
 // Lifecycle / route safety
 has(/function\s+clearDerivedCaches\s*\(/, 'Derived-view cache reset helper missing');
 has(/function\s+resetRouteRuntime\s*\(/, 'Route reset helper missing');
+has(/function\s+routeSnapshot\s*\(/, 'Route handling should be centralized behind a routeSnapshot helper');
+has(/function\s+routeTransitionState\s*\(/, 'Route transition classification helper missing');
 hasText('resetRouteRuntime();', 'Leaving a case page should reset case-scoped runtime state');
 hasText("runtime.appNo = '';", 'Non-case render/reset path should clear active case number');
+hasText("runtime.fetchLabel = 'Idle';", 'Route reset should fully clear case-scoped fetch status when leaving a case');
 has(/function\s+scheduleInit\s*\(force = false\)/, 'Debounced init scheduler missing');
 has(/function\s+installRouteObservers\s*\(/, 'Route observer installer missing');
+hasText('if (runtime.routeObserversInstalled) return;', 'Route observers should install idempotently');
 hasText("for (const method of ['pushState', 'replaceState'])", 'Route observers should hook history state changes');
-hasText('setInterval(handleLocationChange, 1500);', 'Route observers should keep only a slower fallback poll');
+hasText('runtime.routePollId = setInterval(handleLocationChange, 1500);', 'Route observers should keep only a slower fallback poll and retain ownership of it');
+has(/function\s+installLifecycleObservers\s*\(/, 'Lifecycle observers should be centralized behind an idempotent installer');
+hasText('if (runtime.lifecycleObserversInstalled) return;', 'Lifecycle observers should install idempotently');
 hasText("addEventListener('pageshow', () => {", 'Pageshow should reschedule init for bfcache / re-entry');
 hasText('scheduleInit(false);', 'Route/pageshow handling should use debounced init scheduling');
 

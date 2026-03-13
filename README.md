@@ -300,6 +300,16 @@ npm test
   - and reversed/fragmented variants (e.g. `months ... 2` style ordering).
 - Keeps these targeted phrase detections lower-priority than explicit legal-wording matches.
 
+### 7.0.65
+- Runtime / lifecycle / cache tidy-up pass for the shipped userscript:
+  - centralized route parsing behind a shared route snapshot + route-transition model instead of scattering case/tab detection logic
+  - made route/lifecycle observer installation idempotent to reduce duplicate-listener / duplicate-poll hazards on re-entry or reinjection
+  - moved lifecycle listeners behind a single installer to keep route, focus, storage, pageshow, and visibility handling coherent
+  - shadow-cached UI state in memory to reduce repeated `localStorage` parse/stringify churn while preserving cross-page hydration
+  - tightened route reset so leaving a case page clears fetch-status and timer state more completely
+  - kept the slower route poll as an owned runtime resource instead of an anonymous interval
+  - updated regression/lifecycle coverage so route snapshots, transition gating, and runtime observer ownership stay locked in
+
 ### 7.0.64
 - Closed the remaining documentation-audit gaps around structured procedural data and branch modeling:
   - the procedural parser now preserves structured legal-event fields such as **STEP_DESCRIPTION_NAME**, **DATE_OF_DISPATCH**, **DATE_OF_REPLY**, **DATE_OF_PAYMENT**, **DATE_OF_REQUEST**, **RESULT_DATE**, and **time-limit** values
