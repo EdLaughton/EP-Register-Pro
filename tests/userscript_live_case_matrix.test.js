@@ -237,7 +237,7 @@ function caseLegal(caseNo) {
     assert(eventHistory.events.some((e) => /Decision on request for further processing/i.test(e.title)), `${fixture.caseNo} should retain the further-processing event-history entry`);
     assert(eventHistory.events.some((e) => /Application deemed to be withdrawn/i.test(e.title)), `${fixture.caseNo} should retain the deemed-withdrawn event-history entry`);
     assert(deadlines.some((d) => d.label === 'Euro-PCT entry acts (31-month stop)'), `${fixture.caseNo} should keep Euro-PCT entry-stop guidance in the deadline model`);
-    assert(deadlines.some((d) => d.label === 'Appeal notice + fee'), `${fixture.caseNo} should preserve appeal-window derivation after the loss-of-rights posture`);
+    assert(!deadlines.some((d) => d.label === 'Appeal notice + fee'), `${fixture.caseNo} should not fabricate appeal clocks from further-processing decisions`);
     assert(legal.renewals.some((r) => r.year === 3), `${fixture.caseNo} should retain renewal-fee history through year 3`);
     assert(family.publications.some((p) => p.no === fixture.epPublication), `${fixture.caseNo} should retain its EP publication in the family/publication parse`);
     assert(family.publications.some((p) => p.no === fixture.woPublication), `${fixture.caseNo} should retain its WO publication in the family/publication parse`);
@@ -349,6 +349,8 @@ function caseLegal(caseNo) {
   assert(eventHistory.events.some((e) => /No opposition filed within time limit/i.test(e.title)), 'Clean Euro-PCT no-opposition control should retain the no-opposition event-history entry');
   assert(eventHistory.events.some((e) => /Lapse of the patent in a contracting state/i.test(e.title)), 'Clean Euro-PCT no-opposition control should retain post-grant lapse signals');
   assert(deadlines.some((d) => d.label === 'Euro-PCT entry acts (31-month stop)'), 'Clean Euro-PCT no-opposition control should preserve its Euro-PCT entry-stop reference in the deadline model');
+  assert.strictEqual(deadlines.find((d) => d.label === 'R71(3) response period')?.sourceDate, '06.12.2024', 'Clean Euro-PCT no-opposition control should anchor Rule 71(3) to the underlying communication date rather than the later announcement row');
+  assert.strictEqual(deadlines.find((d) => d.label === 'Euro-PCT exam/designation deadline (later-of formula)')?.sourceDate, '04.11.2019 / 14.05.2021', 'Clean Euro-PCT no-opposition control should anchor the later-of formula to the actual ISR/WO issue packet instead of later loss-of-rights rows');
   assert(deadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Clean Euro-PCT no-opposition control should derive the opposition monitoring window');
   assert.strictEqual(hooks.selectNextDeadline(deadlines, posture.currentClosed), null, 'Clean Euro-PCT no-opposition control should not keep stale post-grant appeal or UE clocks active once the opposition period is closed');
   assert.strictEqual(buckets.active.length, 0, 'Clean Euro-PCT no-opposition control should move post-grant appeal / UE clocks out of the active bucket after no-opposition closure');

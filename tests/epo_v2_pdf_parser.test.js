@@ -14,7 +14,7 @@ const {
 
 assert.strictEqual(normalizeDateString('1/2/26'), '01.02.2026', 'PDF parser should normalize short slash dates into dd.mm.yyyy');
 assert.strictEqual(parseSmallNumberToken('six'), 6, 'PDF parser should read small spelled-out month counts');
-assert.strictEqual(defaultResponseMonthsForCategory('Art. 94(3) response period'), 4, 'PDF parser should keep the Art. 94(3) default period');
+assert.strictEqual(defaultResponseMonthsForCategory('Art. 94(3) response period'), 0, 'PDF parser should not invent a default Art. 94(3) period without explicit communication text');
 assert.deepStrictEqual(
   inferDeadlineCategoryFromContext({ docTitle: 'Communication about intention to grant', docProcedure: 'Examining division' }),
   {
@@ -54,9 +54,9 @@ const parsedArt94 = parsePdfDeadlineHints(art94Text, {
   docTitle: 'Communication from the Examining Division pursuant to Article 94(3) EPC',
   docProcedure: 'Examining division',
 });
-assert.strictEqual(parsedArt94.hints.length, 1, 'Shared PDF parser should emit one fallback hint for the generic Art. 94 communication fixture');
-assert.strictEqual(parsedArt94.hints[0].label, 'Art. 94(3) response period', 'Shared PDF parser should use metadata fallback to infer the Art. 94 category');
-assert.strictEqual(parsedArt94.hints[0].dateStr, '01.01.2026', 'Shared PDF parser should apply the default 4-month Art. 94 fallback period');
-assert(/Default 4-month period inferred/.test(parsedArt94.diagnostics.responseEvidence), 'Shared PDF parser should preserve fallback-evidence diagnostics for metadata-derived categories');
+assert.strictEqual(parsedArt94.hints.length, 0, 'Shared PDF parser should not emit a dated Art. 94 hint when the generic fixture lacks an explicit period or deadline');
+assert.strictEqual(parsedArt94.diagnostics.category, 'Art. 94(3) response period', 'Shared PDF parser should still classify the generic fixture as Art. 94(3) for downstream review');
+assert.strictEqual(parsedArt94.diagnostics.responseMonths, 0, 'Shared PDF parser should leave Art. 94(3) at zero months when the communication text gives no express period');
+assert.strictEqual(parsedArt94.diagnostics.responseEvidence, '', 'Shared PDF parser should avoid fabricating fallback-period evidence for generic Art. 94 metadata');
 
 console.log('epo_v2_pdf_parser.test.js passed');

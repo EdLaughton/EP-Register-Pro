@@ -5716,8 +5716,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     if (/\brule\s*116\b|summons to oral proceedings/.test(low)) {
       return { category: 'Rule 116 final date', evidence: 'Inferred from document title/procedure metadata (Rule 116 / summons signal)' };
     }
-    if (/\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)|communication from (?:the )?examining|examining division/.test(low)) {
-      return { category: 'Art. 94(3) response period', evidence: 'Inferred from document title/procedure metadata (examining-division communication signal)' };
+    if (/\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)|communication pursuant to article 94\(3\)/.test(low)) {
+      return { category: 'Art. 94(3) response period', evidence: 'Inferred from document title/procedure metadata (explicit Art. 94(3) signal)' };
     }
     if (/\brule\s*161\b|\brule\s*162\b/.test(low)) {
       return { category: 'Rule 161/162 response period', evidence: 'Inferred from document title/procedure metadata (Rule 161/162 signal)' };
@@ -5731,8 +5731,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
   function defaultResponseMonthsForCategory(category) {
     const c = String(category || '').toLowerCase();
-    if (c.includes('art. 94(3)')) return 4;
     if (c.includes('r71(3)')) return 4;
+    if (c.includes('rule 70(2)')) return 6;
     if (c.includes('rule 161/162')) return 6;
     return 0;
   }
@@ -6991,6 +6991,11 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
     const filingDate = parseDateString(main.filingDate);
 
+    const docsDesc = [...(docs || [])].sort(compareDateDesc);
+    const eventDesc = dedupe([...(eventHistory.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.codexKey || ''}`).sort(compareDateDesc);
+    const legalEventsDesc = dedupe([...(legal.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.codexKey || ''}`).sort(compareDateDesc);
+    const codedEventsDesc = dedupe([...(legal.codedEvents || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.originalCode || ''}|${e.codexKey || ''}`).sort(compareDateDesc);
+
     const latestRecord = (regex) => records.find((r) => regex.test(`${r.title || ''} ${r.detail || ''}`));
     const hasPdfHint = (regex) => pdfHints.some((h) => regex.test(String(h.label || '')));
     const hasAfter = (anchorDate, predicate) => {
@@ -7063,9 +7068,32 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       return hasApplicantResponseAfter(anchorDate);
     };
 
-    const addMonthsDeadline = ({ triggerRegex, label, months, level, confidence = 'medium', resolvedBy }) => {
+    const rawItemDetail = (item = {}) => item.detail || item.procedure || item.freeFormatText || '';
+    const anchorRecordFromItem = (item = {}, source = '') => ({
+      dateStr: item.dateStr || '',
+      title: item.title || '',
+      detail: rawItemDetail(item),
+      actor: item.actor || '',
+      source: source || item.source || '',
+      codexKey: item.codexKey || '',
+      originalCode: item.originalCode || '',
+      effectiveDate: item.effectiveDate || '',
+    });
+
+    const pickPreferredAnchor = (plans = []) => {
+      for (const plan of plans) {
+        const items = Array.isArray(plan?.items) ? plan.items : [];
+        const predicate = typeof plan?.predicate === 'function' ? plan.predicate : null;
+        if (!predicate) continue;
+        const match = items.find((item) => predicate(item, normalize(`${item?.title || ''} ${rawItemDetail(item)}`.toLowerCase())));
+        if (match) return anchorRecordFromItem(match, plan.source);
+      }
+      return null;
+    };
+
+    const addMonthsDeadline = ({ record = null, triggerRegex = null, label, months, level, confidence = 'medium', resolvedBy }) => {
       if (hasPdfHint(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) return;
-      const rec = latestRecord(triggerRegex);
+      const rec = record || (triggerRegex ? latestRecord(triggerRegex) : null);
       if (!rec) return;
       const anchor = parseDateString(rec.dateStr);
       if (!anchor) return;
@@ -7075,6 +7103,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         : hasApplicantResponseAfter(anchor);
 
       const calc = addCalendarMonthsDetailed(anchor, months);
+      const sourceLabel = normalize(String(rec.source || 'preferred source')).toLowerCase() || 'preferred source';
       push({
         label,
         date: calc.date,
@@ -7082,11 +7111,67 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         confidence,
         sourceDate: rec.dateStr,
         resolved,
-        method: `Heuristic: +${months} month(s) from ${rec.source.toLowerCase()} trigger`,
+        method: `Heuristic: +${months} month(s) from ${sourceLabel} trigger`,
         rolledOver: calc.rolledOver,
         rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
       });
     };
+
+    const findNoOppositionRecord = () => pickPreferredAnchor([
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.codexKey === 'NO_OPPOSITION_FILED' || /no opposition filed within time limit|no opposition filed/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => e.codexKey === 'NO_OPPOSITION_FILED' || /no opposition filed within time limit|no opposition filed/.test(low) },
+      { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /no opposition filed within time limit|no opposition filed/.test(low) },
+      { items: records, source: 'Event', predicate: (r, low) => /no opposition filed within time limit|no opposition filed/.test(low) },
+    ]);
+
+    const findR71Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /communication about intention to grant a european patent|communication of intention to grant a patent/.test(low) },
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /text intended for grant|intention to grant \(signatures\)|annex to the communication about intention to grant/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'EPIDOSNIGR1' || /despatch of communication of intention to grant a patent/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => e.codexKey === 'GRANT_R71_3_EVENT' || /new entry: communication of intention to grant a patent|communication of intention to grant a patent/.test(low) },
+      { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /despatch of communication of intention to grant a patent/.test(low) },
+    ]);
+
+    const findArt94Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
+    ]);
+
+    const findRule702Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*70\(2\)|wish to proceed further|desire to proceed further|confirm.*proceed/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*70\(2\)|wish to proceed further|desire to proceed further|confirm.*proceed/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*70\(2\)|wish to proceed further|desire to proceed further|confirm.*proceed/.test(low) },
+    ]);
+
+    const findRule161162Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+    ]);
+
+    const findEuroPctSearchAnchor = () => pickPreferredAnchor([
+      {
+        items: docsDesc,
+        source: 'Documents',
+        predicate: (d, low) => d.actor === 'EPO'
+          && (/copy of the international search report|international publication of the international search report|written opinion of the isa|partial international search report|isr:/.test(low))
+          && !(/non-reply to written opinion|correction of deficiencies in written opinion|reply to|communication concerning|reminder period|deemed to be withdrawn/.test(low)),
+      },
+    ]);
+
+    const findGrantMentionAnchor = () => pickPreferredAnchor([
+      { items: legalEventsDesc, source: 'Event', predicate: (e, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
+      { items: records, source: 'Event', predicate: (r, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
+    ]);
+
+    const findAppealableDecisionAnchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain/.test(low) },
+      { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain/.test(low) },
+    ]);
 
     return {
       out,
@@ -7107,6 +7192,14 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       terminalEpoOutcomeAfter,
       resolveHintByActivity,
       addMonthsDeadline,
+      findNoOppositionRecord,
+      findR71Anchor,
+      findArt94Anchor,
+      findRule702Anchor,
+      findRule161162Anchor,
+      findEuroPctSearchAnchor,
+      findGrantMentionAnchor,
+      findAppealableDecisionAnchor,
     };
   }
 
@@ -7137,7 +7230,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
   function appendCoreCommunicationDeadlines(ctx) {
     ctx.addMonthsDeadline({
-      triggerRegex: /rule\s*71\(3\)|intention to grant|text intended for grant/i,
+      record: ctx.findR71Anchor(),
       label: 'R71(3) response period',
       months: 4,
       level: 'bad',
@@ -7145,16 +7238,12 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       resolvedBy: (anchor) => ctx.hasFeeSignalAfter(anchor, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections/i) || ctx.hasApplicantResponseAfter(anchor),
     });
 
-    ctx.addMonthsDeadline({
-      triggerRegex: /article\s*94\(3\)|art\.\s*94\(3\)|communication from (?:the )?examining/i,
-      label: 'Art. 94(3) response period',
-      months: 4,
-      level: 'warn',
-      confidence: 'medium',
-    });
+    if (ctx.findArt94Anchor() && ctx.hasPdfHint(/Art\. 94\(3\) response period/i)) {
+      // Keep explicit Art. 94(3) deadline computation tied to parsed communication text/PDF evidence.
+    }
 
     ctx.addMonthsDeadline({
-      triggerRegex: /rule\s*70\(2\)|confirm.*proceed|wish to proceed|proceed further/i,
+      record: ctx.findRule702Anchor(),
       label: 'Rule 70(2) confirmation/response period',
       months: 6,
       level: 'warn',
@@ -7162,7 +7251,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     });
 
     ctx.addMonthsDeadline({
-      triggerRegex: /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/i,
+      record: ctx.findRule161162Anchor(),
       label: 'Rule 161/162 response period',
       months: 6,
       level: 'bad',
@@ -7173,24 +7262,6 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
   function appendDirectOrPctDeadlines(ctx) {
     if (!ctx.isEuroPct) {
-      const esrMention = ctx.latestRecord(/mention of publication of (?:the )?european search report|publication of (?:the )?european search report/i);
-      if (esrMention) {
-        const anchor = parseDateString(esrMention.dateStr);
-        if (anchor) {
-          const calc = addCalendarMonthsDetailed(anchor, 6);
-          ctx.push({
-            label: `${ctx.isDivisional ? 'Divisional ' : ''}exam/designation + search-opinion bundle`,
-            date: calc.date,
-            level: 'bad',
-            confidence: 'high',
-            sourceDate: esrMention.dateStr,
-            resolved: ctx.hasFeeSignalAfter(anchor, /request for examination|examination fee|designation fee|extension fee|validation fee|fee payment received/i) || ctx.hasApplicantResponseAfter(anchor),
-            method: 'Rule-based: +6 months from ESR publication mention',
-            rolledOver: calc.rolledOver,
-            rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
-          });
-        }
-      }
       return;
     }
 
@@ -7199,7 +7270,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const calc31 = addCalendarMonthsDetailed(base31Date, 31);
     const due31 = calc31.date;
-    const isr = ctx.latestRecord(/international search report|\bisr\b|written opinion/i);
+    const isr = ctx.findEuroPctSearchAnchor();
     const isrDate = parseDateString(isr?.dateStr || '');
     const calcIsr = isrDate ? addCalendarMonthsDetailed(isrDate, 6) : null;
     const isrPlus6 = calcIsr?.date || null;
@@ -7225,21 +7296,21 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       label: 'Euro-PCT exam/designation deadline (later-of formula)',
       date: dueLater,
       level: 'bad',
-      confidence: isrDate ? 'high' : 'medium',
+      confidence: isrDate ? 'medium' : 'low',
       sourceDate: isrDate ? `${formatDate(base31Date)} / ${isr?.dateStr || ''}` : formatDate(base31Date),
       resolved: ctx.hasFeeSignalAfter(base31Date, /request for examination|examination fee|designation fee|extension fee|validation fee/i),
-      method: isrDate ? 'Rule-based: max(31 months from priority/filing, ISR +6 months)' : 'Rule-based: 31 months from priority/filing (ISR date unavailable)',
+      method: isrDate ? 'Heuristic: max(31 months from priority/filing, qualifying ISR/WO issue date +6 months)' : 'Rule-based: 31 months from priority/filing (no qualifying ISR/WO date found)',
       rolledOver: dueLaterRolled,
       rolloverNote: dueLaterRollNote,
     });
   }
 
   function appendPostGrantDeadlines(ctx) {
-    const noOpposition = ctx.latestRecord(/no opposition filed within time limit/i);
+    const noOpposition = ctx.findNoOppositionRecord();
     const noOppositionDate = parseDateString(noOpposition?.dateStr || '');
     const closedByNoOpposition = (dueDate) => !!(noOppositionDate && dueDate && noOppositionDate.getTime() >= dueDate.getTime());
 
-    const grantMention = ctx.records.find((record) => isActualGrantMentionText(`${record.title || ''} ${record.detail || ''}`));
+    const grantMention = ctx.findGrantMentionAnchor();
     if (grantMention) {
       const anchor = parseDateString(grantMention.dateStr);
       if (anchor) {
@@ -7270,7 +7341,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       }
     }
 
-    const decision = ctx.latestRecord(/\bdecision\b.*(?:refus|grant|revok|maintain)|\bdecision\b/i);
+    const decision = ctx.findAppealableDecisionAnchor();
     if (decision) {
       const anchor = parseDateString(decision.dateStr);
       if (anchor) {

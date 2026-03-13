@@ -195,6 +195,9 @@ const conflictMain = hooks.parseMain(loadFixtureDocument(['cases', 'EP23182542',
 const conflictDoclist = hooks.parseDoclist(loadFixtureDocument(['cases', 'EP23182542', 'doclist.html'], 'https://register.epo.org/application?number=EP23182542&tab=doclist&lng=en'));
 const conflictEvent = hooks.parseEventHistory(loadFixtureDocument(['cases', 'EP23182542', 'event.html'], 'https://register.epo.org/application?number=EP23182542&tab=event&lng=en'), 'EP23182542');
 const conflictLegal = hooks.parseLegal(loadFixtureDocument(['cases', 'EP23182542', 'legal.html'], 'https://register.epo.org/application?number=EP23182542&tab=legal&lng=en'), 'EP23182542');
+const conflictDeadlines = hooks.inferProceduralDeadlines(conflictMain, conflictDoclist.docs, conflictEvent, conflictLegal, {});
+assert.strictEqual(conflictDeadlines.find((d) => d.label === 'R71(3) response period')?.sourceDate, '13.05.2025', 'Deadline model should anchor Rule 71(3) to the underlying communication packet rather than the later grant-announcement row');
+assert.strictEqual(conflictDeadlines.some((d) => d.label === 'Art. 94(3) response period'), false, 'Deadline model should not fabricate an Art. 94(3) due date from applicant reply packets or generic examining-division rows');
 const conflictPosture = hooks.proceduralPostureModel(conflictMain, conflictDoclist.docs, conflictEvent, conflictLegal);
 assert.strictEqual(conflictPosture.label, 'Granted', 'Procedural posture should keep the current granted state after further processing cures an earlier adverse event');
 assert.strictEqual(conflictPosture.recoveredBeforeGrant, true, 'Procedural posture should detect that the case recovered from an adverse posture before grant');
@@ -262,10 +265,10 @@ const pdfArt94Fallback = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'art
   docTitle: 'Communication from the Examining Division pursuant to Article 94(3) EPC',
   docProcedure: 'Examining division',
 });
-assert.strictEqual(pdfArt94Fallback.hints.length, 1, 'PDF parser should produce a fallback Art. 94(3) deadline hint from metadata + communication date');
-assert.strictEqual(pdfArt94Fallback.hints[0].label, 'Art. 94(3) response period', 'PDF parser should use metadata fallback to infer Art. 94(3) category');
-assert.strictEqual(pdfArt94Fallback.hints[0].dateStr, '01.01.2026', 'PDF parser should apply the default 4-month Art. 94(3) period when months are not explicit');
-assert(/Default 4-month period inferred/.test(pdfArt94Fallback.diagnostics.responseEvidence), 'PDF parser should record default-period fallback evidence for metadata-derived categories');
+assert.strictEqual(pdfArt94Fallback.hints.length, 0, 'PDF parser should not produce a dated Art. 94(3) hint when the generic fixture lacks an explicit period or due date');
+assert.strictEqual(pdfArt94Fallback.diagnostics.category, 'Art. 94(3) response period', 'PDF parser should still classify the generic fixture as Art. 94(3) for manual review');
+assert.strictEqual(pdfArt94Fallback.diagnostics.responseMonths, 0, 'PDF parser should leave the Art. 94(3) response period unset when months are not explicit');
+assert.strictEqual(pdfArt94Fallback.diagnostics.responseEvidence, '', 'PDF parser should not fabricate default-period fallback evidence for generic Art. 94 metadata');
 
 const deadlines = hooks.inferProceduralDeadlines(main, doclist.docs, eventHistory, legal, pdfR71);
 assert(deadlines.some((d) => d.label === 'R71(3) response period'), 'Deadline model should derive the R71(3) cycle from live grant-communication material');

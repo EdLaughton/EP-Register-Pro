@@ -81,4 +81,30 @@ const publishedDivisionalDeadlines = inferProceduralDeadlinesFromSources({
 assert(!publishedDivisionalDeadlines.some((d) => d.label === 'Unitary effect request window'), 'Shared deadline inference should not invent unitary-effect windows for a published divisional that only has request-for-grant/search-publication signals');
 assert(!publishedDivisionalDeadlines.some((d) => d.label === 'Opposition period (third-party monitor)'), 'Shared deadline inference should not invent opposition windows for a published divisional without an actual grant mention');
 
+const grantCaseNo = 'EP20816706';
+const grantMain = hooks.parseMain(loadFixtureDocument(['cases', grantCaseNo, 'main.html'], `https://register.epo.org/application?number=${grantCaseNo}&tab=main&lng=en`), grantCaseNo);
+const grantDoclist = hooks.parseDoclist(loadFixtureDocument(['cases', grantCaseNo, 'doclist.html'], `https://register.epo.org/application?number=${grantCaseNo}&tab=doclist&lng=en`));
+const grantEventHistory = hooks.parseEventHistory(loadFixtureDocument(['cases', grantCaseNo, 'event.html'], `https://register.epo.org/application?number=${grantCaseNo}&tab=event&lng=en`), grantCaseNo);
+const grantLegal = hooks.parseLegal(loadFixtureDocument(['cases', grantCaseNo, 'legal.html'], `https://register.epo.org/application?number=${grantCaseNo}&tab=legal&lng=en`), grantCaseNo);
+const grantDeadlines = inferProceduralDeadlinesFromSources({ main: grantMain, docs: grantDoclist.docs, eventHistory: grantEventHistory, legal: grantLegal, pdfData: {} });
+assert.strictEqual(grantDeadlines.find((d) => d.label === 'R71(3) response period')?.sourceDate, '06.12.2024', 'Shared deadline inference should anchor Rule 71(3) to the underlying communication date rather than the later announcement row');
+assert.strictEqual(grantDeadlines.find((d) => d.label === 'Euro-PCT exam/designation deadline (later-of formula)')?.sourceDate, '04.11.2019 / 14.05.2021', 'Shared deadline inference should anchor the later-of formula to the qualifying ISR/WO packet rather than later loss-of-rights rows');
+
+const conflictCaseNo = 'EP23182542';
+const conflictMain = hooks.parseMain(loadFixtureDocument(['cases', conflictCaseNo, 'main.html'], `https://register.epo.org/application?number=${conflictCaseNo}&tab=main&lng=en`), conflictCaseNo);
+const conflictDoclist = hooks.parseDoclist(loadFixtureDocument(['cases', conflictCaseNo, 'doclist.html'], `https://register.epo.org/application?number=${conflictCaseNo}&tab=doclist&lng=en`));
+const conflictEventHistory = hooks.parseEventHistory(loadFixtureDocument(['cases', conflictCaseNo, 'event.html'], `https://register.epo.org/application?number=${conflictCaseNo}&tab=event&lng=en`), conflictCaseNo);
+const conflictLegal = hooks.parseLegal(loadFixtureDocument(['cases', conflictCaseNo, 'legal.html'], `https://register.epo.org/application?number=${conflictCaseNo}&tab=legal&lng=en`), conflictCaseNo);
+const conflictDeadlines = inferProceduralDeadlinesFromSources({ main: conflictMain, docs: conflictDoclist.docs, eventHistory: conflictEventHistory, legal: conflictLegal, pdfData: {} });
+assert.strictEqual(conflictDeadlines.find((d) => d.label === 'R71(3) response period')?.sourceDate, '13.05.2025', 'Shared deadline inference should prefer the actual Rule 71(3) communication packet over later grant-announcement rows');
+assert.strictEqual(conflictDeadlines.some((d) => d.label === 'Art. 94(3) response period'), false, 'Shared deadline inference should not fabricate Art. 94(3) dates from applicant reply packets or generic examining-division rows');
+
+const recoveryCaseNo = 'EP23721286';
+const recoveryMain = hooks.parseMain(loadFixtureDocument(['cases', recoveryCaseNo, 'main.html'], `https://register.epo.org/application?number=${recoveryCaseNo}&tab=main&lng=en`), recoveryCaseNo);
+const recoveryDoclist = hooks.parseDoclist(loadFixtureDocument(['cases', recoveryCaseNo, 'doclist.html'], `https://register.epo.org/application?number=${recoveryCaseNo}&tab=doclist&lng=en`));
+const recoveryEventHistory = hooks.parseEventHistory(loadFixtureDocument(['cases', recoveryCaseNo, 'event.html'], `https://register.epo.org/application?number=${recoveryCaseNo}&tab=event&lng=en`), recoveryCaseNo);
+const recoveryLegal = hooks.parseLegal(loadFixtureDocument(['cases', recoveryCaseNo, 'legal.html'], `https://register.epo.org/application?number=${recoveryCaseNo}&tab=legal&lng=en`), recoveryCaseNo);
+const recoveryDeadlines = inferProceduralDeadlinesFromSources({ main: recoveryMain, docs: recoveryDoclist.docs, eventHistory: recoveryEventHistory, legal: recoveryLegal, pdfData: {} });
+assert.strictEqual(recoveryDeadlines.some((d) => d.label === 'Appeal notice + fee'), false, 'Shared deadline inference should not fabricate appeal clocks from further-processing decisions');
+
 console.log('epo_v2_deadline_signals.test.js passed');
