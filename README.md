@@ -300,6 +300,13 @@ npm test
   - and reversed/fragmented variants (e.g. `months ... 2` style ordering).
 - Keeps these targeted phrase detections lower-priority than explicit legal-wording matches.
 
+### 7.0.66
+- Follow-up runtime optimisation pass on cache/state and route hot paths:
+  - case/session writes now skip persistence when a patch is a no-op, reducing avoidable `localStorage` / `sessionStorage` churn
+  - deduplicated log writes now avoid touching case cache state when the new entry would be suppressed anyway
+  - fast route helpers no longer pay the DOM application-number fallback cost unless a caller explicitly asks for it
+  - kept live-case verification green after the optimisation pass via the real-fixture and live-case matrix suites
+
 ### 7.0.65
 - Runtime / lifecycle / cache tidy-up pass for the shipped userscript:
   - centralized route parsing behind a shared route snapshot + route-transition model instead of scattering case/tab detection logic

@@ -2525,12 +2525,22 @@
     return store.apps[caseNo];
   }
 
+  function jsonEqual(a, b) {
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+      return a === b;
+    }
+  }
+
   function patchCase(caseNo, mutator) {
     const store = appStore();
-    if (!store.apps[caseNo]) {
+    const created = !store.apps[caseNo];
+    if (created) {
       store.apps[caseNo] = { appNo: caseNo, updatedAt: 0, sources: {}, logs: [] };
     }
-    mutator(store.apps[caseNo]);
+    const changed = mutator(store.apps[caseNo]);
+    if (changed === false && !created) return store.apps[caseNo];
     store.apps[caseNo].updatedAt = Date.now();
     markDirty();
     return store.apps[caseNo];
@@ -2554,6 +2564,8 @@
     if (!caseNo || !key) return null;
     const title = payload.title || sourceTitle(key);
     return patchCase(caseNo, (c) => {
+      const previousSource = c.sources[key];
+      const previousMeta = key === 'main' ? { ...(c.meta || {}) } : null;
       const next = {
         key,
         title,
@@ -2573,6 +2585,10 @@
         if (payload.data && payload.status === 'ok') syncMainSourceMeta(c, payload.data);
         else clearMainSourceMeta(c);
       }
+
+      const mainMetaChanged = key === 'main' ? !jsonEqual(previousMeta || {}, c.meta || {}) : false;
+      if (jsonEqual(previousSource || null, next) && !mainMetaChanged) return false;
+      return true;
     });
   }
 
@@ -2589,12 +2605,13 @@
           const delta = Number.isFinite(lastTs) ? Date.now() - lastTs : Infinity;
           if (delta >= 0 && delta < 900) {
             const sameMeta = safeInlineJson(last.meta || {}) === safeInlineJson(normalizedMeta);
-            if (sameMeta) return;
+            if (sameMeta) return false;
           }
         }
 
         c.logs.push({ ts: nowIso(), level: normalizedLevel, message: normalizedMessage, meta: normalizedMeta });
         if (c.logs.length > MAX_LOGS_PER_APP) c.logs = c.logs.slice(-MAX_LOGS_PER_APP);
+        return true;
       });
     } catch {
       // logging must never break script
@@ -2898,11 +2915,13 @@
     return new URL(location.href);
   }
 
-  function routeSnapshot(url = currentUrl(), doc = document) {
+  function routeSnapshot(url = currentUrl(), doc = null, config = {}) {
     const nextUrl = typeof url === 'string' ? new URL(url, location.origin) : url;
+    const allowDomFallback = !!config.allowDomFallback;
     const fromUrl = appNoFromUrl(nextUrl);
     const caseNo = /^EP\d+/i.test(fromUrl) ? fromUrl : (() => {
-      const fromDom = doc ? appNoFromDocument(doc) : '';
+      if (!allowDomFallback || !doc) return '';
+      const fromDom = appNoFromDocument(doc);
       return /^EP\d+/i.test(fromDom) ? fromDom : '';
     })();
     const registerTab = normalize(nextUrl.searchParams.get('tab') || 'main');
@@ -2930,15 +2949,15 @@
   }
 
   function detectAppNo(url = currentUrl(), doc = document) {
-    return routeSnapshot(url, doc).caseNo;
+    return routeSnapshot(url, doc, { allowDomFallback: true }).caseNo;
   }
 
   function tabSlug(url = currentUrl()) {
-    return routeSnapshot(url, document).registerTab;
+    return routeSnapshot(url).registerTab;
   }
 
   function isCasePage(url = currentUrl()) {
-    return routeSnapshot(url, document).isCasePage;
+    return routeSnapshot(url).isCasePage;
   }
 
   function sourceUrl(caseNo, slug) {
@@ -3008,7 +3027,7 @@
   function setUiState(patch) {
     const prev = uiState();
     const next = { ...prev, ...patch };
-    const same = JSON.stringify(prev) === JSON.stringify(next);
+    const same = jsonEqual(prev, next);
     if (!same) {
       uiShadow = next;
       saveJson(UI_KEY, next);
@@ -3042,7 +3061,11 @@
     if (!caseNo || !patch || typeof patch !== 'object') return {};
     const state = sessionState();
     const key = String(caseNo).toUpperCase();
-    const next = { ...(state.cases[key] || {}), ...patch, updatedAt: Date.now() };
+    const previous = state.cases[key] && typeof state.cases[key] === 'object' ? state.cases[key] : {};
+    const merged = { ...previous, ...patch };
+    if (jsonEqual(previous, merged)) return previous;
+
+    const next = { ...merged, updatedAt: Date.now() };
     state.cases[key] = next;
 
     const keys = Object.keys(state.cases || {});
