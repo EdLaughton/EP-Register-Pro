@@ -17,6 +17,10 @@
 // @connect      tessdata.projectnaptha.com
 // ==/UserScript==
 
+// Source template for build/build-userscript.js.
+// Core parser/signal implementations are bundled from lib/ into the generated userscript;
+// edit lib/* for those, not the legacy in-file copies below.
+
 (() => {
   'use strict';
 
@@ -67,2160 +71,6472 @@
     logger: () => {},
   };
 
-  const EPO_CODEX_DATA = Object.freeze({
-  "byCode": {
-    "ABEX": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ABEX",
-      "sourceDescription": "Amendments",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "examination",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "ADWI": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ADWI",
-      "sourceDescription": "Application deemed to be withdrawn",
-      "internalKey": "LOSS_OF_RIGHTS_R112",
-      "procedureFamily": "ALL_EP",
-      "phase": "loss_of_rights",
-      "classification": "consequence",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Link to underlying missed act using STEP_DESCRIPTION_NAME",
-      "parserNote": "Reason strings include missed examination reply, EESR reply, prior-art info, fees, etc."
-    },
-    "DOBS": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "DOBS",
-      "sourceDescription": "Communication of observations of proprietor",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "opposition",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "time-limit in record",
-      "parserNote": ""
-    },
-    "EXRE": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "EXRE",
-      "sourceDescription": "Invitation to indicate the basis for amendments",
-      "internalKey": "AMENDMENT_BASIS_INVITATION",
-      "procedureFamily": "ALL_EP",
-      "phase": "examination",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
-      "parserNote": "Good structured marker for Rule 137(4)-type issue."
-    },
-    "FFEE": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "FFEE",
-      "sourceDescription": "Payment of national basic fee",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "entry-regional-phase",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "IDOP": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "IDOP",
-      "sourceDescription": "Interlocutory decision in opposition",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "opposition",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "decision",
-      "parserNote": ""
-    },
-    "IGRA": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "IGRA",
-      "sourceDescription": "Intention to grant the patent",
-      "internalKey": "GRANT_R71_3",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create 4-month candidate from DATE_OF_DISPATCH; prefer actual document despatch/date",
-      "parserNote": "Also stores grant fee / print fee / translation dates."
-    },
-    "IGRE": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "IGRE",
-      "sourceDescription": "Disapproval of the communication of intention to grant the patent",
-      "internalKey": "GRANT_R71_6_DISAPPROVAL",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "incoming-response",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use as applicant action affecting grant branch",
-      "parserNote": "May lead to fresh Rule 71(3) or resumed examination."
-    },
-    "ISAT": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ISAT",
-      "sourceDescription": "International searching authority",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "entry-regional-phase",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "LIRE": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "LIRE",
-      "sourceDescription": "Communication from the examining division in a limitation procedure",
-      "internalKey": "LIMITATION_COMMUNICATION",
-      "procedureFamily": "LIMITATION_REVOCATION",
-      "phase": "limitation",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
-      "parserNote": "Limitation-specific communication family."
-    },
-    "ORAL": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ORAL",
-      "sourceDescription": "Oral proceedings",
-      "internalKey": "ORAL_PROCEEDINGS_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "examination/opposition/appeal",
-      "classification": "hearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Store OP date(s); parse annex separately for Rule 116 final date",
-      "parserNote": "The event itself is not enough for final-date logic."
-    },
-    "OREX": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "OREX",
-      "sourceDescription": "Communication from the opposition division",
-      "internalKey": "OPPOSITION_DIVISION_COMMUNICATION",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
-      "parserNote": "Strong structured marker for opposition communications."
-    },
-    "PART": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PART",
-      "sourceDescription": "Invitation to provide information on prior art",
-      "internalKey": "PRIOR_ART_INFORMATION_INVITATION",
-      "procedureFamily": "ALL_EP",
-      "phase": "examination",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create deadline from DATE_OF_DISPATCH + available time-limit/manual review",
-      "parserNote": "Often relevant to later ADWI / RFPR routing."
-    },
-    "PFEE": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PFEE",
-      "sourceDescription": "Penalty fee / additional fee",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "examination",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "time-limit in record",
-      "parserNote": ""
-    },
-    "PMAP": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PMAP",
-      "sourceDescription": "Preparation for maintenance of the patent in an amended form",
-      "internalKey": "OPPOSITION_R82_BRANCH",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_endgame",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use DATE_OF_DISPATCH as Rule 82 branch anchor and track payment",
-      "parserNote": "Maps well to Rule 82(1)/(2) maintenance logic."
-    },
-    "PREX": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PREX",
-      "sourceDescription": "Preliminary examination - PCT II",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "international-examination",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "PROL": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PROL",
-      "sourceDescription": "Language of the procedure",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "all",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "RAEX": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "RAEX",
-      "sourceDescription": "Request for accelerated examination",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "examination",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "REJR": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "REJR",
-      "sourceDescription": "Rejection of the request for revocation of the patent",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "revocation",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "decision",
-      "parserNote": ""
-    },
-    "RFEE": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "RFEE",
-      "sourceDescription": "Renewal fee payment",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "all",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "RFPR": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "RFPR",
-      "sourceDescription": "Request for further processing",
-      "internalKey": "FURTHER_PROCESSING_REQUEST",
-      "procedureFamily": "ALL_EP",
-      "phase": "remedial",
-      "classification": "remedial",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Attach to missed act using STEP_DESCRIPTION_NAME and record result",
-      "parserNote": "Central remedial branch for many missed deadlines."
-    },
-    "SFEE": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "SFEE",
-      "sourceDescription": "Fee for a supplementary search",
-      "internalKey": "SUPPLEMENTARY_SEARCH_FEE_PAYMENT",
-      "procedureFamily": "EURO_PCT",
-      "phase": "regional_phase_entry",
-      "classification": "payment",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use as Euro-PCT entry/compliance signal, not communication deadline",
-      "parserNote": "One of the regional-phase acts."
-    },
-    "TRAN": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "TRAN",
-      "sourceDescription": "Translation of the application",
-      "internalKey": "EURO_PCT_TRANSLATION_RECEIVED",
-      "procedureFamily": "EURO_PCT",
-      "phase": "regional_phase_entry",
-      "classification": "filing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use as Euro-PCT entry/compliance signal",
-      "parserNote": "One of the regional-phase acts."
-    },
-    "DDIV": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "DDIV",
-      "sourceDescription": "First communication from the examining division",
-      "internalKey": "FIRST_EXAM_COMM_DIVISIONAL_MARKER",
-      "procedureFamily": "ALL_EP",
-      "phase": "examination",
-      "classification": "marker",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use for divisional-window logic and examination chronology",
-      "parserNote": "Not necessarily the full text of the communication."
-    },
-    "WINT": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "WINT",
-      "sourceDescription": "Withdrawal during international phase - procedure closed",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "entry-regional-phase",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "procedure closed",
-      "parserNote": ""
-    },
-    "ACOR": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ACOR",
-      "sourceDescription": "Despatch of invitation to pay additional claims fees",
-      "internalKey": "ADDITIONAL_CLAIMS_FEE_INVITATION_AFTER_ALLOWED_AMENDMENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create fee deadline from DATE_OF_DISPATCH + time-limit in record",
-      "parserNote": "Grant-stage edge case after allowed amendment/correction."
-    },
-    "CDEC": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "CDEC",
-      "sourceDescription": "Request for correction of the decision to grant filed",
-      "internalKey": "CORRECTION_REQUEST_AFTER_GRANT_DECISION",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "incoming-request",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Store as branch affecting post-grant decision correction",
-      "parserNote": "Do not confuse with Rule 71(3) amendment branch."
-    },
-    "0009012": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009012",
-      "sourceDescription": "Publication in section I.1 EP Bulletin",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009199EPPU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199EPPU",
-      "sourceDescription": "Change or deletion - publication of A document",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0008199SEPU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0008199SEPU",
-      "sourceDescription": "Change - publication of search report",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009013": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009013",
-      "sourceDescription": "Publication of search report",
-      "internalKey": "SEARCH_REPORT_PUBLICATION",
-      "procedureFamily": "EP_DIRECT",
-      "phase": "search",
-      "classification": "informational",
-      "preferredSurface": "event_history/all_documents",
-      "codexAction": "No standalone deadline; pair with Rule 70/70a path",
-      "parserNote": "Use publication event as anchor for search-stage awareness, not reply deadline."
-    },
-    "0009015": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009015",
-      "sourceDescription": "Publication of international search report",
-      "internalKey": "ISR_PUBLICATION",
-      "procedureFamily": "EURO_PCT",
-      "phase": "pre-regional-phase",
-      "classification": "informational",
-      "preferredSurface": "event_history/all_documents",
-      "codexAction": "No EP reply deadline from this event alone",
-      "parserNote": "Useful for PCT chronology only."
-    },
-    "0009016": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009016",
-      "sourceDescription": "Supplementary search report",
-      "internalKey": "SUPPLEMENTARY_SEARCH_REPORT_PUBLICATION",
-      "procedureFamily": "EURO_PCT",
-      "phase": "search",
-      "classification": "informational",
-      "preferredSurface": "event_history/all_documents",
-      "codexAction": "No standalone deadline; pair with downstream communication",
-      "parserNote": "Useful for Euro-PCT search chronology."
-    },
-    "0009199SEPU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199SEPU",
-      "sourceDescription": "Change or deletion - publication of search report",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009210": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009210",
-      "sourceDescription": "(Expected) grant",
-      "internalKey": "EXPECTED_GRANT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "expected B1 publication"
-    },
-    "0009299EPPU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299EPPU",
-      "sourceDescription": "Change or deletion - publication of B1 document",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009272": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009272",
-      "sourceDescription": "Patent maintained (B2 publication)",
-      "internalKey": "OPPOSITION_B2_PUBLICATION",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_endgame",
-      "classification": "publication",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Close Rule 82 branch once publication confirmed",
-      "parserNote": "Publication, not the underlying communication itself."
-    },
-    "0009299PMAP": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299PMAP",
-      "sourceDescription": "Change - publication of B2 document",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009399EPPU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009399EPPU",
-      "sourceDescription": "Change or deletion - publication of B2 document",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009410": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009410",
-      "sourceDescription": "(Expected) limited patent specification",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009499EPPU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009499EPPU",
-      "sourceDescription": "Change or deletion - publication of limited patent specification",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0008199WDRA": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0008199WDRA",
-      "sourceDescription": "Change - withdrawal",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009182": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009182",
-      "sourceDescription": "Withdrawal of application",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009199WDRA": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199WDRA",
-      "sourceDescription": "Change - withdrawal",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009299WDRA": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299WDRA",
-      "sourceDescription": "Change - withdrawal",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0008199ADWI": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0008199ADWI",
-      "sourceDescription": "Change or deletion - application deemed withdrawn",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009121": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009121",
-      "sourceDescription": "Application deemed to be withdrawn",
-      "internalKey": "LOSS_OF_RIGHTS_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "loss_of_rights",
-      "classification": "consequence",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "No new response deadline by default; route to remedies",
-      "parserNote": "Look for underlying missed act and possible further processing/re-establishment."
-    },
-    "0009183": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009183",
-      "sourceDescription": "Application deemed to be withdrawn",
-      "internalKey": "APPLICATION_DEEMED_WITHDRAWN",
-      "procedureFamily": "ALL_EP",
-      "phase": "loss_of_rights",
-      "classification": "consequence",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "loss-of-rights published"
-    },
-    "0009199ADWI": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199ADWI",
-      "sourceDescription": "Change or deletion - application deemed withdrawn",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009299ADWI": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299ADWI",
-      "sourceDescription": "Change or deletion - application deemed withdrawn",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0008199REFU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0008199REFU",
-      "sourceDescription": "Change - refusal",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009181": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009181",
-      "sourceDescription": "Refusal of application",
-      "internalKey": "REFUSAL_DECISION_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "decision",
-      "classification": "decision",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Route to appeal branch",
-      "parserNote": "Do not treat as ordinary office action."
-    },
-    "0009199REFU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199REFU",
-      "sourceDescription": "Change - refusal",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009299REFU": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299REFU",
-      "sourceDescription": "Change - refusal",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "EPIDOSNIGR1": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSNIGR1",
-      "sourceDescription": "New entry: Communication of intention to grant a patent",
-      "internalKey": "GRANT_R71_3_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "deadline-bearing",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Create 4-month candidate, but confirm exact despatch/date from document",
-      "parserNote": "Use all_documents for legal date and supersession logic."
-    },
-    "EPIDOSCIGR1": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSCIGR1",
-      "sourceDescription": "Change: Communication of intention to grant a patent",
-      "internalKey": "GRANT_R71_3_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "deadline-bearing",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Refresh 4-month candidate, but confirm exact despatch/date from document",
-      "parserNote": "Treat as update to Rule 71(3) state."
-    },
-    "EPIDOSDIGR1": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSDIGR1",
-      "sourceDescription": "Deletion: Communication of intention to grant a patent",
-      "internalKey": "GRANT_R71_3_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "deleted Rule 71(3) event"
-    },
-    "0009261": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009261",
-      "sourceDescription": "No opposition filed within time limit",
-      "internalKey": "NO_OPPOSITION_FILED",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_end",
-      "classification": "status",
-      "preferredSurface": "event_history/about_this_file",
-      "codexAction": "Close opposition watch for the patent",
-      "parserNote": "Post-grant status update."
-    },
-    "0009299DELT": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299DELT",
-      "sourceDescription": "Change - no opposition filed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0008299OPPO": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0008299OPPO",
-      "sourceDescription": "Change - opposition filed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009260": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009260",
-      "sourceDescription": "Opposition filed",
-      "internalKey": "OPPOSITION_FILED",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition",
-      "classification": "status",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Create opposition case state; next real deadline usually from Rule 79/OREX/DOBS",
-      "parserNote": "Not itself the proprietor reply communication."
-    },
-    "0009264": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009264",
-      "sourceDescription": "Opposition withdrawn",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009274": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009274",
-      "sourceDescription": "Opposition deemed not to have been filed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009299OPPB": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299OPPB",
-      "sourceDescription": "Opposition deemed not to have been filed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009299OPPO": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299OPPO",
-      "sourceDescription": "Change - opposition data/opponent's data or that of the opponent's representative",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009273": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009273",
-      "sourceDescription": "Opposition rejected",
-      "internalKey": "OPPOSITION_REJECTED",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_decision",
-      "classification": "decision",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Route to appeal branch",
-      "parserNote": "Decision event."
-    },
-    "0009299REJO": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299REJO",
-      "sourceDescription": "Change - rejection of opposition",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009275": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009275",
-      "sourceDescription": "Opposition inadmissible",
-      "internalKey": "OPPOSITION_INADMISSIBLE",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_decision",
-      "classification": "decision",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "opposition inadmissible"
-    },
-    "0009299OPPA": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299OPPA",
-      "sourceDescription": "Opposition inadmissible",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009271": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009271",
-      "sourceDescription": "Revocation of patent",
-      "internalKey": "OPPOSITION_REVOCATION",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_decision",
-      "classification": "decision",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "revocation in opposition"
-    },
-    "0009299REVO": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299REVO",
-      "sourceDescription": "Change - revocation of patent",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009220": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009220",
-      "sourceDescription": "Patent revoked on request of proprietor",
-      "internalKey": "PROPRIETOR_REVOCATION",
-      "procedureFamily": "LIMITATION_REVOCATION",
-      "phase": "revocation_request",
-      "classification": "decision",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "proprietor revocation"
-    },
-    "0009276": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009276",
-      "sourceDescription": "Opposition procedure terminated - date of legal effect published",
-      "internalKey": "OPPOSITION_TERMINATED",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_closed",
-      "classification": "status",
-      "preferredSurface": "event_history/about_this_file",
-      "codexAction": "Close opposition case state",
-      "parserNote": "Termination marker."
-    },
-    "0009299OPPC": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299OPPC",
-      "sourceDescription": "Change - opposition procedure terminated",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "EPIDOSNRFE2": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSNRFE2",
-      "sourceDescription": "New entry: Renewal fee paid",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "EPIDOSCRFE2": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSCRFE2",
-      "sourceDescription": "Change: Renewal fee paid",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "EPIDOSDRFE2": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSDRFE2",
-      "sourceDescription": "Deletion: Renewal fee paid",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009250": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009250",
-      "sourceDescription": "Lapse of the patent in a contracting state",
-      "internalKey": "NATIONAL_LAPSE",
-      "procedureFamily": "POST_GRANT_NATIONAL",
-      "phase": "post_grant_national",
-      "classification": "status",
-      "preferredSurface": "event_history/about_this_file/federated register",
-      "codexAction": "Update national status only",
-      "parserNote": "National post-grant layer, not central EP procedure."
-    },
-    "0009299LAPS": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299LAPS",
-      "sourceDescription": "Change - lapse in a contracting state",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0008199LREG": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0008199LREG",
-      "sourceDescription": "Change - licence",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009199LREG": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199LREG",
-      "sourceDescription": "Change - licence",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009341": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009341",
-      "sourceDescription": "Licence",
-      "internalKey": "LICENCE_EVENT",
-      "procedureFamily": "POST_GRANT_NATIONAL",
-      "phase": "post_grant_national",
-      "classification": "status",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "licence data"
-    },
-    "0009702UREQ10": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009702UREQ10",
-      "sourceDescription": "Request for unitary effect withdrawn",
-      "internalKey": "UP_REQUEST_WITHDRAWN",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_request",
-      "classification": "status",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "request for unitary effect withdrawn"
-    },
-    "0009799UREQ10": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UREQ10",
-      "sourceDescription": "Change or deletion – Date of withdrawal of request for unitary effect",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009701UREQ02": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009701UREQ02",
-      "sourceDescription": "Decision on the request for unitary effect",
-      "internalKey": "UP_REQUEST_DECISION",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_request",
-      "classification": "decision",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "decision on unitary effect request"
-    },
-    "0009799UREQ02": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UREQ02",
-      "sourceDescription": "Change or deletion – Date of decision on the request for unitary effect",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009700UREQ01": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009700UREQ01",
-      "sourceDescription": "Filing of request for unitary effect",
-      "internalKey": "UP_REQUEST_FILED",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_request",
-      "classification": "status",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "unitary effect request filed"
-    },
-    "0009799UREQ01": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UREQ01",
-      "sourceDescription": "Change: Date of filing of request for unitary request",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009705LAPS22": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009705LAPS22",
-      "sourceDescription": "Unitary effect lapsed",
-      "internalKey": "UP_LAPSE",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_post_registration",
-      "classification": "consequence",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "unitary effect lapsed"
-    },
-    "0009799LAPS22": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799LAPS22",
-      "sourceDescription": "Change or deletion: unitary effect lapse date",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009706REES22": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009706REES22",
-      "sourceDescription": "Request for re-establishment of rights filed",
-      "internalKey": "UP_REESTABLISHMENT_REQUEST",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_post_registration",
-      "classification": "remedial branch",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "re-establishment request filed"
-    },
-    "0009799REES22": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799REES22",
-      "sourceDescription": "Change or deletion: Date of request for re-establishment of rights",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009704UDLA02": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009704UDLA02",
-      "sourceDescription": "Renewal fees not paid: Unitary Patent Protection lapsed",
-      "internalKey": "UP_LAPSE_RENEWAL",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_post_registration",
-      "classification": "consequence",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "UP lapse for unpaid renewal fee"
-    },
-    "0009799UDLA02": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UDLA02",
-      "sourceDescription": "Change: Renewal fees not paid: Unitary Patent Protection lapsed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "0009799UREG01": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UREG01",
-      "sourceDescription": "Change or deletion – Date of registration of Unitary Patent Protection",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
+    const __EPRP_MODULES = (() => {
+    const __factories = {
+      "lib/epo_codex_data": function(module, exports, require) {
+        const EPO_CODEX_DATA = Object.freeze({
+          "byCode": {
+            "ABEX": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ABEX",
+              "sourceDescription": "Amendments",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "examination",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "ADWI": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ADWI",
+              "sourceDescription": "Application deemed to be withdrawn",
+              "internalKey": "LOSS_OF_RIGHTS_R112",
+              "procedureFamily": "ALL_EP",
+              "phase": "loss_of_rights",
+              "classification": "consequence",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Link to underlying missed act using STEP_DESCRIPTION_NAME",
+              "parserNote": "Reason strings include missed examination reply, EESR reply, prior-art info, fees, etc."
+            },
+            "DOBS": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "DOBS",
+              "sourceDescription": "Communication of observations of proprietor",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "opposition",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "time-limit in record",
+              "parserNote": ""
+            },
+            "EXRE": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "EXRE",
+              "sourceDescription": "Invitation to indicate the basis for amendments",
+              "internalKey": "AMENDMENT_BASIS_INVITATION",
+              "procedureFamily": "ALL_EP",
+              "phase": "examination",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+              "parserNote": "Good structured marker for Rule 137(4)-type issue."
+            },
+            "FFEE": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "FFEE",
+              "sourceDescription": "Payment of national basic fee",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "entry-regional-phase",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "IDOP": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "IDOP",
+              "sourceDescription": "Interlocutory decision in opposition",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "opposition",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "decision",
+              "parserNote": ""
+            },
+            "IGRA": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "IGRA",
+              "sourceDescription": "Intention to grant the patent",
+              "internalKey": "GRANT_R71_3",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create 4-month candidate from DATE_OF_DISPATCH; prefer actual document despatch/date",
+              "parserNote": "Also stores grant fee / print fee / translation dates."
+            },
+            "IGRE": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "IGRE",
+              "sourceDescription": "Disapproval of the communication of intention to grant the patent",
+              "internalKey": "GRANT_R71_6_DISAPPROVAL",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "incoming-response",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use as applicant action affecting grant branch",
+              "parserNote": "May lead to fresh Rule 71(3) or resumed examination."
+            },
+            "ISAT": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ISAT",
+              "sourceDescription": "International searching authority",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "entry-regional-phase",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "LIRE": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "LIRE",
+              "sourceDescription": "Communication from the examining division in a limitation procedure",
+              "internalKey": "LIMITATION_COMMUNICATION",
+              "procedureFamily": "LIMITATION_REVOCATION",
+              "phase": "limitation",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+              "parserNote": "Limitation-specific communication family."
+            },
+            "ORAL": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ORAL",
+              "sourceDescription": "Oral proceedings",
+              "internalKey": "ORAL_PROCEEDINGS_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "examination/opposition/appeal",
+              "classification": "hearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Store OP date(s); parse annex separately for Rule 116 final date",
+              "parserNote": "The event itself is not enough for final-date logic."
+            },
+            "OREX": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "OREX",
+              "sourceDescription": "Communication from the opposition division",
+              "internalKey": "OPPOSITION_DIVISION_COMMUNICATION",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+              "parserNote": "Strong structured marker for opposition communications."
+            },
+            "PART": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PART",
+              "sourceDescription": "Invitation to provide information on prior art",
+              "internalKey": "PRIOR_ART_INFORMATION_INVITATION",
+              "procedureFamily": "ALL_EP",
+              "phase": "examination",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create deadline from DATE_OF_DISPATCH + available time-limit/manual review",
+              "parserNote": "Often relevant to later ADWI / RFPR routing."
+            },
+            "PFEE": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PFEE",
+              "sourceDescription": "Penalty fee / additional fee",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "examination",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "time-limit in record",
+              "parserNote": ""
+            },
+            "PMAP": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PMAP",
+              "sourceDescription": "Preparation for maintenance of the patent in an amended form",
+              "internalKey": "OPPOSITION_R82_BRANCH",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_endgame",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use DATE_OF_DISPATCH as Rule 82 branch anchor and track payment",
+              "parserNote": "Maps well to Rule 82(1)/(2) maintenance logic."
+            },
+            "PREX": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PREX",
+              "sourceDescription": "Preliminary examination - PCT II",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "international-examination",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "PROL": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PROL",
+              "sourceDescription": "Language of the procedure",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "all",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "RAEX": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "RAEX",
+              "sourceDescription": "Request for accelerated examination",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "examination",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "REJR": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "REJR",
+              "sourceDescription": "Rejection of the request for revocation of the patent",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "revocation",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "decision",
+              "parserNote": ""
+            },
+            "RFEE": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "RFEE",
+              "sourceDescription": "Renewal fee payment",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "all",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "RFPR": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "RFPR",
+              "sourceDescription": "Request for further processing",
+              "internalKey": "FURTHER_PROCESSING_REQUEST",
+              "procedureFamily": "ALL_EP",
+              "phase": "remedial",
+              "classification": "remedial",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Attach to missed act using STEP_DESCRIPTION_NAME and record result",
+              "parserNote": "Central remedial branch for many missed deadlines."
+            },
+            "SFEE": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "SFEE",
+              "sourceDescription": "Fee for a supplementary search",
+              "internalKey": "SUPPLEMENTARY_SEARCH_FEE_PAYMENT",
+              "procedureFamily": "EURO_PCT",
+              "phase": "regional_phase_entry",
+              "classification": "payment",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use as Euro-PCT entry/compliance signal, not communication deadline",
+              "parserNote": "One of the regional-phase acts."
+            },
+            "TRAN": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "TRAN",
+              "sourceDescription": "Translation of the application",
+              "internalKey": "EURO_PCT_TRANSLATION_RECEIVED",
+              "procedureFamily": "EURO_PCT",
+              "phase": "regional_phase_entry",
+              "classification": "filing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use as Euro-PCT entry/compliance signal",
+              "parserNote": "One of the regional-phase acts."
+            },
+            "DDIV": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "DDIV",
+              "sourceDescription": "First communication from the examining division",
+              "internalKey": "FIRST_EXAM_COMM_DIVISIONAL_MARKER",
+              "procedureFamily": "ALL_EP",
+              "phase": "examination",
+              "classification": "marker",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use for divisional-window logic and examination chronology",
+              "parserNote": "Not necessarily the full text of the communication."
+            },
+            "WINT": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "WINT",
+              "sourceDescription": "Withdrawal during international phase - procedure closed",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "entry-regional-phase",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "procedure closed",
+              "parserNote": ""
+            },
+            "ACOR": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ACOR",
+              "sourceDescription": "Despatch of invitation to pay additional claims fees",
+              "internalKey": "ADDITIONAL_CLAIMS_FEE_INVITATION_AFTER_ALLOWED_AMENDMENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create fee deadline from DATE_OF_DISPATCH + time-limit in record",
+              "parserNote": "Grant-stage edge case after allowed amendment/correction."
+            },
+            "CDEC": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "CDEC",
+              "sourceDescription": "Request for correction of the decision to grant filed",
+              "internalKey": "CORRECTION_REQUEST_AFTER_GRANT_DECISION",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "incoming-request",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Store as branch affecting post-grant decision correction",
+              "parserNote": "Do not confuse with Rule 71(3) amendment branch."
+            },
+            "0009012": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009012",
+              "sourceDescription": "Publication in section I.1 EP Bulletin",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009199EPPU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199EPPU",
+              "sourceDescription": "Change or deletion - publication of A document",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0008199SEPU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0008199SEPU",
+              "sourceDescription": "Change - publication of search report",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009013": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009013",
+              "sourceDescription": "Publication of search report",
+              "internalKey": "SEARCH_REPORT_PUBLICATION",
+              "procedureFamily": "EP_DIRECT",
+              "phase": "search",
+              "classification": "informational",
+              "preferredSurface": "event_history/all_documents",
+              "codexAction": "No standalone deadline; pair with Rule 70/70a path",
+              "parserNote": "Use publication event as anchor for search-stage awareness, not reply deadline."
+            },
+            "0009015": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009015",
+              "sourceDescription": "Publication of international search report",
+              "internalKey": "ISR_PUBLICATION",
+              "procedureFamily": "EURO_PCT",
+              "phase": "pre-regional-phase",
+              "classification": "informational",
+              "preferredSurface": "event_history/all_documents",
+              "codexAction": "No EP reply deadline from this event alone",
+              "parserNote": "Useful for PCT chronology only."
+            },
+            "0009016": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009016",
+              "sourceDescription": "Supplementary search report",
+              "internalKey": "SUPPLEMENTARY_SEARCH_REPORT_PUBLICATION",
+              "procedureFamily": "EURO_PCT",
+              "phase": "search",
+              "classification": "informational",
+              "preferredSurface": "event_history/all_documents",
+              "codexAction": "No standalone deadline; pair with downstream communication",
+              "parserNote": "Useful for Euro-PCT search chronology."
+            },
+            "0009199SEPU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199SEPU",
+              "sourceDescription": "Change or deletion - publication of search report",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009210": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009210",
+              "sourceDescription": "(Expected) grant",
+              "internalKey": "EXPECTED_GRANT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "expected B1 publication"
+            },
+            "0009299EPPU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299EPPU",
+              "sourceDescription": "Change or deletion - publication of B1 document",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009272": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009272",
+              "sourceDescription": "Patent maintained (B2 publication)",
+              "internalKey": "OPPOSITION_B2_PUBLICATION",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_endgame",
+              "classification": "publication",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Close Rule 82 branch once publication confirmed",
+              "parserNote": "Publication, not the underlying communication itself."
+            },
+            "0009299PMAP": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299PMAP",
+              "sourceDescription": "Change - publication of B2 document",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009399EPPU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009399EPPU",
+              "sourceDescription": "Change or deletion - publication of B2 document",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009410": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009410",
+              "sourceDescription": "(Expected) limited patent specification",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009499EPPU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009499EPPU",
+              "sourceDescription": "Change or deletion - publication of limited patent specification",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0008199WDRA": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0008199WDRA",
+              "sourceDescription": "Change - withdrawal",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009182": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009182",
+              "sourceDescription": "Withdrawal of application",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009199WDRA": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199WDRA",
+              "sourceDescription": "Change - withdrawal",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009299WDRA": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299WDRA",
+              "sourceDescription": "Change - withdrawal",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0008199ADWI": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0008199ADWI",
+              "sourceDescription": "Change or deletion - application deemed withdrawn",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009121": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009121",
+              "sourceDescription": "Application deemed to be withdrawn",
+              "internalKey": "LOSS_OF_RIGHTS_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "loss_of_rights",
+              "classification": "consequence",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "No new response deadline by default; route to remedies",
+              "parserNote": "Look for underlying missed act and possible further processing/re-establishment."
+            },
+            "0009183": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009183",
+              "sourceDescription": "Application deemed to be withdrawn",
+              "internalKey": "APPLICATION_DEEMED_WITHDRAWN",
+              "procedureFamily": "ALL_EP",
+              "phase": "loss_of_rights",
+              "classification": "consequence",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "loss-of-rights published"
+            },
+            "0009199ADWI": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199ADWI",
+              "sourceDescription": "Change or deletion - application deemed withdrawn",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009299ADWI": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299ADWI",
+              "sourceDescription": "Change or deletion - application deemed withdrawn",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0008199REFU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0008199REFU",
+              "sourceDescription": "Change - refusal",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009181": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009181",
+              "sourceDescription": "Refusal of application",
+              "internalKey": "REFUSAL_DECISION_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "decision",
+              "classification": "decision",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Route to appeal branch",
+              "parserNote": "Do not treat as ordinary office action."
+            },
+            "0009199REFU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199REFU",
+              "sourceDescription": "Change - refusal",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009299REFU": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299REFU",
+              "sourceDescription": "Change - refusal",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "EPIDOSNIGR1": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSNIGR1",
+              "sourceDescription": "New entry: Communication of intention to grant a patent",
+              "internalKey": "GRANT_R71_3_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "deadline-bearing",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Create 4-month candidate, but confirm exact despatch/date from document",
+              "parserNote": "Use all_documents for legal date and supersession logic."
+            },
+            "EPIDOSCIGR1": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSCIGR1",
+              "sourceDescription": "Change: Communication of intention to grant a patent",
+              "internalKey": "GRANT_R71_3_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "deadline-bearing",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Refresh 4-month candidate, but confirm exact despatch/date from document",
+              "parserNote": "Treat as update to Rule 71(3) state."
+            },
+            "EPIDOSDIGR1": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSDIGR1",
+              "sourceDescription": "Deletion: Communication of intention to grant a patent",
+              "internalKey": "GRANT_R71_3_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "deleted Rule 71(3) event"
+            },
+            "0009261": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009261",
+              "sourceDescription": "No opposition filed within time limit",
+              "internalKey": "NO_OPPOSITION_FILED",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_end",
+              "classification": "status",
+              "preferredSurface": "event_history/about_this_file",
+              "codexAction": "Close opposition watch for the patent",
+              "parserNote": "Post-grant status update."
+            },
+            "0009299DELT": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299DELT",
+              "sourceDescription": "Change - no opposition filed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0008299OPPO": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0008299OPPO",
+              "sourceDescription": "Change - opposition filed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009260": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009260",
+              "sourceDescription": "Opposition filed",
+              "internalKey": "OPPOSITION_FILED",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition",
+              "classification": "status",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Create opposition case state; next real deadline usually from Rule 79/OREX/DOBS",
+              "parserNote": "Not itself the proprietor reply communication."
+            },
+            "0009264": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009264",
+              "sourceDescription": "Opposition withdrawn",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009274": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009274",
+              "sourceDescription": "Opposition deemed not to have been filed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009299OPPB": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299OPPB",
+              "sourceDescription": "Opposition deemed not to have been filed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009299OPPO": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299OPPO",
+              "sourceDescription": "Change - opposition data/opponent's data or that of the opponent's representative",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009273": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009273",
+              "sourceDescription": "Opposition rejected",
+              "internalKey": "OPPOSITION_REJECTED",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_decision",
+              "classification": "decision",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Route to appeal branch",
+              "parserNote": "Decision event."
+            },
+            "0009299REJO": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299REJO",
+              "sourceDescription": "Change - rejection of opposition",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009275": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009275",
+              "sourceDescription": "Opposition inadmissible",
+              "internalKey": "OPPOSITION_INADMISSIBLE",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_decision",
+              "classification": "decision",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "opposition inadmissible"
+            },
+            "0009299OPPA": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299OPPA",
+              "sourceDescription": "Opposition inadmissible",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009271": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009271",
+              "sourceDescription": "Revocation of patent",
+              "internalKey": "OPPOSITION_REVOCATION",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_decision",
+              "classification": "decision",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "revocation in opposition"
+            },
+            "0009299REVO": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299REVO",
+              "sourceDescription": "Change - revocation of patent",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009220": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009220",
+              "sourceDescription": "Patent revoked on request of proprietor",
+              "internalKey": "PROPRIETOR_REVOCATION",
+              "procedureFamily": "LIMITATION_REVOCATION",
+              "phase": "revocation_request",
+              "classification": "decision",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "proprietor revocation"
+            },
+            "0009276": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009276",
+              "sourceDescription": "Opposition procedure terminated - date of legal effect published",
+              "internalKey": "OPPOSITION_TERMINATED",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_closed",
+              "classification": "status",
+              "preferredSurface": "event_history/about_this_file",
+              "codexAction": "Close opposition case state",
+              "parserNote": "Termination marker."
+            },
+            "0009299OPPC": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299OPPC",
+              "sourceDescription": "Change - opposition procedure terminated",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "EPIDOSNRFE2": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSNRFE2",
+              "sourceDescription": "New entry: Renewal fee paid",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "EPIDOSCRFE2": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSCRFE2",
+              "sourceDescription": "Change: Renewal fee paid",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "EPIDOSDRFE2": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSDRFE2",
+              "sourceDescription": "Deletion: Renewal fee paid",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009250": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009250",
+              "sourceDescription": "Lapse of the patent in a contracting state",
+              "internalKey": "NATIONAL_LAPSE",
+              "procedureFamily": "POST_GRANT_NATIONAL",
+              "phase": "post_grant_national",
+              "classification": "status",
+              "preferredSurface": "event_history/about_this_file/federated register",
+              "codexAction": "Update national status only",
+              "parserNote": "National post-grant layer, not central EP procedure."
+            },
+            "0009299LAPS": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299LAPS",
+              "sourceDescription": "Change - lapse in a contracting state",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0008199LREG": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0008199LREG",
+              "sourceDescription": "Change - licence",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009199LREG": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199LREG",
+              "sourceDescription": "Change - licence",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009341": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009341",
+              "sourceDescription": "Licence",
+              "internalKey": "LICENCE_EVENT",
+              "procedureFamily": "POST_GRANT_NATIONAL",
+              "phase": "post_grant_national",
+              "classification": "status",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "licence data"
+            },
+            "0009702UREQ10": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009702UREQ10",
+              "sourceDescription": "Request for unitary effect withdrawn",
+              "internalKey": "UP_REQUEST_WITHDRAWN",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_request",
+              "classification": "status",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "request for unitary effect withdrawn"
+            },
+            "0009799UREQ10": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UREQ10",
+              "sourceDescription": "Change or deletion – Date of withdrawal of request for unitary effect",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009701UREQ02": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009701UREQ02",
+              "sourceDescription": "Decision on the request for unitary effect",
+              "internalKey": "UP_REQUEST_DECISION",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_request",
+              "classification": "decision",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "decision on unitary effect request"
+            },
+            "0009799UREQ02": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UREQ02",
+              "sourceDescription": "Change or deletion – Date of decision on the request for unitary effect",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009700UREQ01": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009700UREQ01",
+              "sourceDescription": "Filing of request for unitary effect",
+              "internalKey": "UP_REQUEST_FILED",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_request",
+              "classification": "status",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "unitary effect request filed"
+            },
+            "0009799UREQ01": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UREQ01",
+              "sourceDescription": "Change: Date of filing of request for unitary request",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009705LAPS22": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009705LAPS22",
+              "sourceDescription": "Unitary effect lapsed",
+              "internalKey": "UP_LAPSE",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_post_registration",
+              "classification": "consequence",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "unitary effect lapsed"
+            },
+            "0009799LAPS22": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799LAPS22",
+              "sourceDescription": "Change or deletion: unitary effect lapse date",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009706REES22": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009706REES22",
+              "sourceDescription": "Request for re-establishment of rights filed",
+              "internalKey": "UP_REESTABLISHMENT_REQUEST",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_post_registration",
+              "classification": "remedial branch",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "re-establishment request filed"
+            },
+            "0009799REES22": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799REES22",
+              "sourceDescription": "Change or deletion: Date of request for re-establishment of rights",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009704UDLA02": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009704UDLA02",
+              "sourceDescription": "Renewal fees not paid: Unitary Patent Protection lapsed",
+              "internalKey": "UP_LAPSE_RENEWAL",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_post_registration",
+              "classification": "consequence",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "UP lapse for unpaid renewal fee"
+            },
+            "0009799UDLA02": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UDLA02",
+              "sourceDescription": "Change: Renewal fees not paid: Unitary Patent Protection lapsed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "0009799UREG01": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UREG01",
+              "sourceDescription": "Change or deletion – Date of registration of Unitary Patent Protection",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            }
+          },
+          "byDescription": {
+            "amendments": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ABEX",
+              "sourceDescription": "Amendments",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "examination",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "application deemed to be withdrawn": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ADWI",
+              "sourceDescription": "Application deemed to be withdrawn",
+              "internalKey": "LOSS_OF_RIGHTS_R112",
+              "procedureFamily": "ALL_EP",
+              "phase": "loss_of_rights",
+              "classification": "consequence",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Link to underlying missed act using STEP_DESCRIPTION_NAME",
+              "parserNote": "Reason strings include missed examination reply, EESR reply, prior-art info, fees, etc."
+            },
+            "communication of observations of proprietor": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "DOBS",
+              "sourceDescription": "Communication of observations of proprietor",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "opposition",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "time-limit in record",
+              "parserNote": ""
+            },
+            "invitation to indicate the basis for amendments": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "EXRE",
+              "sourceDescription": "Invitation to indicate the basis for amendments",
+              "internalKey": "AMENDMENT_BASIS_INVITATION",
+              "procedureFamily": "ALL_EP",
+              "phase": "examination",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+              "parserNote": "Good structured marker for Rule 137(4)-type issue."
+            },
+            "payment of national basic fee": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "FFEE",
+              "sourceDescription": "Payment of national basic fee",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "entry-regional-phase",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "interlocutory decision in opposition": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "IDOP",
+              "sourceDescription": "Interlocutory decision in opposition",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "opposition",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "decision",
+              "parserNote": ""
+            },
+            "intention to grant the patent": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "IGRA",
+              "sourceDescription": "Intention to grant the patent",
+              "internalKey": "GRANT_R71_3",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create 4-month candidate from DATE_OF_DISPATCH; prefer actual document despatch/date",
+              "parserNote": "Also stores grant fee / print fee / translation dates."
+            },
+            "disapproval of the communication of intention to grant the patent": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "IGRE",
+              "sourceDescription": "Disapproval of the communication of intention to grant the patent",
+              "internalKey": "GRANT_R71_6_DISAPPROVAL",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "incoming-response",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use as applicant action affecting grant branch",
+              "parserNote": "May lead to fresh Rule 71(3) or resumed examination."
+            },
+            "international searching authority": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ISAT",
+              "sourceDescription": "International searching authority",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "entry-regional-phase",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "communication from the examining division in a limitation procedure": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "LIRE",
+              "sourceDescription": "Communication from the examining division in a limitation procedure",
+              "internalKey": "LIMITATION_COMMUNICATION",
+              "procedureFamily": "LIMITATION_REVOCATION",
+              "phase": "limitation",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+              "parserNote": "Limitation-specific communication family."
+            },
+            "oral proceedings": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ORAL",
+              "sourceDescription": "Oral proceedings",
+              "internalKey": "ORAL_PROCEEDINGS_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "examination/opposition/appeal",
+              "classification": "hearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Store OP date(s); parse annex separately for Rule 116 final date",
+              "parserNote": "The event itself is not enough for final-date logic."
+            },
+            "communication from the opposition division": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "OREX",
+              "sourceDescription": "Communication from the opposition division",
+              "internalKey": "OPPOSITION_DIVISION_COMMUNICATION",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
+              "parserNote": "Strong structured marker for opposition communications."
+            },
+            "invitation to provide information on prior art": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PART",
+              "sourceDescription": "Invitation to provide information on prior art",
+              "internalKey": "PRIOR_ART_INFORMATION_INVITATION",
+              "procedureFamily": "ALL_EP",
+              "phase": "examination",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create deadline from DATE_OF_DISPATCH + available time-limit/manual review",
+              "parserNote": "Often relevant to later ADWI / RFPR routing."
+            },
+            "penalty fee / additional fee": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PFEE",
+              "sourceDescription": "Penalty fee / additional fee",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "examination",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "time-limit in record",
+              "parserNote": ""
+            },
+            "preparation for maintenance of the patent in an amended form": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PMAP",
+              "sourceDescription": "Preparation for maintenance of the patent in an amended form",
+              "internalKey": "OPPOSITION_R82_BRANCH",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_endgame",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use DATE_OF_DISPATCH as Rule 82 branch anchor and track payment",
+              "parserNote": "Maps well to Rule 82(1)/(2) maintenance logic."
+            },
+            "preliminary examination - pct ii": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PREX",
+              "sourceDescription": "Preliminary examination - PCT II",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "international-examination",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "language of the procedure": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "PROL",
+              "sourceDescription": "Language of the procedure",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "all",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "request for accelerated examination": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "RAEX",
+              "sourceDescription": "Request for accelerated examination",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "examination",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "rejection of the request for revocation of the patent": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "REJR",
+              "sourceDescription": "Rejection of the request for revocation of the patent",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "revocation",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "decision",
+              "parserNote": ""
+            },
+            "renewal fee payment": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "RFEE",
+              "sourceDescription": "Renewal fee payment",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "all",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "none",
+              "parserNote": ""
+            },
+            "request for further processing": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "RFPR",
+              "sourceDescription": "Request for further processing",
+              "internalKey": "FURTHER_PROCESSING_REQUEST",
+              "procedureFamily": "ALL_EP",
+              "phase": "remedial",
+              "classification": "remedial",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Attach to missed act using STEP_DESCRIPTION_NAME and record result",
+              "parserNote": "Central remedial branch for many missed deadlines."
+            },
+            "fee for a supplementary search": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "SFEE",
+              "sourceDescription": "Fee for a supplementary search",
+              "internalKey": "SUPPLEMENTARY_SEARCH_FEE_PAYMENT",
+              "procedureFamily": "EURO_PCT",
+              "phase": "regional_phase_entry",
+              "classification": "payment",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use as Euro-PCT entry/compliance signal, not communication deadline",
+              "parserNote": "One of the regional-phase acts."
+            },
+            "translation of the application": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "TRAN",
+              "sourceDescription": "Translation of the application",
+              "internalKey": "EURO_PCT_TRANSLATION_RECEIVED",
+              "procedureFamily": "EURO_PCT",
+              "phase": "regional_phase_entry",
+              "classification": "filing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use as Euro-PCT entry/compliance signal",
+              "parserNote": "One of the regional-phase acts."
+            },
+            "first communication from the examining division": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "DDIV",
+              "sourceDescription": "First communication from the examining division",
+              "internalKey": "FIRST_EXAM_COMM_DIVISIONAL_MARKER",
+              "procedureFamily": "ALL_EP",
+              "phase": "examination",
+              "classification": "marker",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Use for divisional-window logic and examination chronology",
+              "parserNote": "Not necessarily the full text of the communication."
+            },
+            "withdrawal during international phase - procedure closed": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "WINT",
+              "sourceDescription": "Withdrawal during international phase - procedure closed",
+              "internalKey": "",
+              "procedureFamily": "",
+              "phase": "entry-regional-phase",
+              "classification": "",
+              "preferredSurface": "st36/all_documents",
+              "codexAction": "procedure closed",
+              "parserNote": ""
+            },
+            "despatch of invitation to pay additional claims fees": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "ACOR",
+              "sourceDescription": "Despatch of invitation to pay additional claims fees",
+              "internalKey": "ADDITIONAL_CLAIMS_FEE_INVITATION_AFTER_ALLOWED_AMENDMENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "deadline-bearing",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Create fee deadline from DATE_OF_DISPATCH + time-limit in record",
+              "parserNote": "Grant-stage edge case after allowed amendment/correction."
+            },
+            "request for correction of the decision to grant filed": {
+              "codeNamespace": "procedural_step",
+              "sourceCode": "CDEC",
+              "sourceDescription": "Request for correction of the decision to grant filed",
+              "internalKey": "CORRECTION_REQUEST_AFTER_GRANT_DECISION",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "incoming-request",
+              "preferredSurface": "all_documents/ST36 procedural-data",
+              "codexAction": "Store as branch affecting post-grant decision correction",
+              "parserNote": "Do not confuse with Rule 71(3) amendment branch."
+            },
+            "publication in section i.1 ep bulletin": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009012",
+              "sourceDescription": "Publication in section I.1 EP Bulletin",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change or deletion - publication of a document": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199EPPU",
+              "sourceDescription": "Change or deletion - publication of A document",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change - publication of search report": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0008199SEPU",
+              "sourceDescription": "Change - publication of search report",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "publication of search report": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009013",
+              "sourceDescription": "Publication of search report",
+              "internalKey": "SEARCH_REPORT_PUBLICATION",
+              "procedureFamily": "EP_DIRECT",
+              "phase": "search",
+              "classification": "informational",
+              "preferredSurface": "event_history/all_documents",
+              "codexAction": "No standalone deadline; pair with Rule 70/70a path",
+              "parserNote": "Use publication event as anchor for search-stage awareness, not reply deadline."
+            },
+            "publication of international search report": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009015",
+              "sourceDescription": "Publication of international search report",
+              "internalKey": "ISR_PUBLICATION",
+              "procedureFamily": "EURO_PCT",
+              "phase": "pre-regional-phase",
+              "classification": "informational",
+              "preferredSurface": "event_history/all_documents",
+              "codexAction": "No EP reply deadline from this event alone",
+              "parserNote": "Useful for PCT chronology only."
+            },
+            "supplementary search report": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009016",
+              "sourceDescription": "Supplementary search report",
+              "internalKey": "SUPPLEMENTARY_SEARCH_REPORT_PUBLICATION",
+              "procedureFamily": "EURO_PCT",
+              "phase": "search",
+              "classification": "informational",
+              "preferredSurface": "event_history/all_documents",
+              "codexAction": "No standalone deadline; pair with downstream communication",
+              "parserNote": "Useful for Euro-PCT search chronology."
+            },
+            "change or deletion - publication of search report": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199SEPU",
+              "sourceDescription": "Change or deletion - publication of search report",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "(expected) grant": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009210",
+              "sourceDescription": "(Expected) grant",
+              "internalKey": "EXPECTED_GRANT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "expected B1 publication"
+            },
+            "change or deletion - publication of b1 document": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299EPPU",
+              "sourceDescription": "Change or deletion - publication of B1 document",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "patent maintained (b2 publication)": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009272",
+              "sourceDescription": "Patent maintained (B2 publication)",
+              "internalKey": "OPPOSITION_B2_PUBLICATION",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_endgame",
+              "classification": "publication",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Close Rule 82 branch once publication confirmed",
+              "parserNote": "Publication, not the underlying communication itself."
+            },
+            "change - publication of b2 document": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299PMAP",
+              "sourceDescription": "Change - publication of B2 document",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change or deletion - publication of b2 document": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009399EPPU",
+              "sourceDescription": "Change or deletion - publication of B2 document",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "(expected) limited patent specification": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009410",
+              "sourceDescription": "(Expected) limited patent specification",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change or deletion - publication of limited patent specification": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009499EPPU",
+              "sourceDescription": "Change or deletion - publication of limited patent specification",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change - withdrawal": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299WDRA",
+              "sourceDescription": "Change - withdrawal",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "withdrawal of application": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009182",
+              "sourceDescription": "Withdrawal of application",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change or deletion - application deemed withdrawn": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299ADWI",
+              "sourceDescription": "Change or deletion - application deemed withdrawn",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change - refusal": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299REFU",
+              "sourceDescription": "Change - refusal",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "refusal of application": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009181",
+              "sourceDescription": "Refusal of application",
+              "internalKey": "REFUSAL_DECISION_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "decision",
+              "classification": "decision",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Route to appeal branch",
+              "parserNote": "Do not treat as ordinary office action."
+            },
+            "new entry: communication of intention to grant a patent": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSNIGR1",
+              "sourceDescription": "New entry: Communication of intention to grant a patent",
+              "internalKey": "GRANT_R71_3_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "deadline-bearing",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Create 4-month candidate, but confirm exact despatch/date from document",
+              "parserNote": "Use all_documents for legal date and supersession logic."
+            },
+            "change: communication of intention to grant a patent": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSCIGR1",
+              "sourceDescription": "Change: Communication of intention to grant a patent",
+              "internalKey": "GRANT_R71_3_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "deadline-bearing",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Refresh 4-month candidate, but confirm exact despatch/date from document",
+              "parserNote": "Treat as update to Rule 71(3) state."
+            },
+            "deletion: communication of intention to grant a patent": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSDIGR1",
+              "sourceDescription": "Deletion: Communication of intention to grant a patent",
+              "internalKey": "GRANT_R71_3_EVENT",
+              "procedureFamily": "ALL_EP",
+              "phase": "grant",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "deleted Rule 71(3) event"
+            },
+            "no opposition filed within time limit": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009261",
+              "sourceDescription": "No opposition filed within time limit",
+              "internalKey": "NO_OPPOSITION_FILED",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_end",
+              "classification": "status",
+              "preferredSurface": "event_history/about_this_file",
+              "codexAction": "Close opposition watch for the patent",
+              "parserNote": "Post-grant status update."
+            },
+            "change - no opposition filed": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299DELT",
+              "sourceDescription": "Change - no opposition filed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change - opposition filed": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0008299OPPO",
+              "sourceDescription": "Change - opposition filed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "opposition filed": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009260",
+              "sourceDescription": "Opposition filed",
+              "internalKey": "OPPOSITION_FILED",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition",
+              "classification": "status",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Create opposition case state; next real deadline usually from Rule 79/OREX/DOBS",
+              "parserNote": "Not itself the proprietor reply communication."
+            },
+            "opposition withdrawn": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009264",
+              "sourceDescription": "Opposition withdrawn",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "opposition deemed not to have been filed": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299OPPB",
+              "sourceDescription": "Opposition deemed not to have been filed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change - opposition data/opponent's data or that of the opponent's representative": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299OPPO",
+              "sourceDescription": "Change - opposition data/opponent's data or that of the opponent's representative",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "opposition rejected": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009273",
+              "sourceDescription": "Opposition rejected",
+              "internalKey": "OPPOSITION_REJECTED",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_decision",
+              "classification": "decision",
+              "preferredSurface": "event_history/about_this_file/all_documents",
+              "codexAction": "Route to appeal branch",
+              "parserNote": "Decision event."
+            },
+            "change - rejection of opposition": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299REJO",
+              "sourceDescription": "Change - rejection of opposition",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "opposition inadmissible": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299OPPA",
+              "sourceDescription": "Opposition inadmissible",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "revocation of patent": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009271",
+              "sourceDescription": "Revocation of patent",
+              "internalKey": "OPPOSITION_REVOCATION",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_decision",
+              "classification": "decision",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "revocation in opposition"
+            },
+            "change - revocation of patent": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299REVO",
+              "sourceDescription": "Change - revocation of patent",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "patent revoked on request of proprietor": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009220",
+              "sourceDescription": "Patent revoked on request of proprietor",
+              "internalKey": "PROPRIETOR_REVOCATION",
+              "procedureFamily": "LIMITATION_REVOCATION",
+              "phase": "revocation_request",
+              "classification": "decision",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "proprietor revocation"
+            },
+            "opposition procedure terminated - date of legal effect published": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009276",
+              "sourceDescription": "Opposition procedure terminated - date of legal effect published",
+              "internalKey": "OPPOSITION_TERMINATED",
+              "procedureFamily": "POST_GRANT_OPPOSITION",
+              "phase": "opposition_closed",
+              "classification": "status",
+              "preferredSurface": "event_history/about_this_file",
+              "codexAction": "Close opposition case state",
+              "parserNote": "Termination marker."
+            },
+            "change - opposition procedure terminated": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299OPPC",
+              "sourceDescription": "Change - opposition procedure terminated",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "new entry: renewal fee paid": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSNRFE2",
+              "sourceDescription": "New entry: Renewal fee paid",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change: renewal fee paid": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSCRFE2",
+              "sourceDescription": "Change: Renewal fee paid",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "deletion: renewal fee paid": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "EPIDOSDRFE2",
+              "sourceDescription": "Deletion: Renewal fee paid",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "lapse of the patent in a contracting state": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009250",
+              "sourceDescription": "Lapse of the patent in a contracting state",
+              "internalKey": "NATIONAL_LAPSE",
+              "procedureFamily": "POST_GRANT_NATIONAL",
+              "phase": "post_grant_national",
+              "classification": "status",
+              "preferredSurface": "event_history/about_this_file/federated register",
+              "codexAction": "Update national status only",
+              "parserNote": "National post-grant layer, not central EP procedure."
+            },
+            "change - lapse in a contracting state": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009299LAPS",
+              "sourceDescription": "Change - lapse in a contracting state",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change - licence": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009199LREG",
+              "sourceDescription": "Change - licence",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "licence": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009341",
+              "sourceDescription": "Licence",
+              "internalKey": "LICENCE_EVENT",
+              "procedureFamily": "POST_GRANT_NATIONAL",
+              "phase": "post_grant_national",
+              "classification": "status",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "licence data"
+            },
+            "request for unitary effect withdrawn": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009702UREQ10",
+              "sourceDescription": "Request for unitary effect withdrawn",
+              "internalKey": "UP_REQUEST_WITHDRAWN",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_request",
+              "classification": "status",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "request for unitary effect withdrawn"
+            },
+            "change or deletion – date of withdrawal of request for unitary effect": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UREQ10",
+              "sourceDescription": "Change or deletion – Date of withdrawal of request for unitary effect",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "decision on the request for unitary effect": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009701UREQ02",
+              "sourceDescription": "Decision on the request for unitary effect",
+              "internalKey": "UP_REQUEST_DECISION",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_request",
+              "classification": "decision",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "decision on unitary effect request"
+            },
+            "change or deletion – date of decision on the request for unitary effect": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UREQ02",
+              "sourceDescription": "Change or deletion – Date of decision on the request for unitary effect",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "filing of request for unitary effect": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009700UREQ01",
+              "sourceDescription": "Filing of request for unitary effect",
+              "internalKey": "UP_REQUEST_FILED",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_request",
+              "classification": "status",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "unitary effect request filed"
+            },
+            "change: date of filing of request for unitary request": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UREQ01",
+              "sourceDescription": "Change: Date of filing of request for unitary request",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "unitary effect lapsed": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009705LAPS22",
+              "sourceDescription": "Unitary effect lapsed",
+              "internalKey": "UP_LAPSE",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_post_registration",
+              "classification": "consequence",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "unitary effect lapsed"
+            },
+            "change or deletion: unitary effect lapse date": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799LAPS22",
+              "sourceDescription": "Change or deletion: unitary effect lapse date",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "request for re-establishment of rights filed": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009706REES22",
+              "sourceDescription": "Request for re-establishment of rights filed",
+              "internalKey": "UP_REESTABLISHMENT_REQUEST",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_post_registration",
+              "classification": "remedial branch",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "re-establishment request filed"
+            },
+            "change or deletion: date of request for re-establishment of rights": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799REES22",
+              "sourceDescription": "Change or deletion: Date of request for re-establishment of rights",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "renewal fees not paid: unitary patent protection lapsed": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009704UDLA02",
+              "sourceDescription": "Renewal fees not paid: Unitary Patent Protection lapsed",
+              "internalKey": "UP_LAPSE_RENEWAL",
+              "procedureFamily": "UNITARY_PATENT",
+              "phase": "up_post_registration",
+              "classification": "consequence",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "branch to consequence/decision logic",
+              "parserNote": "UP lapse for unpaid renewal fee"
+            },
+            "change: renewal fees not paid: unitary patent protection lapsed": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UDLA02",
+              "sourceDescription": "Change: Renewal fees not paid: Unitary Patent Protection lapsed",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            },
+            "change or deletion – date of registration of unitary patent protection": {
+              "codeNamespace": "register_main_event",
+              "sourceCode": "0009799UREG01",
+              "sourceDescription": "Change or deletion – Date of registration of Unitary Patent Protection",
+              "internalKey": "UNMAPPED_MAIN_EVENT",
+              "procedureFamily": "UNKNOWN",
+              "phase": "unknown",
+              "classification": "informational",
+              "preferredSurface": "event_history + about_this_file + all_documents",
+              "codexAction": "monitor",
+              "parserNote": "map in your own taxonomy"
+            }
+          }
+        });
+        
+        module.exports = { EPO_CODEX_DATA };
+        
+      },
+      "lib/epo_v2_utils": function(module, exports, require) {
+        const DATE_RE = /\b(\d{2}\.\d{2}\.\d{4})\b/;
+        
+        function normalize(value = '') {
+          return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+        
+        function normalizeLower(value = '') {
+          return normalize(value).toLowerCase();
+        }
+        
+        function text(node) {
+          return node ? normalize(node.innerText || node.textContent || '') : '';
+        }
+        
+        function dedupe(items = [], keyFn = (item) => item) {
+          const out = [];
+          const seen = new Set();
+          for (const item of items || []) {
+            const key = keyFn(item);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(item);
+          }
+          return out;
+        }
+        
+        function parseDateString(value = '') {
+          const match = String(value || '').match(DATE_RE);
+          if (!match) return null;
+          const [dd, mm, yyyy] = match[1].split('.').map(Number);
+          const date = new Date(yyyy, mm - 1, dd);
+          return Number.isNaN(date.getTime()) ? null : date;
+        }
+        
+        function formatDate(dt) {
+          if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return '';
+          return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')}.${dt.getFullYear()}`;
+        }
+        
+        function compareDateDesc(a, b) {
+          return (parseDateString(b?.dateStr)?.getTime() || 0) - (parseDateString(a?.dateStr)?.getTime() || 0);
+        }
+        
+        function isValidDate(value) {
+          return value instanceof Date && !Number.isNaN(value.getTime());
+        }
+        
+        module.exports = {
+          DATE_RE,
+          normalize,
+          normalizeLower,
+          text,
+          dedupe,
+          parseDateString,
+          formatDate,
+          compareDateDesc,
+          isValidDate,
+        };
+        
+      },
+      "lib/epo_v2_doc_signals": function(module, exports, require) {
+        const { EPO_CODEX_DATA } = require('./epo_codex_data');
+        const { normalizeLower } = require('./epo_v2_utils');
+        
+        function codexDescriptionRecord(description = '') {
+          const key = normalizeLower(description);
+          return key ? (EPO_CODEX_DATA.byDescription[key] || null) : null;
+        }
+        
+        function docSignalFromCodexRecord(record, title = '', procedure = '') {
+          if (!record) return null;
+          const t = normalizeLower(title);
+          const p = normalizeLower(procedure);
+          const actor = /third party/.test(`${t} ${p}`) || /opposition/.test(`${t} ${p}`) ? 'Third party' : 'EPO';
+        
+          switch (record.internalKey) {
+            case 'GRANT_R71_3_EVENT':
+              return { family: 'grant', bundle: 'Intention to grant (R71(3) EPC)', actor: 'EPO', level: 'warn', reason: 'codex grant-intended event' };
+            case 'FURTHER_PROCESSING_REQUEST':
+            case 'FURTHER_PROCESSING_DECISION':
+              return { family: 'remedial', bundle: 'Further processing', actor: 'EPO', level: 'warn', reason: 'codex remedial event' };
+            case 'NO_OPPOSITION_FILED':
+              return { family: 'opposition', bundle: 'Opposition', actor: 'EPO', level: 'warn', reason: 'codex opposition-end status' };
+            case 'LOSS_OF_RIGHTS_EVENT':
+            case 'APPLICATION_DEEMED_WITHDRAWN':
+              return { family: 'loss_of_rights', bundle: 'Loss-of-rights communication', actor: 'EPO', level: 'bad', reason: 'codex loss-of-rights event' };
+            default:
+              break;
+          }
+        
+          if (record.phase === 'hearing') {
+            return { family: 'hearing', bundle: 'Oral proceedings', actor, level: 'warn', reason: 'codex hearing-phase event' };
+          }
+          if (record.phase === 'opposition' || record.phase === 'opposition_end') {
+            return { family: 'opposition', bundle: 'Opposition', actor, level: 'warn', reason: 'codex opposition-phase event' };
+          }
+          if (record.phase === 'remedial') {
+            return { family: 'remedial', bundle: 'Further processing', actor: 'EPO', level: 'warn', reason: 'codex remedial-phase event' };
+          }
+          if (record.phase === 'loss_of_rights') {
+            return { family: 'loss_of_rights', bundle: 'Loss-of-rights communication', actor: 'EPO', level: 'bad', reason: 'codex loss-of-rights phase' };
+          }
+          if (record.phase === 'grant') {
+            return { family: 'grant', bundle: record.classification === 'deadline-bearing' ? 'Intention to grant (R71(3) EPC)' : 'Grant decision', actor: 'EPO', level: record.classification === 'deadline-bearing' ? 'warn' : 'ok', reason: 'codex grant-phase event' };
+          }
+          if (record.phase === 'search') {
+            return { family: 'search', bundle: 'Search package', actor: 'EPO', level: 'info', reason: 'codex search-phase event' };
+          }
+          return null;
+        }
+        
+        const NORMALIZED_DOC_SIGNAL_RULES = Object.freeze([
+          { test: (t) => /decision to allow further processing/.test(t), signal: { family: 'remedial', bundle: 'Further processing', actor: 'EPO', level: 'warn', reason: 'further-processing decision' } },
+          { test: (t) => /decision to grant a european patent/.test(t), signal: { family: 'grant', bundle: 'Grant decision', actor: 'EPO', level: 'ok', reason: 'grant decision' } },
+          { test: (t) => /transmission of the certificate for a european patent pursuant to rule\s*74/.test(t), signal: { family: 'post_grant', bundle: 'Patent certificate', actor: 'EPO', level: 'ok', reason: 'rule-74 certificate' } },
+          { test: (t) => /grant of extension of time limit/.test(t), signal: { family: 'remedial', bundle: 'Extension of time limit', actor: 'EPO', level: 'info', reason: 'extension of time limit' } },
+          { test: (t) => /application deemed to be withdrawn.*non-entry into european phase/.test(t), signal: { family: 'loss_of_rights', bundle: 'Euro-PCT non-entry failure', actor: 'EPO', level: 'bad', reason: 'non-entry into EP phase' } },
+          { test: (t) => /application deemed to be withdrawn.*translations of claims\/payment missing/.test(t), signal: { family: 'loss_of_rights', bundle: 'Grant-formalities failure', actor: 'EPO', level: 'bad', reason: 'grant formalities missing' } },
+          { test: (t) => /application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(t), signal: { family: 'loss_of_rights', bundle: 'Fees / written-opinion failure', actor: 'EPO', level: 'bad', reason: 'fees plus written-opinion failure' } },
+          { test: (t) => /application deemed to be withdrawn.*non-reply to written opinion/.test(t), signal: { family: 'loss_of_rights', bundle: 'Written-opinion loss', actor: 'EPO', level: 'bad', reason: 'written opinion not answered' } },
+          { test: (t) => /loss of rights|rule\s*112\(1\)/.test(t), signal: { family: 'loss_of_rights', bundle: 'Loss-of-rights communication', actor: 'EPO', level: 'bad', reason: 'rule 112 / loss-of-rights notice' } },
+          { test: (t) => /document annexed to the extended european search report|extended european search report/.test(t), signal: { family: 'search', bundle: 'Extended European search package', actor: 'EPO', level: 'info', reason: 'extended search report annex' } },
+          { test: (t) => /supplementary european search report/.test(t), signal: { family: 'search', bundle: 'Supplementary European search package', actor: 'EPO', level: 'info', reason: 'supplementary ESR' } },
+          { test: (t) => /international preliminary report on patentability|written opinion of the isa|isr: cited documents/.test(t), signal: { family: 'search', bundle: 'International search / IPRP', actor: 'EPO', level: 'info', reason: 'IPRP / ISA packet' } },
+          { test: (t) => /partial international search report|provisional opinion accompanying the partial search results/.test(t), signal: { family: 'search', bundle: 'Partial international search', actor: 'EPO', level: 'info', reason: 'partial ISR packet' } },
+          { test: (t) => /communication regarding the transmission of the european search report|european search opinion|european search report|information on search strategy/.test(t), signal: { family: 'search', bundle: 'European search package', actor: 'EPO', level: 'info', reason: 'European search packet' } },
+          { test: (t) => /rule\s*71\(3\)|intention to grant|text intended for grant|mention of grant/.test(t), signal: { family: 'grant', bundle: 'Intention to grant (R71(3) EPC)', actor: 'EPO', level: 'warn', reason: 'R71 / grant-intended packet' } },
+          { test: (t, p) => /opposition|third party/.test(t) || /third party/.test(p), signal: { family: 'opposition', bundle: 'Opposition', actor: 'Third party', level: 'warn', reason: 'opposition / third-party filing' } },
+        ]);
+        
+        function normalizedDocSignalFromRules(title = '', procedure = '') {
+          const t = normalizeLower(title);
+          const p = normalizeLower(procedure);
+          for (const rule of NORMALIZED_DOC_SIGNAL_RULES) {
+            if (rule.test(t, p)) return { ...rule.signal };
+          }
+          return null;
+        }
+        
+        function classifyDocSignal({ title = '', procedure = '' } = {}) {
+          const codexSignal = docSignalFromCodexRecord(codexDescriptionRecord(title), title, procedure);
+          if (codexSignal) return codexSignal;
+          return normalizedDocSignalFromRules(title, procedure);
+        }
+        
+        module.exports = {
+          codexDescriptionRecord,
+          docSignalFromCodexRecord,
+          NORMALIZED_DOC_SIGNAL_RULES,
+          normalizedDocSignalFromRules,
+          classifyDocSignal,
+        };
+        
+      },
+      "lib/epo_v2_packet_signals": function(module, exports, require) {
+        const { classifyDocSignal } = require('./epo_v2_doc_signals');
+        
+        const PACKET_SIGNAL_PRECEDENCE = Object.freeze([
+          'Euro-PCT non-entry failure',
+          'Grant-formalities failure',
+          'Fees / written-opinion failure',
+          'Written-opinion loss',
+          'Loss-of-rights communication',
+          'Further processing',
+          'Grant decision',
+          'Patent certificate',
+          'Extension of time limit',
+          'Extended European search package',
+          'Supplementary European search package',
+          'International search / IPRP',
+          'Partial international search',
+          'European search package',
+          'Intention to grant (R71(3) EPC)',
+          'Opposition',
+          'Oral proceedings',
+          'Search package',
+        ]);
+        
+        const STANDALONE_PACKET_BUNDLES = new Set([
+          'Further processing',
+          'Grant decision',
+          'Patent certificate',
+          'Extension of time limit',
+          'Euro-PCT non-entry failure',
+          'Grant-formalities failure',
+          'Fees / written-opinion failure',
+          'Written-opinion loss',
+          'Loss-of-rights communication',
+          'Opposition',
+          'Oral proceedings',
+        ]);
+        
+        function packetSignalBundle(signal) {
+          return signal?.bundle || '';
+        }
+        
+        function standalonePacketBundle(signal) {
+          const bundle = packetSignalBundle(signal);
+          return STANDALONE_PACKET_BUNDLES.has(bundle) ? bundle : '';
+        }
+        
+        function classifyPacketSignal(models = []) {
+          const signals = (models || [])
+            .map((model) => classifyDocSignal({ title: model?.title || '', procedure: model?.procedure || '' }))
+            .filter(Boolean);
+        
+          if (!signals.length) return null;
+        
+          for (const bundle of PACKET_SIGNAL_PRECEDENCE) {
+            const match = signals.find((signal) => signal.bundle === bundle);
+            if (match) return { ...match, source: 'normalized-packet-signal' };
+          }
+        
+          return { ...signals[0], source: 'normalized-packet-signal' };
+        }
+        
+        module.exports = {
+          PACKET_SIGNAL_PRECEDENCE,
+          STANDALONE_PACKET_BUNDLES,
+          packetSignalBundle,
+          standalonePacketBundle,
+          classifyPacketSignal,
+        };
+        
+      },
+      "lib/epo_v2_status_signals": function(module, exports, require) {
+        const { normalize } = require('./epo_v2_utils');
+        
+        function matchStatusRule(text, rules, fallback) {
+          const low = normalize(text).toLowerCase();
+          for (const rule of rules) {
+            if (rule.test(low, text)) return typeof rule.value === 'function' ? rule.value(text, low) : rule.value;
+          }
+          return typeof fallback === 'function' ? fallback(text, low) : fallback;
+        }
+        
+        const STATUS_STAGE_RULES = Object.freeze([
+          { test: (low) => /revoked|refused|withdrawn|deemed to be withdrawn|lapsed|expired|closed/.test(low), value: 'Closed' },
+          { test: (low) => /no opposition filed within time limit/.test(low), value: 'Post-grant' },
+          { test: (low) => /patent has been granted|the patent has been granted|grant decision|decision to grant/.test(low), value: 'Granted' },
+          { test: (low) => /grant of patent is intended|rule\s*71\(3\)|intention to grant/.test(low), value: 'R71 / grant intended' },
+          { test: (low) => /article\s*94\(3\)|art\.\s*94\(3\)|examining division|request for examination was made|examination/.test(low), value: 'Examination' },
+          { test: (low) => /search report|search opinion|written opinion|\bsearch\b/.test(low), value: 'Search' },
+          { test: (low) => /filing/.test(low), value: 'Filing' },
+          { test: (low) => /published|publication/.test(low), value: 'Post-publication' },
+        ]);
+        
+        const STATUS_SUMMARY_RULES = Object.freeze([
+          { test: (low) => !low, value: { simple: 'Unknown', level: 'warn' } },
+          { test: (low) => /no opposition filed within time limit/.test(low), value: { simple: 'Granted (no opposition)', level: 'ok' } },
+          { test: (low, raw) => /grant of patent is intended|rule\s*71\(3\)/i.test(raw), value: { simple: 'Grant intended (R71(3))', level: 'warn' } },
+          { test: (low) => /patent has been granted|the patent has been granted/.test(low), value: { simple: 'Granted', level: 'ok' } },
+          { test: (low) => /application deemed to be withdrawn.*non-entry into european phase/.test(low), value: { simple: 'Deemed withdrawn (non-entry)', level: 'bad' } },
+          { test: (low) => /application deemed to be withdrawn.*translations of claims\/payment missing/.test(low), value: { simple: 'Deemed withdrawn (grant formalities)', level: 'bad' } },
+          { test: (low) => /application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(low), value: { simple: 'Deemed withdrawn (fees / no WO reply)', level: 'bad' } },
+          { test: (low) => /application deemed to be withdrawn.*non-reply to written opinion/.test(low), value: { simple: 'Deemed withdrawn (no WO reply)', level: 'bad' } },
+          { test: (low) => /deemed to be withdrawn/.test(low), value: { simple: 'Deemed withdrawn', level: 'bad' } },
+          { test: (low) => /withdrawn by applicant|application withdrawn/.test(low), value: { simple: 'Withdrawn', level: 'bad' } },
+          { test: (low) => /revoked|refused|expired|lapsed/.test(low), value: { simple: 'Closed', level: 'bad' } },
+          { test: (low) => /application has been published|has been published/.test(low), value: { simple: 'Published', level: 'info' } },
+          { test: (low) => /request for examination was made|examination/.test(low), value: { simple: 'Examination', level: 'info' } },
+          { test: (low) => /search/.test(low), value: { simple: 'Search', level: 'info' } },
+        ]);
+        
+        function inferStatusStageFromText(statusRaw = '') {
+          return matchStatusRule(statusRaw, STATUS_STAGE_RULES, '');
+        }
+        
+        function summarizeStatusText(statusRaw = '') {
+          return matchStatusRule(statusRaw, STATUS_SUMMARY_RULES, (raw) => {
+            const oneLine = normalize(String(raw || '').split('\n')[0] || raw);
+            return { simple: oneLine || 'Unknown', level: 'info' };
+          });
+        }
+        
+        module.exports = {
+          STATUS_STAGE_RULES,
+          STATUS_SUMMARY_RULES,
+          inferStatusStageFromText,
+          summarizeStatusText,
+        };
+        
+      },
+      "lib/epo_v2_doclist_parser": function(module, exports, require) {
+        const { DATE_RE, normalize, text, parseDateString, compareDateDesc } = require('./epo_v2_utils');
+        const DOCLIST_TABLE_HINT_SETS = Object.freeze([
+          ['date', 'document'],
+          ['document type'],
+        ]);
+        
+        function structuralTableScore(table) {
+          const rows = [...table.querySelectorAll('tr')];
+          if (!rows.length) return 0;
+          let datedCells = 0;
+          let linkCells = 0;
+          let rowsWithDates = 0;
+          let rowsWithLinks = 0;
+          for (const row of rows.slice(0, 18)) {
+            const cells = [...row.querySelectorAll('th,td')];
+            if (!cells.length) continue;
+            let rowHasDate = false;
+            let rowHasLink = false;
+            for (const cell of cells) {
+              const cellText = text(cell);
+              if (DATE_RE.test(cellText)) {
+                datedCells += 1;
+                rowHasDate = true;
+              }
+              if (cell.querySelector('a')) {
+                linkCells += 1;
+                rowHasLink = true;
+              }
+            }
+            if (rowHasDate) rowsWithDates += 1;
+            if (rowHasLink) rowsWithLinks += 1;
+          }
+          return (rowsWithDates * 3) + (rowsWithLinks * 3) + datedCells + linkCells;
+        }
+        
+        function bestTable(doc, hints = []) {
+          let best = null;
+          let score = 0;
+          for (const table of doc.querySelectorAll('table')) {
+            const headerText = text(table.querySelector('thead') || table).toLowerCase();
+            let current = structuralTableScore(table);
+            for (const hint of hints) if (headerText.includes(String(hint || '').toLowerCase())) current += 5;
+            if (current > score) {
+              score = current;
+              best = table;
+            }
+          }
+          return score > 0 ? best : null;
+        }
+        
+        function doclistTable(doc) {
+          for (const hints of DOCLIST_TABLE_HINT_SETS) {
+            const table = bestTable(doc, hints);
+            if (table) return table;
+          }
+          return null;
+        }
+        
+        function tableColumnMap(table) {
+          const map = {};
+          const headerRow = table.querySelector('thead tr') || table.querySelector('tr');
+          const headers = [...(headerRow?.querySelectorAll('th,td') || [])].map(text);
+          headers.forEach((header, idx) => {
+            const low = header.toLowerCase();
+            if (/^date$/.test(low)) map.date = idx;
+            if (low.includes('document type') || low === 'document') map.document = idx;
+            if (low.includes('procedure')) map.procedure = idx;
+            if (low.includes('number') && low.includes('page')) map.pages = idx;
+          });
+        
+          const bodyRows = [...table.querySelectorAll('tbody tr, tr')].filter((row) => row.querySelector('td'));
+          const width = Math.max(0, ...bodyRows.map((row) => row.querySelectorAll('td').length));
+          const stats = Array.from({ length: width }, () => ({ dateHits: 0, linkHits: 0, textHits: 0, numberHits: 0 }));
+          for (const row of bodyRows.slice(0, 24)) {
+            [...row.querySelectorAll('td')].forEach((cell, idx) => {
+              const value = text(cell);
+              if (!value) return;
+              if (DATE_RE.test(value)) stats[idx].dateHits += 1;
+              if (cell.querySelector('a')) stats[idx].linkHits += 1;
+              if (value.length >= 12) stats[idx].textHits += 1;
+              if (/^\d{1,4}$/.test(value)) stats[idx].numberHits += 1;
+            });
+          }
+        
+          if (map.date == null) {
+            map.date = stats
+              .map((stat, idx) => ({ idx, score: stat.dateHits * 4 + stat.linkHits }))
+              .sort((a, b) => b.score - a.score)[0]?.idx;
+          }
+          if (map.document == null) {
+            map.document = stats
+              .map((stat, idx) => ({ idx, score: stat.linkHits * 5 + stat.textHits * 2 - (idx === map.date ? 100 : 0) }))
+              .sort((a, b) => b.score - a.score)[0]?.idx;
+          }
+          if (map.procedure == null) {
+            map.procedure = stats
+              .map((stat, idx) => ({ idx, score: stat.textHits - (idx === map.date || idx === map.document ? 100 : 0) }))
+              .sort((a, b) => b.score - a.score)[0]?.idx;
+          }
+          if (map.pages == null) {
+            map.pages = stats
+              .map((stat, idx) => ({ idx, score: stat.numberHits * 4 + stat.textHits - (idx === map.date || idx === map.document || idx === map.procedure ? 100 : 0) }))
+              .sort((a, b) => b.score - a.score)[0]?.idx;
+          }
+          return map;
+        }
+        
+        function createParseStats(source = 'doclist') {
+          return {
+            source,
+            tableFound: false,
+            rowsSeen: 0,
+            rowsAccepted: 0,
+            rowsDropped: 0,
+            rowsDroppedByReason: {},
+          };
+        }
+        
+        function noteParseDrop(parseStats, reason = 'unknown') {
+          if (!parseStats) return;
+          parseStats.rowsDropped += 1;
+          parseStats.rowsDroppedByReason[reason] = (parseStats.rowsDroppedByReason[reason] || 0) + 1;
+        }
+        
+        function doclistEntryFromRow(row, map = {}, { fallbackUrl = '', rowOrder = 0, parseStats = null } = {}) {
+          const cells = [...row.querySelectorAll('td')];
+          if (!cells.length) {
+            noteParseDrop(parseStats, 'missing-cells');
+            return null;
+          }
+          if (!row.querySelector("input[type='checkbox']")) {
+            noteParseDrop(parseStats, 'missing-checkbox');
+            return null;
+          }
+          const rowText = cells.map(text).filter(Boolean).join(' ') || text(row);
+          const dateMatch = rowText.match(DATE_RE);
+          if (!dateMatch) {
+            noteParseDrop(parseStats, 'missing-date');
+            return null;
+          }
+          const dateStr = dateMatch[1];
+          const getCell = (idx) => (idx != null && idx < cells.length ? text(cells[idx]) : '');
+        
+          let title = getCell(map.document);
+          if (!title) {
+            title = [...row.querySelectorAll('a')]
+              .map(text)
+              .filter(Boolean)
+              .sort((a, b) => b.length - a.length)[0] || '';
+          }
+          if (!title) {
+            noteParseDrop(parseStats, 'missing-title');
+            return null;
+          }
+        
+          const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || fallbackUrl;
+          const procedure = getCell(map.procedure);
+          const pages = getCell(map.pages);
+        
+          return {
+            dateStr,
+            title,
+            procedure,
+            pages,
+            rowOrder,
+            url,
+            source: 'All documents',
+          };
+        }
+        
+        function parseDoclistFromDocument(doc, { fallbackUrl = '', transformEntry = null } = {}) {
+          const parseStats = createParseStats('doclist');
+          const table = doclistTable(doc);
+          if (!table) return { docs: [], parseStats };
+          parseStats.tableFound = true;
+          const map = tableColumnMap(table);
+          const docs = [];
+          let rowOrder = 0;
+          for (const row of table.querySelectorAll('tr')) {
+            if (!row.querySelector('td')) continue;
+            parseStats.rowsSeen += 1;
+            const entry = doclistEntryFromRow(row, map, { fallbackUrl, rowOrder, parseStats });
+            if (!entry) continue;
+            rowOrder += 1;
+            parseStats.rowsAccepted += 1;
+            docs.push(typeof transformEntry === 'function' ? transformEntry(entry, { row, map }) : entry);
+          }
+          return { docs: docs.sort(compareDateDesc), parseStats };
+        }
+        
+        module.exports = {
+          DATE_RE,
+          DOCLIST_TABLE_HINT_SETS,
+          normalize,
+          text,
+          parseDateString,
+          compareDateDesc,
+          bestTable,
+          doclistTable,
+          tableColumnMap,
+          doclistEntryFromRow,
+          parseDoclistFromDocument,
+        };
+        
+      },
+      "lib/epo_v2_document_classification": function(module, exports, require) {
+        const { normalize } = require('./epo_v2_utils');
+        const { classifyDocSignal } = require('./epo_v2_doc_signals');
+        
+        function parseApplicationType(mainData = {}) {
+          const appNo = mainData.appNo || '';
+          const priorities = Array.isArray(mainData.priorities) ? mainData.priorities : [];
+          const internationalAppNo = normalize(mainData.internationalAppNo || '').toUpperCase();
+          const statusRaw = normalize(mainData.statusRaw || '');
+        
+          const hasExplicitPctMarker =
+            /\bPCT\/[A-Z]{2}\d{4}\/\d{5,}\b/i.test(internationalAppNo)
+            || /\bWO\d{4}[A-Z]{2}\d{3,}\b/i.test(internationalAppNo)
+            || /\b(?:E\/PCT|EURO-?PCT|regional phase)\b/i.test(statusRaw);
+        
+          if (hasExplicitPctMarker || priorities.some((priority) => /^WO\d{4}[A-Z]{2}\d{3,}$/i.test(String(priority?.no || '')))) {
+            return 'E/PCT regional phase';
+          }
+          if (mainData.isDivisional || mainData.parentCase) return 'Divisional';
+          if (priorities.length > 0) return 'EP convention filing';
+          if (/^EP\d+$/i.test(appNo)) return 'EP direct first filing';
+          return 'Unknown';
+        }
+        
+        function classifyDocument(title, procedure = '') {
+          const t = String(title || '').toLowerCase();
+          const p = String(procedure || '').toLowerCase();
+        
+          const isSearchResponseContext =
+            /search\s*\/\s*examination|search\s*and\s*examination|search report|search opinion/.test(p)
+            || /after receipt of \(?(?:european\)? )?search report|before examination/.test(t);
+        
+          const isGrantContext = /rule\s*71\(3\)|intention to grant|text intended for grant|text proposed for grant|proposed for grant/.test(`${t} ${p}`);
+          const isGrantCommunicationTitle = /text intended for grant|communication about intention to grant|annex to the communication about intention to grant|intention to grant/.test(t);
+          const isGrantResponse = isGrantContext
+            && !isGrantCommunicationTitle
+            && /amend|correction|request|claims|description|translation|approval|text proposed for grant/.test(t);
+        
+          const normalizedSignal = classifyDocSignal({ title, procedure });
+          if (normalizedSignal) {
+            if (normalizedSignal.family === 'search') {
+              return { bundle: 'Search package', level: normalizedSignal.level, actor: normalizedSignal.actor };
+            }
+            if (normalizedSignal.bundle === 'Intention to grant (R71(3) EPC)') {
+              return { bundle: 'Grant package', level: normalizedSignal.level, actor: normalizedSignal.actor };
+            }
+            return { bundle: normalizedSignal.bundle, level: normalizedSignal.level, actor: normalizedSignal.actor };
+          }
+        
+          const isLossOfRights = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|noting of loss of rights|application refused|application rejected/.test(`${t} ${p}`);
+          if (isLossOfRights) {
+            return { bundle: 'Examination', level: 'bad', actor: 'EPO' };
+          }
+        
+          if (/by applicant|amendment by applicant|filed by applicant|from applicant/.test(p)) {
+            if (isGrantResponse) {
+              return { bundle: 'Grant package', level: 'warn', actor: 'Applicant' };
+            }
+            if (isSearchResponseContext && !isGrantContext && /amend|claims|description|letter|annotations|subsequently filed items/.test(t)) {
+              return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
+            }
+            if (/request for grant|description|claims|drawings|designation of inventor|priority document|annex/.test(t)) {
+              return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
+            }
+            return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
+          }
+        
+          if (/acknowledgement of receipt|receipt of electronic submission|auto-acknowledgement/.test(t) || /acknowledgement/.test(p)) {
+            return { bundle: 'Other', level: 'info', actor: 'System' };
+          }
+        
+          if (isGrantResponse) {
+            return { bundle: 'Grant package', level: 'warn', actor: 'Applicant' };
+          }
+        
+          if (isSearchResponseContext && !isGrantContext && /amend|claims|description|letter accompanying subsequently filed items|annotations|amendments received before examination/.test(t)) {
+            return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
+          }
+        
+          if (/amended claims filed|amendment by applicant|claims and\/or description|filed after receipt/i.test(t)) {
+            return isGrantContext
+              ? { bundle: 'Grant package', level: 'warn', actor: 'Applicant' }
+              : { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
+          }
+        
+          if (/search report|search opinion|written opinion|search strategy|esr/.test(t)) return { bundle: 'Search package', level: 'info', actor: 'EPO' };
+          if (/rule\s*71\(3\)|intention to grant|text intended for grant|mention of grant/.test(t)) return { bundle: 'Grant package', level: 'warn', actor: 'EPO' };
+          if (/annex to (?:the )?communication|communication annex|annex.*examining division/.test(t)) {
+            return /intention to grant|rule\s*71\(3\)/.test(t)
+              ? { bundle: 'Grant package', level: 'warn', actor: 'EPO' }
+              : { bundle: 'Examination', level: 'info', actor: 'EPO' };
+          }
+          if (/article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining|examining division has become responsible/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
+          if (/renewal|annual fee/.test(t)) return { bundle: 'Renewal', level: 'ok', actor: 'Applicant' };
+          if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
+          if (/reply|response|arguments|observations|letter|filed by applicant|submission|request/.test(t)) return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
+          if (/opposition|third party/.test(t) || /third party/.test(p)) return { bundle: 'Opposition', level: 'warn', actor: 'Third party' };
+        
+          if (/examining division|epo|office/.test(p)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
+          return { bundle: 'Other', level: 'info', actor: 'Other' };
+        }
+        
+        function refineDocumentClassification(title = '', procedure = '', cls = {}) {
+          const t = normalize(title).toLowerCase();
+          const p = normalize(procedure).toLowerCase();
+          const merged = `${t} ${p}`;
+          if (/reminder to observe due time limit|communication concerning the reminder|invitation pursuant to rule\s*45|communication under rule\s*112\(1\)|loss of rights|notification of forthcoming publication|transmission of the certificate|mention of grant|decision to grant|communication to designated inventor|search started|examining division becomes responsible|examination started|publication of the mention of the grant|grant of a european patent/.test(merged)) {
+            return {
+              bundle: /loss of rights|rule\s*112\(1\)|deemed to be withdrawn/.test(merged) ? 'Examination' : (cls.bundle || 'Other'),
+              level: /loss of rights|rule\s*112\(1\)|deemed to be withdrawn/.test(merged) ? 'bad' : (cls.level || 'info'),
+              actor: 'EPO',
+            };
+          }
+          return cls;
+        }
+        
+        module.exports = {
+          parseApplicationType,
+          classifyDocument,
+          refineDocumentClassification,
+        };
+        
+      },
+      "lib/epo_v2_reference_parsers": function(module, exports, require) {
+        const { DATE_RE, normalize, text, compareDateDesc, dedupe } = require('./epo_v2_utils');
+        
+        function normalizePublicationNumber(raw) {
+          return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        }
+        
+        function splitPublicationNumber(rawNo, rawKind = '') {
+          let no = normalizePublicationNumber(rawNo);
+          let kind = String(rawKind || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        
+          if (kind && no.endsWith(kind) && no.length > kind.length + 5) {
+            no = no.slice(0, -kind.length);
+          }
+        
+          if (!kind) {
+            const match = no.match(/^(.*?)([A-Z]\d)$/);
+            if (match && match[1].length >= 7) {
+              no = match[1];
+              kind = match[2];
+            }
+          }
+        
+          return { no, kind };
+        }
+        
+        function parsePublications(textBlock, role = '') {
+          const out = [];
+          const pubPrefixes = /^(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)/;
+        
+          const push = (rawNo, rawKind, rawDate) => {
+            const parsed = splitPublicationNumber(rawNo, rawKind);
+            const dateStr = String(rawDate || '').match(DATE_RE)?.[1] || '';
+            if (!parsed.no || !dateStr) return;
+            if (!pubPrefixes.test(parsed.no)) return;
+            if (!/\d/.test(parsed.no.slice(2))) return;
+            out.push({ no: parsed.no, kind: parsed.kind, dateStr, role });
+          };
+        
+          const textValue = String(textBlock || '');
+          const numberPattern = '((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)(?:[\\s.\\-\\/]*[A-Z0-9]){5,18})';
+          let match;
+        
+          const strictNumberBeforeDate = new RegExp(`\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?\\s+(\\d{2}\\.\\d{2}\\.\\d{4})\\b`, 'gi');
+          while ((match = strictNumberBeforeDate.exec(textValue)) !== null) {
+            push(match[1], match[2], match[3]);
+          }
+        
+          if (!out.length) {
+            const strictDateBeforeNumber = new RegExp(`\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b\\s+${numberPattern}\\b(?:\\s+([A-Z]\\d))?`, 'gi');
+            while ((match = strictDateBeforeNumber.exec(textValue)) !== null) {
+              push(match[2], match[3], match[1]);
+            }
+          }
+        
+          if (!out.length) {
+            const reNumberBeforeDate = new RegExp(`\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?[\\s\\S]{0,50}?\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b`, 'gi');
+            while ((match = reNumberBeforeDate.exec(textValue)) !== null) {
+              push(match[1], match[2], match[3]);
+            }
+        
+            const reDateBeforeNumber = new RegExp(`\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b[\\s\\S]{0,50}?\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?`, 'gi');
+            while ((match = reDateBeforeNumber.exec(textValue)) !== null) {
+              push(match[2], match[3], match[1]);
+            }
+          }
+        
+          return dedupe(out, (publication) => `${publication.no}${publication.kind}|${publication.dateStr}|${publication.role}`);
+        }
+        
+        function bodyText(doc) {
+          return normalize(doc?.body?.innerText || doc?.body?.textContent || '');
+        }
+        
+        function parseFamilyFromDocument(doc) {
+          const publications = [];
+          const rows = [...doc.querySelectorAll('tr')];
+          let inPublicationBlock = false;
+        
+          for (const row of rows) {
+            const cells = [...row.querySelectorAll('td,th')].map((cell) => normalize(text(cell)));
+            if (!cells.length) continue;
+        
+            if (/^publication no\.?$/i.test(cells[0] || '')) {
+              inPublicationBlock = true;
+              continue;
+            }
+            if (/^priority number$/i.test(cells[0] || '')) {
+              inPublicationBlock = false;
+              continue;
+            }
+            if (!inPublicationBlock) continue;
+            if (!/^(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)/i.test(cells[0] || '')) continue;
+        
+            const dateStr = cells.find((value) => DATE_RE.test(value || '')) || '';
+            const kind = cells.find((value) => /^[A-Z]\d?$/.test(value || '')) || '';
+            const parsed = splitPublicationNumber(cells[0], kind);
+            if (!parsed.no || !dateStr) continue;
+            publications.push({ no: parsed.no, kind: parsed.kind, dateStr: dateStr.match(DATE_RE)?.[1] || '', role: 'Family' });
+          }
+        
+          return {
+            publications: publications.length
+              ? dedupe(publications, (publication) => `${publication.no}${publication.kind}|${publication.dateStr}|${publication.role}`)
+              : parsePublications(bodyText(doc), 'Family'),
+          };
+        }
+        
+        const CITATION_PHASE_ORDER = ['Search', 'International search', 'Examination', 'Opposition', 'Appeal', 'by applicant'];
+        
+        function parseCitationsFromDocument(doc) {
+          const entries = [];
+          let phase = '';
+          let currentType = '';
+        
+          for (const row of doc.querySelectorAll('tr')) {
+            const cells = [...row.querySelectorAll('th,td')].map((cell) => normalize(text(cell))).filter(Boolean);
+            if (!cells.length) continue;
+        
+            if (/^Cited in$/i.test(cells[0] || '') && cells[1]) {
+              phase = cells[1];
+              continue;
+            }
+            if (/^Type:?$/i.test(cells[0] || '')) {
+              currentType = cells[1] || '';
+              continue;
+            }
+            if (!/^Publication No\.:?$/i.test(cells[0] || '')) continue;
+        
+            const raw = cells.slice(1).join(' ');
+            const pubMatch = raw.match(/\b((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)\d{4,})\b/i);
+            if (!pubMatch?.[1]) continue;
+            const categoryMatches = [...raw.matchAll(/\[([A-Z]{1,4})\]/g)].map((match) => String(match[1] || ''));
+            const applicant = raw.match(/\(([^)]+)\)/)?.[1] || '';
+            entries.push({
+              phase: phase || 'Other',
+              type: currentType || 'Patent literature',
+              publicationNo: String(pubMatch[1] || '').toUpperCase(),
+              categories: dedupe(categoryMatches, (category) => category),
+              applicant,
+              detail: raw,
+            });
+          }
+        
+          const byPhase = {};
+          for (const entry of entries) (byPhase[entry.phase] ||= []).push(entry);
+          const phases = Object.keys(byPhase)
+            .sort((a, b) => {
+              const ai = CITATION_PHASE_ORDER.indexOf(a);
+              const bi = CITATION_PHASE_ORDER.indexOf(b);
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.localeCompare(b);
+            })
+            .map((name) => ({ name, entries: byPhase[name] }));
+        
+          return { entries, phases };
+        }
+        
+        module.exports = {
+          CITATION_PHASE_ORDER,
+          normalizePublicationNumber,
+          splitPublicationNumber,
+          parsePublications,
+          parseFamilyFromDocument,
+          parseCitationsFromDocument,
+        };
+        
+      },
+      "lib/epo_v2_territorial_parser": function(module, exports, require) {
+        const { normalize, text } = require('./epo_v2_utils');
+        
+        function bodyText(doc) {
+          return normalize(doc?.body?.innerText || doc?.body?.textContent || '');
+        }
+        
+        function rowLabelValuePairs(row) {
+          const pairs = {};
+          let currentKey = '';
+          for (const cell of row.querySelectorAll('th,td')) {
+            const raw = normalize(text(cell));
+            const tag = String(cell.tagName || '').toUpperCase();
+            const cls = String(cell.className || '').toLowerCase();
+            const isLabel = tag === 'TH' || /\bth\b/.test(cls) || cls.includes('header');
+            if (isLabel) {
+              currentKey = raw.replace(/:\s*$/, '').trim();
+              if (currentKey && !(currentKey in pairs)) pairs[currentKey] = '';
+              continue;
+            }
+            if (!currentKey) continue;
+            if (raw) pairs[currentKey] = pairs[currentKey] ? `${pairs[currentKey]} ${raw}`.trim() : raw;
+            currentKey = '';
+          }
+          return pairs;
+        }
+        
+        function fieldByLabel(doc, regexes) {
+          for (const row of doc.querySelectorAll('tr')) {
+            const cells = [...row.querySelectorAll('th,td')].map(text);
+            if (cells.length < 2) continue;
+            for (let i = 0; i < cells.length - 1; i++) {
+              if (!regexes.some((re) => re.test(cells[i] || ''))) continue;
+              const value = cells.slice(i + 1).filter(Boolean).join('\n').trim();
+              if (value) return value;
+            }
+          }
+          for (const dl of doc.querySelectorAll('dl')) {
+            const children = [...dl.children];
+            for (let i = 0; i < children.length; i++) {
+              if (children[i]?.tagName !== 'DT') continue;
+              if (!regexes.some((re) => re.test(text(children[i])))) continue;
+              const values = [];
+              for (let j = i + 1; j < children.length && children[j]?.tagName !== 'DT'; j++) {
+                if (children[j]?.tagName === 'DD') values.push(text(children[j]));
+              }
+              const value = values.filter(Boolean).join('\n').trim();
+              if (value) return value;
+            }
+          }
+          return '';
+        }
+        
+        function fieldTailByLabel(doc, regexes) {
+          for (const row of doc.querySelectorAll('tr')) {
+            const cells = [...row.querySelectorAll('th,td')];
+            if (cells.length < 2) continue;
+            for (let i = 0; i < cells.length - 1; i++) {
+              if (!regexes.some((re) => re.test(text(cells[i]) || ''))) continue;
+              const value = text(cells[cells.length - 1]);
+              if (value) return value;
+            }
+          }
+          return '';
+        }
+        
+        function stripBulletinRef(value = '') {
+          return normalize(String(value || '').replace(/\s*\[\d{4}\/\d{2}\]\s*/g, ' '));
+        }
+        
+        function cleanMemberStatesValue(value = '') {
+          return stripBulletinRef(String(value || '').replace(/^\s*\d{2}\.\d{2}\.\d{4}\s*/i, ' '));
+        }
+        
+        function cleanUeStatusValue(value = '') {
+          return normalize(String(value || '')
+            .replace(/\bStatus updated on\b\s*\d{2}\.\d{2}\.\d{4}\b/gi, ' ')
+            .replace(/\bDatabase last updated on\b\s*\d{2}\.\d{2}\.\d{4}\b/gi, ' '));
+        }
+        
+        function parseUeFromDocument(doc) {
+          const pageText = bodyText(doc);
+          const status = cleanUeStatusValue(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
+          const renewalPaidYears = [...new Set([...doc.querySelectorAll('tr')]
+            .map((row) => {
+              const match = normalize(text(row)).match(/renewal fee unitary effect year\s*0*(\d{1,2})\b/i);
+              return match ? Number(match[1] || 0) : 0;
+            })
+            .filter(Boolean))].sort((a, b) => b - a);
+          let ueStatus = '';
+          let upcOptOut = '';
+        
+          if (/unitary effect registered|registered as a unitary patent/i.test(pageText)) ueStatus = 'Unitary effect registered';
+          else if (/request.*unitary effect|unitary effect.*request/i.test(pageText)) ueStatus = 'UE requested';
+          else if (status) ueStatus = status;
+        
+          if (/opt[\s-]*out.*registered|opted[\s-]*out/i.test(pageText)) upcOptOut = 'Opted out';
+          else if (/opt[\s-]*out.*withdrawn|opt[\s-]*out.*removed/i.test(pageText)) upcOptOut = 'Opt-out withdrawn';
+          else if (/no\s*opt[\s-]*out|not\s*opted/i.test(pageText)) upcOptOut = 'No opt-out';
+        
+          const memberStateLabels = [/^Member States? covered by Unitary/i, /^Participating member states?$/i];
+          const memberStates = cleanMemberStatesValue(
+            fieldTailByLabel(doc, memberStateLabels)
+            || fieldByLabel(doc, memberStateLabels)
+          );
+        
+          return {
+            statusRaw: status,
+            ueStatus,
+            upcOptOut,
+            memberStates,
+            renewalPaidYears,
+            highestRenewalPaidYear: renewalPaidYears[0] || null,
+            text: pageText,
+          };
+        }
+        
+        function parseFederatedFromDocument(doc, caseNo = '') {
+          const states = [];
+          const summary = {
+            appNo: caseNo,
+            fullPublicationNo: '',
+            applicantProprietor: '',
+            status: '',
+            upMemberStates: '',
+            invalidationDate: '',
+            renewalFeesPaidUntil: '',
+            recordUpdated: '',
+          };
+        
+          const captureSummary = (pairs) => {
+            if (!summary.appNo && pairs['EP application number']) summary.appNo = pairs['EP application number'];
+            if (!summary.fullPublicationNo && pairs['Full publication number']) summary.fullPublicationNo = pairs['Full publication number'];
+            if (!summary.applicantProprietor && pairs['Applicant / proprietor']) summary.applicantProprietor = pairs['Applicant / proprietor'];
+            if (!summary.status && pairs.Status) summary.status = pairs.Status;
+            if (!summary.upMemberStates && pairs['Member States covered by Unitary Patent Protection']) summary.upMemberStates = pairs['Member States covered by Unitary Patent Protection'];
+            if (!summary.invalidationDate && pairs['Invalidation date']) summary.invalidationDate = pairs['Invalidation date'];
+            if (!summary.renewalFeesPaidUntil && pairs['Renewal fees paid until']) summary.renewalFeesPaidUntil = pairs['Renewal fees paid until'];
+            if (!summary.recordUpdated && pairs['Record last updated']) summary.recordUpdated = pairs['Record last updated'];
+          };
+        
+          for (const row of doc.querySelectorAll('tr')) {
+            const pairs = rowLabelValuePairs(row);
+            if (Object.keys(pairs).length < 1) continue;
+            captureSummary(pairs);
+            if (!pairs.State) continue;
+            states.push({
+              state: pairs.State,
+              nationalPublicationNo: pairs['National publication number'] || '',
+              publicationDate: pairs['Publication date'] || '',
+              upMemberStates: pairs['Member States covered by Unitary Patent Protection'] || '',
+              invalidationDate: pairs['Invalidation date'] || '',
+              renewalFeesPaidUntil: pairs['Renewal fees paid until'] || '',
+              recordUpdated: pairs['Record last updated'] || '',
+              notInForceSince: pairs['Not in force since'] || '',
+              status: pairs.Status || summary.status || '',
+            });
+          }
+        
+          return {
+            ...summary,
+            states,
+            notableStates: states.filter((state) => normalize(state.notInForceSince || '') || /lapse|revok|terminated|not in force/i.test(`${state.status || ''} ${state.nationalPublicationNo || ''}`)),
+          };
+        }
+        
+        module.exports = {
+          bodyText,
+          rowLabelValuePairs,
+          fieldByLabel,
+          parseUeFromDocument,
+          parseFederatedFromDocument,
+        };
+        
+      },
+      "lib/epo_v2_territorial_signals": function(module, exports, require) {
+        const { normalize } = require('./epo_v2_utils');
+        
+        function upcRegistryNoteText(upcResult = null) {
+          if (!upcResult) return 'UPC registry check unavailable.';
+          const status = normalize(upcResult.status || '');
+          if (!status) return 'UPC registry check unavailable.';
+          if (/^opted out$/i.test(status)) return 'UPC opt-out registered.';
+          if (/^opt-out withdrawn$/i.test(status)) return 'UPC opt-out withdrawn.';
+          if (/^no opt-out found$/i.test(status)) return 'No UPC opt-out found.';
+          return status;
+        }
+        
+        function territorialStatusLevel({ ueStatus = '', upcNote = '', notableStates = [] } = {}) {
+          const ueLow = normalize(ueStatus).toLowerCase();
+          const upcLow = normalize(upcNote).toLowerCase();
+          if (/unitary effect registered/.test(ueLow)) return 'ok';
+          if (/ue requested|request for examination was made|request/.test(ueLow) || /opt-out/.test(upcLow)) return 'warn';
+          if ((notableStates || []).length) return 'warn';
+          return 'info';
+        }
+        
+        function territorialPresentationModel(ue = {}, upcResult = null, federated = {}) {
+          const ueStatus = normalize(ue?.ueStatus || ue?.statusRaw || '');
+          const coverageStates = normalize(ue?.memberStates || federated?.upMemberStates || '');
+          const upcNote = upcRegistryNoteText(upcResult);
+          const notableStates = Array.isArray(federated?.notableStates) ? federated.notableStates : [];
+          const nationalStates = Array.isArray(federated?.states) ? federated.states : [];
+        
+          return {
+            ueStatus,
+            upcNote,
+            coverageStates,
+            notableStates,
+            nationalStates,
+            level: territorialStatusLevel({ ueStatus, upcNote, notableStates }),
+          };
+        }
+        
+        module.exports = {
+          upcRegistryNoteText,
+          territorialStatusLevel,
+          territorialPresentationModel,
+        };
+        
+      },
+      "lib/epo_v2_main_parser": function(module, exports, require) {
+        const { DATE_RE, normalize, text, dedupe } = require('./epo_v2_utils');
+        const { parsePublications } = require('./epo_v2_reference_parsers');
+        const { bodyText, fieldByLabel } = require('./epo_v2_territorial_parser');
+        
+        function dedupeMultiline(raw = '') {
+          return String(raw || '')
+            .split('\n')
+            .map((line) => normalize(line))
+            .filter(Boolean)
+            .filter((line, idx, arr) => arr.findIndex((other) => other.toLowerCase() === line.toLowerCase()) === idx)
+            .join('\n');
+        }
+        
+        function sectionRowsByHeader(doc, headerRegex) {
+          const groups = [];
+          for (const tr of doc.querySelectorAll('tr')) {
+            const headers = [...tr.querySelectorAll('th,td')].filter((cell) => {
+              const tag = String(cell.tagName || '').toUpperCase();
+              if (tag === 'TH') return true;
+              const cls = String(cell.className || '').toLowerCase();
+              return /\bth\b/.test(cls) || cls.includes('header');
+            });
+            const th = headers.find((h) => headerRegex.test(text(h)));
+            if (!th) continue;
+        
+            const rows = [tr];
+            const rowspan = Math.max(1, parseInt(th.getAttribute('rowspan') || '1', 10) || 1);
+            let next = tr;
+            for (let i = 1; i < rowspan; i++) {
+              next = next?.nextElementSibling;
+              if (!next || next.tagName !== 'TR') break;
+              rows.push(next);
+            }
+            groups.push(rows);
+          }
+          return groups;
+        }
+        
+        function sectionTextsByHeader(doc, headerRegex) {
+          return dedupe(sectionRowsByHeader(doc, headerRegex).map((rows) => rows.map((row) => text(row)).join('\n').trim()).filter(Boolean), (value) => value);
+        }
+        
+        function parseApplicationField(raw) {
+          const match = normalize(raw).match(/(\d{6,10}\.\d)[\s\S]{0,70}?(\d{2}\.\d{2}\.\d{4})\b/);
+          return { filingDate: match?.[2] || '' };
+        }
+        
+        function pairCandidates(doc) {
+          const out = [];
+          for (const row of doc.querySelectorAll('tr')) {
+            const cells = [...row.querySelectorAll('th,td')].map(text).map(normalize).filter(Boolean);
+            if (cells.length < 2) continue;
+            const label = cells[0];
+            const value = cells.slice(1).join('\n').trim();
+            if (!value) continue;
+            out.push({ label, value, lowLabel: label.toLowerCase(), lowValue: value.toLowerCase() });
+          }
+          for (const dl of doc.querySelectorAll('dl')) {
+            const children = [...dl.children];
+            for (let i = 0; i < children.length; i++) {
+              if (children[i]?.tagName !== 'DT') continue;
+              const label = normalize(text(children[i]));
+              const values = [];
+              for (let j = i + 1; j < children.length && children[j]?.tagName !== 'DT'; j++) {
+                if (children[j]?.tagName === 'DD') values.push(normalize(text(children[j])));
+              }
+              const value = values.filter(Boolean).join('\n').trim();
+              if (!value) continue;
+              out.push({ label, value, lowLabel: label.toLowerCase(), lowValue: value.toLowerCase() });
+            }
+          }
+          return out;
+        }
+        
+        function firstPairValue(doc, predicate) {
+          return pairCandidates(doc).find((pair) => predicate(pair))?.value || '';
+        }
+        
+        function fallbackAppField(doc, pageText = '') {
+          return firstPairValue(doc, ({ value }) => /(\d{6,10}\.\d)[\s\S]{0,70}?(\d{2}\.\d{2}\.\d{4})\b/.test(value))
+            || normalize(pageText).match(/(\d{6,10}\.\d[\s\S]{0,70}?\d{2}\.\d{2}\.\d{4})/)?.[1]
+            || '';
+        }
+        
+        function fallbackPriorityField(doc, pageText = '') {
+          return firstPairValue(doc, ({ value, lowLabel }) => !/publication|event|status|title/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && /[A-Z]{2}\d+|PCT\/|WO\d{4}|priority/i.test(value))
+            || (String(pageText).match(/priority[\s\S]{0,320}/i)?.[0] || '');
+        }
+        
+        function fallbackPublicationField(doc, pageText = '') {
+          return firstPairValue(doc, ({ value, lowLabel }) => !/priority|event/.test(lowLabel)
+              && /\d{2}\.\d{2}\.\d{4}/.test(value)
+              && !/\b\d{6,10}\.\d\b/.test(value)
+              && (/\b(?:EP\s*\d{6,12}|WO\d{4}[A-Z]{0,2}\d{3,})\b[\s\S]{0,24}\b[A-Z]\d\b/i.test(value) || /\bpublication\b/i.test(value)))
+            || firstPairValue(doc, ({ value, lowLabel }) => !/priority|event/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && /(WO\d{4}|[AB]\d\b|publication)/i.test(value))
+            || (String(pageText).match(/publication[\s\S]{0,360}/i)?.[0] || '');
+        }
+        
+        function fallbackRecentEventField(doc) {
+          return firstPairValue(doc, ({ value, lowLabel }) => !/publication|priority|applic|represent|title|status|former/.test(lowLabel) && /^\s*\d{2}\.\d{2}\.\d{4}\b/.test(value) && String(value).replace(/^\s*\d{2}\.\d{2}\.\d{4}\b\s*/, '').length >= 8);
+        }
+        
+        function fallbackPartyField(doc, kind = 'applicant') {
+          const lowKind = String(kind || '').toLowerCase();
+          const lowBlock = lowKind === 'representative' ? /(representative|represent|attor|agent|mandat|vertreter|vertret|bevollm|avocat)/i : /(applicant|anmelder|demandeur|antragsteller|inhaber|proprietor)/i;
+          const fallback = firstPairValue(doc, ({ label, value }) => lowBlock.test(label) && value.length >= 3);
+          if (fallback) return fallback;
+          return firstPairValue(doc, ({ value, lowLabel }) => {
+            if (/date|priority|publication|event|status|title|number/.test(lowLabel)) return false;
+            if (/\d{2}\.\d{2}\.\d{4}/.test(value)) return false;
+            if (/\bep\d{6,10}|\d{6,10}\.\d\b/i.test(value)) return false;
+            return value.split(/\n+/).filter(Boolean).length >= 1 && value.length >= 8;
+          });
+        }
+        
+        function parseMainPublications(doc, role = 'EP (this file)') {
+          const out = [];
+          const push = (rawNo, rawKind, rawDate) => {
+            const parsed = parsePublications(`${rawNo} ${rawKind} ${rawDate}`, role)[0];
+            if (parsed) out.push(parsed);
+          };
+        
+          for (const rows of sectionRowsByHeader(doc, /^Publication\b/i)) {
+            let currentType = '';
+            let currentNo = '';
+            let currentDate = '';
+        
+            const flush = () => {
+              if (!currentNo || !currentDate) return;
+              push(currentNo, currentType, currentDate);
+              currentType = '';
+              currentNo = '';
+              currentDate = '';
+            };
+        
+            for (const row of rows) {
+              const cells = [...row.querySelectorAll('th,td')].map(text).filter(Boolean);
+              for (let i = 0; i < cells.length - 1; i++) {
+                const label = cells[i];
+                const value = cells.slice(i + 1).join(' ');
+                if (/^Type:?$/i.test(label)) currentType = value.match(/\b([A-Z]\d)\b/)?.[1] || currentType;
+                else if (/^No\.:?$/i.test(label)) currentNo = value;
+                else if (/^Date:?$/i.test(label)) {
+                  currentDate = value;
+                  flush();
+                }
+              }
+            }
+        
+            flush();
+          }
+        
+          return dedupe(out, (publication) => `${publication.no}${publication.kind}|${publication.dateStr}|${publication.role}`);
+        }
+        
+        function extractEpNumbersByHeader(doc, headerRegex) {
+          const values = [];
+          for (const chunk of sectionTextsByHeader(doc, headerRegex)) {
+            for (const match of chunk.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)) {
+              values.push(String(match[1] || '').toUpperCase());
+            }
+          }
+          return dedupe(values, (value) => value);
+        }
+        
+        function parsePriority(raw, pageText = '') {
+          const out = [];
+          const rawText = dedupeMultiline(raw);
+          const rawLines = String(rawText || '').split('\n').map((value) => value.trim()).filter(Boolean);
+        
+          const push = (no, dateStr) => {
+            const n = String(no || '').replace(/\s+/g, '').toUpperCase();
+            const d = String(dateStr || '').trim();
+            if (!n || !d) return;
+            out.push({ no: n, dateStr: d });
+          };
+        
+          const parseLine = (line, loose = false) => {
+            const re = loose
+              ? /\b([A-Z]{2}[0-9A-Z/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i
+              : /\b([A-Z]{2}\d[0-9A-Z/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i;
+            const match = String(line || '').match(re);
+            if (!match) return null;
+            return { no: match[1], dateStr: match[2] };
+          };
+        
+          for (const line of rawLines) {
+            const parsed = parseLine(line, false) || parseLine(line, true);
+            if (parsed) push(parsed.no, parsed.dateStr);
+          }
+        
+          if (!out.length && rawText) {
+            for (const match of rawText.matchAll(/\b([A-Z]{2}\d[0-9A-Z/\-]{4,})\b[\s\S]{0,120}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) push(match[1], match[2]);
+            if (!out.length) {
+              const ids = [...rawText.matchAll(/\b([A-Z]{2}\d[0-9A-Z/\-]{4,})\b/gi)].map((match) => String(match[1] || ''));
+              const dates = [...rawText.matchAll(/\b(\d{2}\.\d{2}\.\d{4})\b/g)].map((match) => String(match[1] || ''));
+              if (ids[0] && dates[0]) push(ids[0], dates[0]);
+            }
+          }
+        
+          if (!out.length && pageText) {
+            const section = String(pageText).match(/Priority\s+number,\s*date([\s\S]{0,500}?)(?=\b(?:Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event)\b|$)/i)?.[1] || '';
+            for (const match of section.matchAll(/\b([A-Z]{2}\d[0-9A-Z/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) push(match[1], match[2]);
+            if (!out.length) {
+              for (const match of section.matchAll(/\b([A-Z]{2}[0-9A-Z/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) push(match[1], match[2]);
+            }
+          }
+        
+          return dedupe(out, (item) => `${item.no}|${item.dateStr}`);
+        }
+        
+        function normalizeRecentEventEntry(entry) {
+          if (!entry || !entry.title) return entry;
+          let title = String(entry.title || '').trim();
+          const detailParts = entry.detail ? [entry.detail] : [];
+        
+          const movedState = title.match(/^(.*?)(\s+New state\(s\):\s*.+)$/i);
+          if (movedState?.[1] && movedState?.[2]) {
+            title = movedState[1].trim();
+            detailParts.unshift(movedState[2].trim());
+          }
+        
+          const movedPublication = title.match(/^(.*?)(\s+published on\s+\d{2}\.\d{2}\.\d{4}.*)$/i);
+          if (movedPublication?.[1] && movedPublication?.[2]) {
+            title = movedPublication[1].trim();
+            detailParts.unshift(movedPublication[2].trim());
+          }
+        
+          return {
+            ...entry,
+            title,
+            detail: detailParts.filter(Boolean).join(' · '),
+          };
+        }
+        
+        function parseRecentEvents(raw) {
+          const lines = String(raw || '').split('\n').map((value) => value.trim()).filter(Boolean);
+          const out = [];
+          let current = null;
+          for (const line of lines) {
+            const match = line.match(/^\s*(\d{2}\.\d{2}\.\d{4})\b\s*(.*)$/);
+            if (match) {
+              if (current?.dateStr && current?.title) out.push(normalizeRecentEventEntry(current));
+              current = { dateStr: match[1], title: String(match[2] || '').trim(), detail: '', source: 'Main page' };
+              continue;
+            }
+            if (!current) continue;
+            if (!current.title) current.title = line;
+            else current.detail = current.detail ? `${current.detail} · ${line}` : line;
+          }
+          if (current?.dateStr && current?.title) out.push(normalizeRecentEventEntry(current));
+          return dedupe(out, (event) => `${event.dateStr}|${event.title}|${event.detail}`);
+        }
+        
+        function cleanTitle(raw) {
+          return dedupeMultiline(raw)
+            .replace(/^\s*(?:English|German|French)\s*:\s*/i, '')
+            .replace(/\s*\[[^\]]+\]\s*$/g, '')
+            .trim();
+        }
+        
+        function trimPartyAddress(line = '') {
+          const normalizedLine = normalize(line).replace(/^for all designated states\b[:\s-]*/i, '').trim();
+          const entityMatch = normalizedLine.match(/^(.*?(?:Inc\.?|LLP|PLC|LLC|Ltd\.?|Limited|GmbH|S\.A\.?|B\.V\.?|Corp\.?|Corporation|Company|Co\.?|AG|AB|A\/S|SAS|SRL|S\.r\.l\.|KG|KGaA))(?=\s|$)/i);
+          if (entityMatch?.[1]) return entityMatch[1].trim();
+          const addressCue = normalizedLine.match(/\s+\d{1,5}[A-Z]?(?:-\d+)?\s+[A-Z]/);
+          if (addressCue && addressCue.index > 6) return normalizedLine.slice(0, addressCue.index).trim();
+          const placeCue = normalizedLine.match(/\s+(?:Parc|Square|Suite|Building|Street|Road|Avenue|Boulevard|Lane|Way|Campus)\b/i);
+          if (placeCue && placeCue.index > 6) return normalizedLine.slice(0, placeCue.index).trim();
+          return normalizedLine;
+        }
+        
+        function pickApplicantLine(raw) {
+          const out = [];
+          const lines = dedupeMultiline(raw)
+            .split('\n')
+            .map((line) => normalize(line))
+            .filter(Boolean);
+        
+          for (let line of lines) {
+            if (/^for all designated states$/i.test(line)) continue;
+            if (/^\[[^\]]+\]$/.test(line)) continue;
+            if (/^for all designated states\b/i.test(line)) {
+              line = line.replace(/^for all designated states\b[:\s-]*/i, '').trim();
+              if (!line) continue;
+            }
+            if (/^(applicant|for applicant)\s*[:\-]?\s*$/i.test(line)) continue;
+            out.push(trimPartyAddress(line));
+          }
+        
+          return out[0] || '';
+        }
+        
+        function extractTitle(doc) {
+          const rawTitle = dedupeMultiline(fieldByLabel(doc, [/^Title$/i]));
+          const page = bodyText(doc);
+          if (rawTitle) {
+            const englishLine = rawTitle.split('\n').map((value) => value.trim()).find((line) => /^English\s*:/i.test(line));
+            if (englishLine) return cleanTitle(englishLine.replace(/^English\s*:\s*/i, ''));
+            const englishFromPage = page.match(/\bEnglish\s*:\s*([^\n\r\[]+)/i);
+            if (englishFromPage?.[1]) return cleanTitle(englishFromPage[1]);
+          }
+        
+          for (const el of [...doc.querySelectorAll('h1,h2,h3,strong,b,a')].slice(0, 120)) {
+            const match = text(el).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
+            if (match?.[1]) return cleanTitle(match[1]);
+          }
+        
+          if (rawTitle) {
+            const cleanedLines = rawTitle.split('\n').map((line) => line.trim()).filter((line) => line && !/^(German|French)\s*:/i.test(line));
+            if (cleanedLines.length) return cleanTitle(cleanedLines[0]);
+          }
+        
+          const fromBody = bodyText(doc).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
+          return cleanTitle(fromBody?.[1] || '');
+        }
+        
+        function parseMainRawFromDocument(doc, caseNo) {
+          const pageText = bodyText(doc);
+          const appSections = sectionTextsByHeader(doc, /^Application number/i);
+          const publicationSections = sectionTextsByHeader(doc, /^Publication\b/i);
+          const appField = appSections[0] || fieldByLabel(doc, [/^Application number/i]) || fallbackAppField(doc, pageText);
+          const statusField = dedupeMultiline(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
+          const priorityField = fieldByLabel(doc, [/^Priority\b/i]) || fallbackPriorityField(doc, pageText);
+          const publicationField = publicationSections.join('\n') || fieldByLabel(doc, [/^Publication\b/i]) || fallbackPublicationField(doc, pageText);
+          const recentEventField = fieldByLabel(doc, [/^Most recent event\b/i]) || fallbackRecentEventField(doc);
+        
+          const appInfo = parseApplicationField(appField);
+          const priorities = parsePriority(priorityField, pageText);
+        
+          const parentCandidates = extractEpNumbersByHeader(doc, /\bParent application(?:\(s\))?\b/i);
+          const parentMatch = pageText.match(/\bparent\s+application(?:\(s\))?[^\n]{0,140}\b(EP\d{6,12})\b/i);
+          const parentCase = parentCandidates[0] || (parentMatch ? parentMatch[1].toUpperCase() : '');
+        
+          const divisionalChildrenFromHeader = extractEpNumbersByHeader(doc, /\bDivisional application(?:\(s\))?\b/i);
+          const divisionalSection = String(pageText).match(/Divisional\s+application(?:\(s\))?[\s\S]{0,400}/i)?.[0] || '';
+          const divisionalChildAppsFromText = [...divisionalSection.matchAll(/\b(EP\d{8})(?:\.\d)?\b\s*(?:&nbsp;|\s)*\//gi)].map((match) => String(match[1] || '').toUpperCase());
+          const divisionalChildrenFromText = [...divisionalSection.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((match) => String(match[1] || '').toUpperCase());
+          const divisionalChildren = dedupe((divisionalChildAppsFromText.length ? divisionalChildAppsFromText : [...divisionalChildrenFromHeader, ...divisionalChildrenFromText]), (value) => value);
+          const mainPublications = parseMainPublications(doc, 'EP (this file)');
+        
+          const internationalField = dedupeMultiline(fieldByLabel(doc, [/^International application\b/i, /^International publication\b/i, /^PCT application\b/i]));
+          const internationalSectionFromPage = String(pageText).match(/International\s+application(?:\s+number)?[\s\S]{0,220}/i)?.[0] || '';
+          const pctScopeText = `${appSections.join('\n')}\n${String(appField || '')}\n${internationalField}\n${internationalSectionFromPage}\n${pageText}`;
+          const woMatch = pctScopeText.match(/\b(WO\d{4}(?:[A-Z]{2})?\d{3,})\b/i);
+          const pctMatch = pctScopeText.match(/\b(PCT\/[A-Z]{2}\d{4}\/\d{5,})\b/i);
+          const internationalAppNo = (woMatch?.[1] || pctMatch?.[1] || '').toUpperCase();
+          const isEuroPct = !!internationalAppNo;
+        
+          const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
+          const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]) || fallbackPartyField(doc, 'applicant'));
+          const representativeField = normalize(fieldByLabel(doc, [/^Representative/i]) || fallbackPartyField(doc, 'representative'));
+          const fallbackApplicant = normalize((pageText.match(/\bApplicant\s*(?:\n|:)\s*([^\n]+)/i)?.[1]) || '');
+          const divisionalMarker = /\bdivisional application\b/i.test(`${String(statusField || '')}\n${pageText}`);
+        
+          return {
+            appNo: caseNo,
+            title: extractTitle(doc) || cleanTitle(titleField),
+            applicant: pickApplicantLine(applicantField) || normalize(applicantField.split('\n').find(Boolean) || '') || fallbackApplicant,
+            representative: trimPartyAddress(representativeField.split('\n').find(Boolean) || ''),
+            filingDate: appInfo.filingDate,
+            priorities,
+            priorityText: priorities.map((priority) => `${priority.no} · ${priority.dateStr}`).join('\n'),
+            statusRaw: normalize(statusField),
+            recentEvents: parseRecentEvents(recentEventField),
+            publications: mainPublications.length ? mainPublications : parsePublications(publicationField, 'EP (this file)'),
+            internationalAppNo,
+            isEuroPct,
+            isDivisional: !!parentCase || divisionalMarker,
+            parentCase,
+            divisionalChildren: divisionalChildren.filter((ep) => ep !== caseNo),
+          };
+        }
+        
+        module.exports = {
+          dedupeMultiline,
+          sectionRowsByHeader,
+          sectionTextsByHeader,
+          parseApplicationField,
+          parseMainPublications,
+          extractEpNumbersByHeader,
+          parsePriority,
+          parseRecentEvents,
+          cleanTitle,
+          pickApplicantLine,
+          extractTitle,
+          parseMainRawFromDocument,
+        };
+        
+      },
+      "lib/epo_v2_procedural_parser": function(module, exports, require) {
+        const { EPO_CODEX_DATA } = require('./epo_codex_data');
+        const { DATE_RE, normalize, text, compareDateDesc, dedupe } = require('./epo_v2_utils');
+        
+        function normalizeCodexDescription(value = '') {
+          return normalize(value).toLowerCase();
+        }
+        
+        function normalizeStructuredLabel(value = '') {
+          return normalize(value).toLowerCase().replace(/[_-]+/g, ' ');
+        }
+        
+        function normalizeStructuredDate(value = '') {
+          const raw = normalize(value);
+          if (!raw) return '';
+          const compact = raw.match(/^(19|20)\d{6}$/)?.[0] || '';
+          if (compact) return `${compact.slice(6, 8)}.${compact.slice(4, 6)}.${compact.slice(0, 4)}`;
+          const dated = raw.match(/(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})/);
+          if (!dated) return '';
+          const dd = String(dated[1] || '').padStart(2, '0');
+          const mm = String(dated[2] || '').padStart(2, '0');
+          const yyRaw = String(dated[3] || '');
+          const yyyy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
+          return `${dd}.${mm}.${yyyy}`;
+        }
+        
+        function parseSmallNumberToken(token = '') {
+          const t = normalize(String(token || '')).toLowerCase();
+          if (!t) return 0;
+          if (/^\d{1,2}$/.test(t)) return Number(t);
+          return {
+            one: 1,
+            two: 2,
+            three: 3,
+            four: 4,
+            five: 5,
+            six: 6,
+            seven: 7,
+            eight: 8,
+            nine: 9,
+            ten: 10,
+            eleven: 11,
+            twelve: 12,
+          }[t] || 0;
+        }
+        
+        function parseStructuredTimeLimit(value = '') {
+          const raw = normalize(value);
+          if (!raw) return { raw: '', months: 0, dateStr: '' };
+          const dateStr = normalizeStructuredDate(raw);
+          const monthToken = raw.match(/(?:within\s+)?(?:a\s+)?(?:period|time\s+limit)?\s*(?:of\s+)?([a-z]+|\d{1,2})\s+months?/i)?.[1] || '';
+          const months = parseSmallNumberToken(monthToken);
+          return { raw, months, dateStr };
+        }
+        
+        function legalCodeRecord(code) {
+          return code ? (EPO_CODEX_DATA.byCode[String(code).toUpperCase()] || null) : null;
+        }
+        
+        function codexDescriptionRecord(description = '') {
+          const key = normalizeCodexDescription(description);
+          return key ? (EPO_CODEX_DATA.byDescription[key] || null) : null;
+        }
+        
+        function normalizeCodexSignal(raw = {}) {
+          const sourceCode = normalize(raw.sourceCode || '').toUpperCase();
+          const sourceDescription = normalize(raw.sourceDescription || '');
+          const exact = legalCodeRecord(sourceCode);
+          if (exact) return { ...raw, matchStrategy: 'exact-code', codexRecord: exact };
+          const fallback = codexDescriptionRecord(sourceDescription);
+          if (fallback) return { ...raw, matchStrategy: 'description-fallback', codexRecord: fallback };
+          return { ...raw, matchStrategy: 'unmapped', codexRecord: null };
+        }
+        
+        function createParseStats(source = 'procedural') {
+          return {
+            source,
+            rowsSeen: 0,
+            rowsAccepted: 0,
+            rowsDropped: 0,
+            rowsDroppedByReason: {},
+          };
+        }
+        
+        function noteParseDrop(parseStats, reason = 'unknown') {
+          if (!parseStats) return;
+          parseStats.rowsDropped += 1;
+          parseStats.rowsDroppedByReason[reason] = (parseStats.rowsDroppedByReason[reason] || 0) + 1;
+        }
+        
+        function attachParseStats(result, parseStats) {
+          Object.defineProperty(result, 'parseStats', {
+            value: parseStats,
+            enumerable: false,
+            configurable: true,
+            writable: true,
+          });
+          return result;
+        }
+        
+        function parseDatedRowsFromDocument(doc, url = '') {
+          const parseStats = createParseStats('procedural-rows');
+          const rows = [];
+          for (const tr of doc.querySelectorAll('tr')) {
+            const cells = [...tr.querySelectorAll('th,td')].map(text).filter(Boolean);
+            if (cells.length < 2) continue;
+            const dateCell = cells.find((value) => DATE_RE.test(value));
+            if (!dateCell) continue;
+            parseStats.rowsSeen += 1;
+            const dateStr = dateCell.match(DATE_RE)[1];
+            let payload = cells.filter((value, idx) => {
+              if (idx === 0 && DATE_RE.test(value)) return false;
+              return !/^(date|event|status|publication|document|document type)$/i.test(value);
+            });
+            if (!payload[0]) {
+              noteParseDrop(parseStats, 'missing-payload');
+              continue;
+            }
+            if (/^event\s*date\s*:?$/i.test(payload[0]) && payload[1]) payload = payload.slice(1);
+            if (!payload[0] || /^\d{2}\.\d{2}\.\d{4}$/.test(payload[0])) {
+              noteParseDrop(parseStats, 'missing-title');
+              continue;
+            }
+            rows.push({ dateStr, title: payload[0], detail: payload.slice(1).join(' · '), url });
+          }
+          const deduped = dedupe(rows, (row) => `${row.dateStr}|${row.title}|${row.detail}`).sort(compareDateDesc);
+          parseStats.rowsAccepted = deduped.length;
+          if (rows.length > deduped.length) {
+            const duplicateCount = rows.length - deduped.length;
+            parseStats.rowsDropped += duplicateCount;
+            parseStats.rowsDroppedByReason.duplicate = (parseStats.rowsDroppedByReason.duplicate || 0) + duplicateCount;
+          }
+          return attachParseStats(deduped, parseStats);
+        }
+        
+        function extractLegalEventBlocksFromDocument(doc, url = '') {
+          const blocks = [];
+          let current = null;
+        
+          const pushCurrent = () => {
+            if (!current) return;
+            if (!current.codexKey && current.title) {
+              const matched = normalizeCodexSignal({ sourceDescription: current.title });
+              current.matchStrategy = current.matchStrategy || matched.matchStrategy;
+              if (matched.codexRecord) {
+                current.codexKey = matched.codexRecord.internalKey;
+                current.codexPhase = matched.codexRecord.phase;
+                current.codexClass = matched.codexRecord.classification;
+              }
+            }
+            if (current.paymentDates?.length) current.paymentDate = current.paymentDates[current.paymentDates.length - 1] || '';
+            if (current.dateStr || current.title || current.detail) blocks.push(current);
+            current = null;
+          };
+        
+          for (const row of doc.querySelectorAll('tr')) {
+            const cells = [...row.querySelectorAll('th,td')].map(text).filter(Boolean);
+            if (!cells.length) continue;
+            const label = cells[0];
+            const value = normalize(cells.slice(1).join(' · '));
+            const labelKey = normalizeStructuredLabel(label);
+        
+            if (/^event date:?$/i.test(label) && DATE_RE.test(value)) {
+              pushCurrent();
+              current = {
+                dateStr: value.match(DATE_RE)?.[1] || '',
+                title: '',
+                detail: '',
+                url,
+                freeFormatText: '',
+                effectiveDate: '',
+                originalCode: '',
+                codexKey: '',
+                codexPhase: '',
+                codexClass: '',
+                stepDescriptionName: '',
+                dispatchDate: '',
+                replyDate: '',
+                paymentDate: '',
+                paymentDates: [],
+                requestDate: '',
+                resultDate: '',
+                timeLimitRaw: '',
+                timeLimitMonths: 0,
+                timeLimitDate: '',
+              };
+              continue;
+            }
+        
+            if (!current) continue;
+            if (/^event description:?$/i.test(label)) {
+              current.title = value;
+              continue;
+            }
+            if (/^free format text:?$/i.test(label)) {
+              current.freeFormatText = value;
+              current.detail = current.detail ? `${current.detail} · ${value}` : value;
+              const originalCode = normalize(value.match(/ORIGINAL CODE:\s*([A-Z0-9]+)/i)?.[1] || '').toUpperCase();
+              const matched = normalizeCodexSignal({ sourceCode: originalCode, sourceDescription: current.title || value });
+              if (originalCode) current.originalCode = originalCode;
+              current.matchStrategy = matched.matchStrategy;
+              if (matched.codexRecord) {
+                current.codexKey = matched.codexRecord.internalKey;
+                current.codexPhase = matched.codexRecord.phase;
+                current.codexClass = matched.codexRecord.classification;
+              }
+              continue;
+            }
+            if (/^effective date:?$/i.test(label)) {
+              current.effectiveDate = normalizeStructuredDate(value) || value;
+              current.detail = current.detail ? `${current.detail} · Effective DATE ${value}` : `Effective DATE ${value}`;
+              continue;
+            }
+            if (/^original code:?$/i.test(label)) {
+              const originalCode = value.toUpperCase();
+              const matched = normalizeCodexSignal({ sourceCode: originalCode, sourceDescription: current.title || current.detail || value });
+              current.originalCode = originalCode;
+              current.matchStrategy = matched.matchStrategy;
+              if (matched.codexRecord) {
+                current.codexKey = matched.codexRecord.internalKey;
+                current.codexPhase = matched.codexRecord.phase;
+                current.codexClass = matched.codexRecord.classification;
+              }
+              continue;
+            }
+            if (/^step description name:?$/.test(labelKey)) {
+              current.stepDescriptionName = value;
+              continue;
+            }
+            if (/^date of dispatch:?$/.test(labelKey) || /^dispatch date:?$/.test(labelKey)) {
+              current.dispatchDate = normalizeStructuredDate(value) || value;
+              continue;
+            }
+            if (/^date of reply:?$/.test(labelKey)) {
+              current.replyDate = normalizeStructuredDate(value) || value;
+              continue;
+            }
+            if (/^date of payment\d*:?$/.test(labelKey) || /^date of payment:?$/.test(labelKey)) {
+              const dateStr = normalizeStructuredDate(value) || value;
+              if (dateStr) current.paymentDates.push(dateStr);
+              current.paymentDate = current.paymentDates[current.paymentDates.length - 1] || '';
+              continue;
+            }
+            if (/^date of request:?$/.test(labelKey)) {
+              current.requestDate = normalizeStructuredDate(value) || value;
+              continue;
+            }
+            if (/^result date:?$/.test(labelKey)) {
+              current.resultDate = normalizeStructuredDate(value) || value;
+              continue;
+            }
+            if (/^time limit:?$/.test(labelKey) || /^time limit in record:?$/.test(labelKey) || /^time limit value:?$/.test(labelKey)) {
+              const parsed = parseStructuredTimeLimit(value);
+              current.timeLimitRaw = parsed.raw;
+              current.timeLimitMonths = parsed.months;
+              current.timeLimitDate = parsed.dateStr;
+              continue;
+            }
+          }
+        
+          pushCurrent();
+          return dedupe(blocks, (event) => `${event.dateStr}|${event.title}|${event.detail}|${event.originalCode}|${event.dispatchDate}|${event.timeLimitRaw}`).sort(compareDateDesc);
+        }
+        
+        function parseEventHistoryFromDocument(doc, url = '') {
+          const rawEvents = parseDatedRowsFromDocument(doc, url);
+          const events = rawEvents.map((event) => {
+            const matched = normalizeCodexSignal({ sourceDescription: event.title || '' });
+            if (!matched.codexRecord) return event;
+            return {
+              ...event,
+              codexKey: matched.codexRecord.internalKey,
+              codexPhase: matched.codexRecord.phase,
+              codexClass: matched.codexRecord.classification,
+              matchStrategy: matched.matchStrategy,
+            };
+          });
+          return {
+            events,
+            parseStats: { ...(rawEvents.parseStats || createParseStats('event')), source: 'event' },
+          };
+        }
+        
+        function parseLegalFromDocument(doc, url = '') {
+          const events = parseDatedRowsFromDocument(doc, url);
+          const codedEvents = extractLegalEventBlocksFromDocument(doc, url);
+          const renewals = [];
+          for (const event of events) {
+            const low = `${event.title} ${event.detail}`.toLowerCase();
+            if (!/renewal|annual fee|year\s*\d+/.test(low)) continue;
+            const ym = low.match(/year\s*(\d+)/i) || low.match(/(\d+)(?:st|nd|rd|th)\s*year/i);
+            renewals.push({ dateStr: event.dateStr, title: event.title, detail: event.detail, year: ym ? +ym[1] : null });
+          }
+          return {
+            events,
+            codedEvents,
+            renewals: renewals.sort(compareDateDesc),
+            parseStats: { ...(events.parseStats || createParseStats('legal')), source: 'legal' },
+          };
+        }
+        
+        module.exports = {
+          normalizeCodexDescription,
+          normalizeStructuredLabel,
+          normalizeStructuredDate,
+          parseSmallNumberToken,
+          parseStructuredTimeLimit,
+          legalCodeRecord,
+          codexDescriptionRecord,
+          normalizeCodexSignal,
+          parseDatedRowsFromDocument,
+          extractLegalEventBlocksFromDocument,
+          parseEventHistoryFromDocument,
+          parseLegalFromDocument,
+        };
+        
+      },
+      "lib/epo_v2_posture_signals": function(module, exports, require) {
+        const { summarizeStatusText } = require('./epo_v2_status_signals');
+        const { normalize, parseDateString, compareDateDesc, dedupe } = require('./epo_v2_utils');
+        
+        function inferRecordActor(entry = {}) {
+          return /applicant|filed by applicant|by applicant/i.test(`${entry.title || ''} ${entry.detail || ''}`) ? 'Applicant' : 'EPO';
+        }
+        
+        function buildProceduralRecords(docs = [], eventHistory = {}, legal = {}) {
+          const sortedDocs = [...(docs || [])].sort(compareDateDesc);
+          const sortedEvents = dedupe([...(eventHistory.events || []), ...(legal.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}`).sort(compareDateDesc);
+          const sortedCodedEvents = dedupe([...(legal.codedEvents || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.originalCode}|${e.codexKey}`).sort(compareDateDesc);
+          return dedupe([
+            ...sortedDocs.map((d) => ({
+              dateStr: d.dateStr,
+              title: d.title || '',
+              detail: d.procedure || d.detail || '',
+              actor: d.actor || 'Other',
+              source: 'Documents',
+            })),
+            ...sortedEvents.map((e) => ({
+              dateStr: e.dateStr,
+              title: e.title || '',
+              detail: e.detail || '',
+              actor: inferRecordActor(e),
+              source: 'Event',
+              codexKey: e.codexKey || '',
+              codexPhase: e.codexPhase || '',
+              codexClass: e.codexClass || '',
+            })),
+            ...sortedCodedEvents.map((e) => ({
+              dateStr: e.dateStr,
+              title: e.title || '',
+              detail: e.detail || '',
+              actor: inferRecordActor(e),
+              source: 'Coded legal event',
+              codexKey: e.codexKey || '',
+              codexPhase: e.codexPhase || '',
+              codexClass: e.codexClass || '',
+              originalCode: e.originalCode || '',
+              effectiveDate: e.effectiveDate || '',
+              freeFormatText: e.freeFormatText || '',
+              stepDescriptionName: e.stepDescriptionName || '',
+              dispatchDate: e.dispatchDate || '',
+              replyDate: e.replyDate || '',
+              paymentDate: e.paymentDate || '',
+              paymentDates: Array.isArray(e.paymentDates) ? [...e.paymentDates] : [],
+              requestDate: e.requestDate || '',
+              resultDate: e.resultDate || '',
+              timeLimitRaw: e.timeLimitRaw || '',
+              timeLimitMonths: Number(e.timeLimitMonths || 0),
+              timeLimitDate: e.timeLimitDate || '',
+            })),
+          ], (r) => `${r.dateStr}|${r.title}|${r.detail}|${r.source}|${r.codexKey || ''}`).sort(compareDateDesc);
+        }
+        
+        function postureRecord(records = [], regex) {
+          return (records || []).find((record) => regex.test(`${record.title || ''} ${record.detail || ''}`.toLowerCase())) || null;
+        }
+        
+        function postureRecordByCodex(records = [], internalKeys = []) {
+          const keys = new Set((internalKeys || []).filter(Boolean));
+          return (records || []).find((record) => record.codexKey && keys.has(record.codexKey)) || null;
+        }
+        
+        function postureRecordDate(record) {
+          return parseDateString(record?.dateStr || '');
+        }
+        
+        const POSTURE_LOSS_LABEL_RULES = Object.freeze([
+          { test: (text) => /non-entry into european phase/.test(text), value: 'non-entry into European phase' },
+          { test: (text) => /translations of claims\/payment missing/.test(text), value: 'grant-formalities failure' },
+          { test: (text) => /non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(text), value: 'fees / written-opinion failure' },
+          { test: (text) => /non-reply to written opinion/.test(text), value: 'no reply to the written opinion' },
+          { test: (text) => /loss of rights|rule\s*112\(1\)/.test(text), value: 'loss-of-rights communication' },
+          { test: (text) => /withdrawn/.test(text), value: 'withdrawn posture' },
+        ]);
+        
+        const POSTURE_RECOVERY_LABEL_RULES = Object.freeze([
+          { test: (text) => /further processing/.test(text), value: 'further processing' },
+          { test: (text) => /re-establishment|rights re-established/.test(text), value: 're-establishment' },
+        ]);
+        
+        function matchRule(text = '', rules = [], fallback = '') {
+          const low = normalize(text).toLowerCase();
+          for (const rule of rules) {
+            if (rule.test(low, text)) return typeof rule.value === 'function' ? rule.value(text, low) : rule.value;
+          }
+          return fallback;
+        }
+        
+        function postureLossLabel(record) {
+          return matchRule(`${record?.title || ''} ${record?.detail || ''}`, POSTURE_LOSS_LABEL_RULES, 'adverse procedural posture');
+        }
+        
+        function postureRecoveryLabel(record) {
+          return matchRule(`${record?.title || ''} ${record?.detail || ''}`, POSTURE_RECOVERY_LABEL_RULES, 'recovery procedure');
+        }
+        
+        function deriveProceduralPosture({ statusRaw = '', records = [] } = {}) {
+          const normalizedStatusRaw = normalize(statusRaw);
+          const statusSummary = summarizeStatusText(normalizedStatusRaw);
+          const statusLow = normalizedStatusRaw.toLowerCase();
+          const latestLoss = postureRecordByCodex(records, ['LOSS_OF_RIGHTS_EVENT', 'APPLICATION_DEEMED_WITHDRAWN'])
+            || postureRecord(records, /application deemed to be withdrawn|deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|withdrawn by applicant|application withdrawn/);
+          const detailedLoss = postureRecord(records, /non-entry into european phase|translations of claims\/payment missing|non-payment of examination fee\/designation fee\/non-reply to written opinion|non-reply to written opinion/);
+          const effectiveLoss = detailedLoss || latestLoss;
+          const latestRecoveryDecision = postureRecordByCodex(records, ['FURTHER_PROCESSING_DECISION'])
+            || postureRecord(records, /decision on request for further processing|decision to allow further processing|re-establishment|rights re-established/);
+          const latestRecoveryRequest = postureRecordByCodex(records, ['FURTHER_PROCESSING_REQUEST'])
+            || postureRecord(records, /request for further processing/);
+          const latestRecovery = latestRecoveryDecision || latestRecoveryRequest;
+          const latestGrantDecision = postureRecordByCodex(records, ['EXPECTED_GRANT'])
+            || postureRecord(records, /decision to grant a european patent|mention of grant|patent granted|the patent has been granted/);
+          const latestNoOpposition = postureRecordByCodex(records, ['NO_OPPOSITION_FILED'])
+            || postureRecord(records, /no opposition filed within time limit/);
+          const latestR71 = postureRecordByCodex(records, ['GRANT_R71_3_EVENT'])
+            || postureRecord(records, /grant of patent is intended|intention to grant|rule\s*71\(3\)|text intended for grant/);
+          const latestSearchPublication = postureRecordByCodex(records, ['SEARCH_REPORT_PUBLICATION']);
+        
+          const latestLossDate = postureRecordDate(latestLoss);
+          const latestRecoveryDecisionDate = postureRecordDate(latestRecoveryDecision);
+          const latestRecoveryRequestDate = postureRecordDate(latestRecoveryRequest);
+          const latestGrantDecisionDate = postureRecordDate(latestGrantDecision);
+          const recovered = !!(latestLossDate && latestRecoveryDecisionDate && latestRecoveryDecisionDate >= latestLossDate);
+          const recoveryPending = !!(latestLossDate && latestRecoveryRequestDate && latestRecoveryRequestDate >= latestLossDate && !recovered);
+          const recoveredBeforeGrant = !!(recovered && latestGrantDecisionDate && latestGrantDecisionDate >= latestRecoveryDecisionDate);
+          const currentClosed = statusSummary.level === 'bad';
+          const currentNoOpposition = /granted \(no opposition\)/i.test(statusSummary.simple || '') || /no opposition filed within time limit/i.test(statusLow) || !!latestNoOpposition;
+          const currentGranted = currentNoOpposition || /^granted$/i.test(statusSummary.simple || '') || /patent has been granted|the patent has been granted/i.test(statusLow) || !!latestGrantDecision;
+          const currentGrantIntended = /grant intended/i.test(statusSummary.simple || '') || /grant of patent is intended|rule\s*71\(3\)|intention to grant/i.test(statusLow) || !!latestR71;
+          const currentExamination = /request for examination was made|examination/.test(statusLow) && !currentClosed;
+          const currentSearch = (/published|search/.test(statusLow) || !!latestSearchPublication) && !currentClosed && !currentGrantIntended && !currentGranted;
+        
+          let currentLabel = statusSummary.simple;
+          let currentLevel = statusSummary.level;
+          if (currentClosed && effectiveLoss) {
+            const lossText = `${effectiveLoss.title || ''} ${effectiveLoss.detail || ''}`.toLowerCase();
+            if (/non-entry into european phase/.test(lossText)) {
+              currentLabel = 'Deemed withdrawn (non-entry)';
+              currentLevel = 'bad';
+            } else if (/translations of claims\/payment missing/.test(lossText)) {
+              currentLabel = 'Deemed withdrawn (grant formalities)';
+              currentLevel = 'bad';
+            } else if (/non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(lossText)) {
+              currentLabel = 'Deemed withdrawn (fees / no WO reply)';
+              currentLevel = 'bad';
+            } else if (/non-reply to written opinion/.test(lossText)) {
+              currentLabel = 'Deemed withdrawn (no WO reply)';
+              currentLevel = 'bad';
+            }
+          } else if (currentNoOpposition) {
+            currentLabel = 'Granted (no opposition)';
+            currentLevel = 'ok';
+          } else if (currentGranted) {
+            currentLabel = 'Granted';
+            currentLevel = 'ok';
+          } else if (currentGrantIntended) {
+            currentLabel = 'Grant intended (R71(3))';
+            currentLevel = 'warn';
+          } else if (currentExamination) {
+            currentLabel = 'Examination';
+            currentLevel = 'info';
+          } else if (currentSearch) {
+            currentLabel = 'Search';
+            currentLevel = 'info';
+          }
+        
+          let note = '';
+          if (recoveredBeforeGrant) {
+            note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecoveryDecision)} before grant.`;
+          } else if (recovered) {
+            note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecoveryDecision)}.`;
+          } else if (recoveryPending) {
+            note = `Recovery requested via ${postureRecoveryLabel(latestRecoveryRequest)}; EPO outcome pending.`;
+          } else if (currentClosed && effectiveLoss) {
+            note = `Current controlling posture is ${postureLossLabel(effectiveLoss)}.`;
+          } else if (currentNoOpposition) {
+            note = 'Current controlling posture is granted with the opposition period closed.';
+          } else if (currentGrantIntended && latestR71) {
+            note = 'Current controlling posture is Rule 71(3) / intention-to-grant.';
+          } else if (currentGranted) {
+            note = 'Current controlling posture is granted / post-grant.';
+          } else if (currentExamination) {
+            note = 'Current controlling posture is active examination.';
+          } else if (currentSearch) {
+            note = 'Current controlling posture is search / publication stage.';
+          }
+        
+          return {
+            label: currentLabel,
+            level: currentLevel,
+            currentLabel,
+            currentLevel,
+            note,
+            recovered,
+            recoveryPending,
+            recoveredBeforeGrant,
+            currentClosed,
+            currentGranted,
+            currentNoOpposition,
+            currentGrantIntended,
+            currentExamination,
+            currentSearch,
+            latestLoss: effectiveLoss,
+            latestRecovery,
+            latestRecoveryDecision,
+            latestRecoveryRequest,
+            latestGrantDecision,
+            latestNoOpposition,
+            latestR71,
+          };
+        }
+        
+        function deriveProceduralPostureFromSources({ statusRaw = '', docs = [], eventHistory = {}, legal = {} } = {}) {
+          return deriveProceduralPosture({
+            statusRaw,
+            records: buildProceduralRecords(docs, eventHistory, legal),
+          });
+        }
+        
+        module.exports = {
+          POSTURE_LOSS_LABEL_RULES,
+          POSTURE_RECOVERY_LABEL_RULES,
+          buildProceduralRecords,
+          postureLossLabel,
+          postureRecoveryLabel,
+          postureRecord,
+          postureRecordByCodex,
+          postureRecordDate,
+          deriveProceduralPosture,
+          deriveProceduralPostureFromSources,
+        };
+        
+      },
+      "lib/epo_v2_deadline_signals": function(module, exports, require) {
+        const { buildProceduralRecords } = require('./epo_v2_posture_signals');
+        const { normalize, parseDateString, formatDate, compareDateDesc, dedupe, isValidDate } = require('./epo_v2_utils');
+        
+        function endOfMonth(year, monthIndex) {
+          return new Date(year, monthIndex + 1, 0);
+        }
+        
+        function addCalendarMonthsDetailed(date, months) {
+          const src = new Date(date);
+          if (Number.isNaN(src.getTime())) return { date: new Date(NaN), rolledOver: false, fromDay: 0, toDay: 0 };
+        
+          const srcDay = src.getDate();
+          const srcMonth = src.getMonth();
+          const srcYear = src.getFullYear();
+          const rawMonth = srcMonth + Number(months || 0);
+        
+          const targetYear = srcYear + Math.floor(rawMonth / 12);
+          const targetMonth = ((rawMonth % 12) + 12) % 12;
+          const lastDay = endOfMonth(targetYear, targetMonth).getDate();
+          const targetDay = Math.min(srcDay, lastDay);
+        
+          return {
+            date: new Date(targetYear, targetMonth, targetDay),
+            rolledOver: srcDay !== targetDay,
+            fromDay: srcDay,
+            toDay: targetDay,
+          };
+        }
+        
+        function pdfHintsWithParsedDates(pdfData = {}) {
+          return (Array.isArray(pdfData?.hints) ? pdfData.hints : [])
+            .map((h) => ({
+              ...h,
+              date: parseDateString(h.dateStr),
+            }))
+            .filter((h) => h.date);
+        }
+        
+        function isTerminalEpoOutcomeText(textValue = '') {
+          return /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|application refused|application rejected|revoked|revocation|not maintained|rights restored refused|re-establishment.*rejected/.test(String(textValue || '').toLowerCase());
+        }
+        
+        function isActualGrantMentionText(textValue = '') {
+          const low = normalize(textValue).toLowerCase();
+          if (!low) return false;
+          if (/request for grant/.test(low)) return false;
+          return /publication of (?:the )?mention of grant|mention of grant|european patent granted|patent has been granted|the patent has been granted|\bpatent granted\b/.test(low);
+        }
+        
+        function sameDay(a, b) {
+          return !!(a && b && String(a.dateStr || '') === String(b.dateStr || ''));
+        }
+        
+        function structuredAnchorDate(record = {}) {
+          return parseDateString(record?.dispatchDate || '')
+            || parseDateString(record?.dateStr || '')
+            || parseDateString(record?.effectiveDate || '')
+            || null;
+        }
+        
+        function structuredExactDueDate(record = {}) {
+          return parseDateString(record?.timeLimitDate || '') || null;
+        }
+        
+        function structuredReplyOrPaymentSeen(record = {}) {
+          return !!(
+            parseDateString(record?.replyDate || '')
+            || parseDateString(record?.paymentDate || '')
+            || (Array.isArray(record?.paymentDates) && record.paymentDates.some((value) => parseDateString(value)))
+            || parseDateString(record?.resultDate || '')
+          );
+        }
+        
+        function inferProceduralPhase(item = {}) {
+          const source = normalize(`${item?.title || ''} ${item?.detail || item?.procedure || ''} ${item?.codexPhase || ''} ${item?.freeFormatText || ''}`).toLowerCase();
+          const code = normalize(item?.originalCode || '').toUpperCase();
+          if (!source && !code) return '';
+          if (/appeal|board of appeal/.test(source)) return 'appeal';
+          if (/opposition/.test(source) || ['OREX', 'PMAP', 'DOBS', 'IDOP'].includes(code)) return 'opposition';
+          if (/limitation|revocation request/.test(source) || ['LIRE', 'REJR'].includes(code)) return 'limitation';
+          if (/grant|rule\s*71/.test(source) || ['IGRA', 'IGRE', 'ACOR', 'CDEC'].includes(code)) return 'grant';
+          if (/search|supplementary search|rule\s*62a|rule\s*63|rule\s*64|rule\s*70a/.test(source)) return 'search';
+          if (/examin|art\.\s*94\(3\)|article\s*94\(3\)|rule\s*116|minutes/.test(source)) return 'examination';
+          return '';
+        }
+        
+        function inferMissedActFromReason(textValue = '') {
+          const low = normalize(textValue).toLowerCase();
+          if (!low) return '';
+          if (/non-entry into european phase|rule\s*159|regional phase/.test(low)) return 'Euro-PCT entry acts';
+          if (/rule\s*62a/.test(low)) return 'Rule 62a invitation';
+          if (/rule\s*63/.test(low)) return 'Rule 63 invitation';
+          if (/rule\s*64|additional search fee|lack of unity/.test(low)) return 'Rule 64 search-fee branch';
+          if (/written opinion|search opinion|eesr|rule\s*70a/.test(low)) return 'search-opinion / Rule 70a reply';
+          if (/article\s*94\(3\)|art\.\s*94\(3\)|examination report|communication from the examining division/.test(low)) return 'Art. 94(3) examination reply';
+          if (/rule\s*71\(3\)|intention to grant|translations of claims|grant and publication fee|grant and publishing fee/.test(low)) return 'Rule 71(3) grant formalities';
+          if (/prior art/.test(low)) return 'prior-art information response';
+          if (/renewal fee|examination fee|designation fee/.test(low)) return 'fee payment';
+          return '';
+        }
+        
+        function buildDeadlineComputationContext({ main = {}, docs = [], eventHistory = {}, legal = {}, pdfData = {} } = {}) {
+          const out = [];
+          const records = buildProceduralRecords(docs, eventHistory, legal);
+          const pdfHints = pdfHintsWithParsedDates(pdfData);
+          const appType = normalize(main.applicationType || '').toLowerCase();
+          const isEuroPct = /e\/pct/.test(appType);
+          const isDivisional = /divisional/.test(appType);
+          const priorityDate = main.priorities?.[0] ? parseDateString(main.priorities[0].dateStr) : null;
+          const filingDate = parseDateString(main.filingDate);
+        
+          const docsDesc = [...(docs || [])].sort(compareDateDesc);
+          const eventDesc = dedupe([...(eventHistory.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.codexKey || ''}`).sort(compareDateDesc);
+          const legalEventsDesc = dedupe([...(legal.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.codexKey || ''}`).sort(compareDateDesc);
+          const codedEventsDesc = dedupe([...(legal.codedEvents || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.originalCode || ''}|${e.codexKey || ''}`).sort(compareDateDesc);
+        
+          const latestRecord = (regex) => records.find((r) => regex.test(`${r.title || ''} ${r.detail || ''}`));
+          const hasPdfHint = (regex) => pdfHints.some((h) => regex.test(String(h.label || '')));
+        
+          const rawItemDetail = (item = {}) => item.detail || item.procedure || item.freeFormatText || '';
+          const anchorRecordFromItem = (item = {}, source = '') => ({
+            dateStr: item.dateStr || '',
+            title: item.title || '',
+            detail: rawItemDetail(item),
+            actor: item.actor || '',
+            source: source || item.source || '',
+            codexKey: item.codexKey || '',
+            codexPhase: item.codexPhase || '',
+            originalCode: item.originalCode || '',
+            effectiveDate: item.effectiveDate || '',
+            freeFormatText: item.freeFormatText || '',
+            stepDescriptionName: item.stepDescriptionName || '',
+            dispatchDate: item.dispatchDate || '',
+            replyDate: item.replyDate || '',
+            paymentDate: item.paymentDate || '',
+            paymentDates: Array.isArray(item.paymentDates) ? [...item.paymentDates] : [],
+            requestDate: item.requestDate || '',
+            resultDate: item.resultDate || '',
+            timeLimitRaw: item.timeLimitRaw || '',
+            timeLimitMonths: Number(item.timeLimitMonths || 0),
+            timeLimitDate: item.timeLimitDate || '',
+          });
+        
+          const collectPreferredAnchors = (plans = []) => {
+            const found = [];
+            for (const plan of plans) {
+              const items = Array.isArray(plan?.items) ? plan.items : [];
+              const predicate = typeof plan?.predicate === 'function' ? plan.predicate : null;
+              if (!predicate) continue;
+              for (const item of items) {
+                if (!predicate(item, normalize(`${item?.title || ''} ${rawItemDetail(item)}`.toLowerCase()))) continue;
+                found.push(anchorRecordFromItem(item, plan.source));
+              }
+            }
+            return dedupe(found, (item) => `${item.dateStr}|${item.title}|${item.detail}|${item.source}|${item.originalCode || ''}|${item.codexKey || ''}`)
+              .sort(compareDateDesc);
+          };
+        
+          const pickPreferredAnchor = (plans = []) => collectPreferredAnchors(plans)[0] || null;
+        
+          const hasAfter = (anchorDate, predicate) => {
+            const ts = anchorDate?.getTime?.() || 0;
+            if (!ts) return false;
+            return records.some((r) => {
+              const dt = structuredAnchorDate(r);
+              return dt && dt.getTime() > ts && predicate(r, dt);
+            });
+          };
+        
+          const findLaterRecordAfter = (anchorDate, predicate) => {
+            const ts = anchorDate?.getTime?.() || 0;
+            if (!ts) return null;
+            return [...records]
+              .sort((a, b) => (structuredAnchorDate(a)?.getTime?.() || 0) - (structuredAnchorDate(b)?.getTime?.() || 0))
+              .find((r) => {
+                const dt = structuredAnchorDate(r);
+                return !!(dt && dt.getTime() > ts && predicate(r, dt));
+              }) || null;
+          };
+        
+          const hasApplicantResponseAfter = (anchorDate, regex = /reply|response|observations|arguments|amended|amendment|claims|request|translation|appeal/i) =>
+            hasAfter(anchorDate, (r) => r.actor === 'Applicant' && regex.test(`${r.title} ${r.detail}`));
+        
+          const hasFeeSignalAfter = (anchorDate, regex = /payment|fee paid|paid|examination fee|designation fee|grant and publishing fee|grant and publication fee|renewal fee/i) =>
+            hasAfter(anchorDate, (r) => regex.test(`${r.title} ${r.detail}`));
+        
+          const terminalEpoOutcomeAfter = (anchorDate, dueDate = null) => {
+            const anchorTs = anchorDate?.getTime?.() || 0;
+            const dueTs = dueDate?.getTime?.() || 0;
+            let match = null;
+            for (const r of [...records].sort((a, b) => (parseDateString(a.dateStr)?.getTime?.() || 0) - (parseDateString(b.dateStr)?.getTime?.() || 0))) {
+              const dt = parseDateString(r.dateStr);
+              if (!dt || r.actor !== 'EPO') continue;
+              if (anchorTs && dt.getTime() <= anchorTs) continue;
+              if (dueTs && dt.getTime() <= dueTs) continue;
+              if (!isTerminalEpoOutcomeText(`${r.title} ${r.detail}`)) continue;
+              match = { dateStr: r.dateStr, title: r.title || '', detail: r.detail || '' };
+              break;
+            }
+            return match;
+          };
+        
+          const recordConfidence = (record = null, fallback = 'medium') => {
+            const source = normalize(record?.source || '').toLowerCase();
+            if (record?.dispatchDate && (record?.timeLimitDate || record?.timeLimitMonths || record?.replyDate || record?.paymentDate || record?.requestDate)) return 'high';
+            if (record?.dispatchDate && source === 'coded legal event') return 'high';
+            if (!source) return fallback;
+            if (source === 'documents') return 'high';
+            if (source === 'coded legal event') return 'medium';
+            if (source === 'event') return 'low';
+            return fallback;
+          };
+        
+          const push = (entry) => {
+            const validDate = isValidDate(entry?.date);
+            if (!validDate && !entry?.reviewOnly) return;
+        
+            const next = { ...entry };
+            if (validDate) {
+              const dueDate = next.date;
+              const anchorDate = parseDateString(next.sourceDate || '') || dueDate;
+              const terminal = terminalEpoOutcomeAfter(anchorDate, dueDate);
+              if (terminal && !next.resolved && !next.superseded) {
+                next.superseded = true;
+                next.supersededBy = terminal;
+                next.method = normalize([next.method || '', `superseded by later EPO outcome on ${terminal.dateStr}`].filter(Boolean).join(' · '));
+              }
+            } else {
+              next.date = null;
+            }
+            out.push(next);
+          };
+        
+          const pushReviewItem = ({ label, record = null, level = 'warn', confidence = '', method = '', namespace = '', internalKey = '', phase = '', date = null, resolved = false, extra = {} }) => {
+            const derivedConfidence = confidence || recordConfidence(record, 'low');
+            push({
+              label,
+              date,
+              level,
+              confidence: derivedConfidence,
+              sourceDate: String(record?.dispatchDate || record?.dateStr || ''),
+              resolved,
+              reviewOnly: true,
+              namespace,
+              internalKey,
+              phase,
+              method,
+              ...extra,
+            });
+          };
+        
+          const resolveHintByActivity = (label, anchorDate) => {
+            const l = String(label || '').toLowerCase();
+            if (!anchorDate) return false;
+        
+            if (/r71\(3\)|intention to grant/.test(l)) {
+              return hasFeeSignalAfter(anchorDate, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections|approval of text|text proposed for grant/i)
+                || hasApplicantResponseAfter(anchorDate, /reply|response|amend|correction|claims|translation|approval|text proposed for grant|request for correction/i);
+            }
+        
+            if (/art\.?\s*94\(3\)|communication response period/.test(l)) {
+              return hasApplicantResponseAfter(anchorDate, /reply|response|observations|arguments|amend|claims|request|further processing|re-establishment/i);
+            }
+        
+            if (/rule 161\/162/.test(l)) {
+              return hasApplicantResponseAfter(anchorDate, /reply|response|amend|claims|observations|arguments/i)
+                || hasFeeSignalAfter(anchorDate, /claims fee|fee payment received/i);
+            }
+        
+            if (/rule 116|oral proceedings/.test(l)) {
+              return hasApplicantResponseAfter(anchorDate, /response|request|submission|oral proceedings|withdrawal/i);
+            }
+        
+            return hasApplicantResponseAfter(anchorDate);
+          };
+        
+          const addMonthsDeadline = ({ record = null, triggerRegex = null, label, months, level, confidence = '', resolvedBy, reviewOnly = false, methodPrefix = 'Heuristic', namespace = '', internalKey = '', phase = '', supersededBy = null, reference = false, extra = {} }) => {
+            if (hasPdfHint(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) return null;
+            const rec = record || (triggerRegex ? latestRecord(triggerRegex) : null);
+            if (!rec) return null;
+            const anchor = structuredAnchorDate(rec);
+            if (!anchor) return null;
+        
+            const resolved = typeof resolvedBy === 'function'
+              ? !!resolvedBy(anchor, rec)
+              : (structuredReplyOrPaymentSeen(rec) || hasApplicantResponseAfter(anchor));
+        
+            const calc = addCalendarMonthsDetailed(anchor, months);
+            const derivedConfidence = confidence || (rec.dispatchDate ? 'high' : recordConfidence(rec, 'medium'));
+            const sourceLabel = normalize(String(rec.source || 'preferred source')).toLowerCase() || 'preferred source';
+            const anchorLabel = rec.dispatchDate ? 'DATE_OF_DISPATCH' : 'trigger';
+            const entry = {
+              label,
+              date: calc.date,
+              level,
+              confidence: derivedConfidence,
+              sourceDate: rec.dispatchDate || rec.dateStr,
+              resolved,
+              reviewOnly: !!reviewOnly || derivedConfidence === 'low',
+              method: `${methodPrefix}: +${months} month(s) from ${sourceLabel} ${anchorLabel}`,
+              rolledOver: calc.rolledOver,
+              rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
+              namespace,
+              internalKey,
+              phase,
+              reference,
+              ...extra,
+            };
+        
+            if (typeof supersededBy === 'function') {
+              const superseding = supersededBy(anchor, rec);
+              if (superseding) {
+                entry.superseded = true;
+                entry.supersededBy = { dateStr: superseding.dateStr, title: superseding.title || '', detail: superseding.detail || '' };
+                entry.method = normalize([entry.method, `superseded by ${superseding.title || 'later governing communication'} on ${superseding.dateStr}`].filter(Boolean).join(' · '));
+              }
+            }
+        
+            push(entry);
+            return entry;
+          };
+        
+          const addStructuredOrReviewDeadline = ({ record = null, label, reviewLabel = '', level = 'warn', fixedMonths = 0, confidence = '', namespace = '', internalKey = '', phase = '', resolvedBy, method = '', reviewMethod = '', supersededBy = null, extra = {} }) => {
+            const rec = record || null;
+            if (!rec) return null;
+            const exactDue = structuredExactDueDate(rec);
+            const anchor = structuredAnchorDate(rec);
+            if (exactDue) {
+              const derivedConfidence = confidence || (rec.dispatchDate ? 'high' : recordConfidence(rec, 'medium'));
+              const resolved = typeof resolvedBy === 'function'
+                ? !!resolvedBy(anchor || exactDue, rec)
+                : (structuredReplyOrPaymentSeen(rec) || (anchor ? hasApplicantResponseAfter(anchor) : false));
+              const entry = {
+                label,
+                date: exactDue,
+                level,
+                confidence: derivedConfidence,
+                sourceDate: rec.dispatchDate || rec.dateStr || rec.timeLimitDate,
+                resolved,
+                reviewOnly: derivedConfidence === 'low',
+                namespace,
+                internalKey,
+                phase,
+                method: method || 'Structured ST.36 time-limit date',
+                ...extra,
+              };
+              if (typeof supersededBy === 'function') {
+                const superseding = supersededBy(anchor || exactDue, rec);
+                if (superseding) {
+                  entry.superseded = true;
+                  entry.supersededBy = { dateStr: superseding.dateStr, title: superseding.title || '', detail: superseding.detail || '' };
+                  entry.method = normalize([entry.method, `superseded by ${superseding.title || 'later governing communication'} on ${superseding.dateStr}`].filter(Boolean).join(' · '));
+                }
+              }
+              push(entry);
+              return entry;
+            }
+            if (Number(rec?.timeLimitMonths || 0) > 0 && anchor) {
+              return addMonthsDeadline({
+                record: rec,
+                label,
+                months: Number(rec.timeLimitMonths || 0),
+                level,
+                confidence: confidence || (rec.dispatchDate ? 'high' : recordConfidence(rec, 'medium')),
+                resolvedBy,
+                methodPrefix: 'Structured ST.36 time-limit',
+                namespace,
+                internalKey,
+                phase,
+                supersededBy,
+                extra,
+              });
+            }
+            if (fixedMonths > 0 && anchor) {
+              return addMonthsDeadline({
+                record: rec,
+                label,
+                months: fixedMonths,
+                level,
+                confidence,
+                resolvedBy,
+                methodPrefix: rec.dispatchDate ? 'Structured ST.36 DATE_OF_DISPATCH' : 'Rule-based',
+                namespace,
+                internalKey,
+                phase,
+                supersededBy,
+                extra,
+              });
+            }
+            pushReviewItem({
+              label: reviewLabel || label,
+              record: rec,
+              level,
+              confidence: confidence || recordConfidence(rec, 'low'),
+              method: reviewMethod || method || 'Review communication text / ST.36 fields for the governing deadline.',
+              namespace,
+              internalKey,
+              phase,
+              extra,
+            });
+            return null;
+          };
+        
+          const addAbsoluteDateEntry = ({ record = null, label, level = 'warn', confidence = '', namespace = '', internalKey = '', phase = '', method = '', resolved = false, reference = false, reviewOnly = false, extra = {} }) => {
+            const rec = record || null;
+            const date = structuredAnchorDate(rec);
+            push({
+              label,
+              date,
+              level,
+              confidence: confidence || recordConfidence(rec, 'medium'),
+              sourceDate: String(rec?.dispatchDate || rec?.dateStr || ''),
+              resolved,
+              reference,
+              reviewOnly,
+              namespace,
+              internalKey,
+              phase,
+              method,
+              ...extra,
+            });
+          };
+        
+          const findNoOppositionRecord = () => pickPreferredAnchor([
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.codexKey === 'NO_OPPOSITION_FILED' || /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => e.codexKey === 'NO_OPPOSITION_FILED' || /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
+            { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
+            { items: records, source: 'Event', predicate: (r, low) => /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
+          ]);
+        
+          const r71AnchorPlans = [
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /communication about intention to grant a european patent|communication of intention to grant a patent/.test(low) },
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /text intended for grant|intention to grant \(signatures\)|annex to the communication about intention to grant/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'EPIDOSNIGR1' || e.codexKey === 'GRANT_R71_3' || /despatch of communication of intention to grant a patent/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => e.codexKey === 'GRANT_R71_3_EVENT' || /new entry: communication of intention to grant a patent|communication of intention to grant a patent/.test(low) },
+            { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /despatch of communication of intention to grant a patent/.test(low) },
+          ];
+          const findR71Anchors = () => collectPreferredAnchors(r71AnchorPlans);
+          const findR71Anchor = () => findR71Anchors()[0] || null;
+        
+          const findRule716DisapprovalAnchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'Applicant' && /disapproval of the communication of intention to grant|rule\s*71\(6\)|disapproval.*intention to grant/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'IGRE' || e.codexKey === 'GRANT_R71_6_DISAPPROVAL' || /disapproval of the communication of intention to grant|rule\s*71\(6\)/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /disapproval of the communication of intention to grant|rule\s*71\(6\)/.test(low) },
+          ]);
+        
+          const findRule62aAnchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(low) },
+          ]);
+        
+          const findRule63Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(low) },
+          ]);
+        
+          const findRule64Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /additional search fee|lack of unity.*search|rule\s*64|further search fees/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /additional search fee|lack of unity.*search|rule\s*64|further search fees/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /additional search fee|lack of unity.*search|rule\s*64|further search fees/.test(low) },
+          ]);
+        
+          const findRule70aAnchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(low) },
+          ]);
+        
+          const findArt94Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
+          ]);
+        
+          const findMinutesFirstActionAnchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low) },
+          ]);
+        
+          const findRule702Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*70\(2\)|wish to proceed further|desire to proceed further|confirm.*proceed/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*70\(2\)|wish to proceed further|desire to proceed further|confirm.*proceed/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*70\(2\)|wish to proceed further|desire to proceed further|confirm.*proceed/.test(low) },
+          ]);
+        
+          const findRule161162Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /\brule\s*161\b|\brule\s*162\b|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /\brule\s*161\b|\brule\s*162\b|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /\brule\s*161\b|\brule\s*162\b|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+          ]);
+        
+          const findRule1641Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*164\(1\)|additional search fees|further search fees|lack of unity/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*164\(1\)|additional search fees|further search fees|lack of unity/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*164\(1\)|additional search fees|further search fees|lack of unity/.test(low) },
+          ]);
+        
+          const findRule1642Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*164\(2\)|unsearched invention|further search fees/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*164\(2\)|unsearched invention|further search fees/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*164\(2\)|unsearched invention|further search fees/.test(low) },
+          ]);
+        
+          const findEuroPctSearchAnchor = () => pickPreferredAnchor([
+            {
+              items: docsDesc,
+              source: 'Documents',
+              predicate: (d, low) => d.actor === 'EPO'
+                && (/copy of the international search report|international publication of the international search report|written opinion of the isa|partial international search report|\bisr:\b/.test(low))
+                && !(/non-reply to written opinion|correction of deficiencies in written opinion|reply to|communication concerning|reminder period|deemed to be withdrawn/.test(low)),
+            },
+          ]);
+        
+          const findSummonsAnchor = (phase = 'all') => pickPreferredAnchor([
+            {
+              items: docsDesc,
+              source: 'Documents',
+              predicate: (d, low) => d.actor === 'EPO'
+                && /summons to oral proceedings/.test(low)
+                && (phase === 'all' || inferProceduralPhase({ ...d, detail: rawItemDetail(d) }) === phase),
+            },
+            {
+              items: codedEventsDesc,
+              source: 'Coded legal event',
+              predicate: (e, low) => /summons to oral proceedings/.test(low)
+                && (phase === 'all' || inferProceduralPhase(e) === phase),
+            },
+            {
+              items: eventDesc,
+              source: 'Event',
+              predicate: (e, low) => /summons to oral proceedings/.test(low)
+                && (phase === 'all' || inferProceduralPhase(e) === phase),
+            },
+          ]);
+        
+          const findOralProceedingsEvent = (phase = 'all') => pickPreferredAnchor([
+            {
+              items: codedEventsDesc,
+              source: 'Coded legal event',
+              predicate: (e, low) => (e.originalCode === 'ORAL' || /^oral proceedings\b/.test(low) || /\boral proceedings\b/.test(low))
+                && !/summons/.test(low)
+                && (phase === 'all' || inferProceduralPhase(e) === phase),
+            },
+            {
+              items: eventDesc,
+              source: 'Event',
+              predicate: (e, low) => /\boral proceedings\b/.test(low)
+                && !/summons/.test(low)
+                && (phase === 'all' || inferProceduralPhase(e) === phase),
+            },
+          ]);
+        
+          const findRule112Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*112|loss of rights|noting of loss of rights/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.codexKey === 'LOSS_OF_RIGHTS_R112' || /rule\s*112|loss of rights|noting of loss of rights/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*112|loss of rights|noting of loss of rights/.test(low) },
+          ]);
+        
+          const findGrantMentionAnchor = () => pickPreferredAnchor([
+            { items: legalEventsDesc, source: 'Event', predicate: (e, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
+            { items: records, source: 'Event', predicate: (r, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
+          ]);
+        
+          const findAppealableDecisionAnchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain|refusal of the application/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain|refusal of the application/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain|refusal of the application/.test(low) },
+            { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain|refusal of the application/.test(low) },
+          ]);
+        
+          const findOppositionRule791Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(low) },
+          ]);
+        
+          const findOppositionRule793Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(low) },
+          ]);
+        
+          const findOppositionOrexAnchor = () => pickPreferredAnchor([
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'OREX' || /communication from the opposition division/.test(low) },
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /communication from the opposition division/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /communication from the opposition division/.test(low) },
+          ]);
+        
+          const findOppositionRule821Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(low) },
+          ]);
+        
+          const findOppositionRule822Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(low) },
+          ]);
+        
+          const findOppositionRule823Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*82\(3\)|further invitation|surcharge/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*82\(3\)|further invitation|surcharge/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*82\(3\)|further invitation|surcharge/.test(low) },
+          ]);
+        
+          const findOppositionPmapAnchor = () => pickPreferredAnchor([
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'PMAP' || /preparation for maintenance of the patent in an amended form/.test(low) },
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /preparation for maintenance of the patent in an amended form/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /preparation for maintenance of the patent in an amended form/.test(low) },
+          ]);
+        
+          const findLimitationRule952Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(low) },
+          ]);
+        
+          const findLimitationRule953Anchor = () => pickPreferredAnchor([
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(low) },
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(low) },
+            { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(low) },
+          ]);
+        
+          const findLimitationLireAnchor = () => pickPreferredAnchor([
+            { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'LIRE' || /communication from the examining division in a limitation procedure|limitation procedure/.test(low) },
+            { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /limitation procedure|request for limitation/.test(low) },
+          ]);
+        
+          const rule161162Variant = (record = null) => {
+            const low = normalize(`${record?.title || ''} ${record?.detail || ''} ${record?.stepDescriptionName || ''}`).toLowerCase();
+            if (!low) return 'generic';
+            if (/mandatory|required reply|must reply|mandatory reply|non-extendable.*reply/.test(low)) return 'mandatory';
+            if (/voluntary|no mandatory substantive reply|no reply required|amendment window|claims fee consequences/.test(low)) return 'voluntary';
+            return 'generic';
+          };
+        
+          return {
+            out,
+            main,
+            docs,
+            records,
+            pdfHints,
+            isEuroPct,
+            isDivisional,
+            priorityDate,
+            filingDate,
+            push,
+            pushReviewItem,
+            latestRecord,
+            hasPdfHint,
+            hasAfter,
+            findLaterRecordAfter,
+            hasApplicantResponseAfter,
+            hasFeeSignalAfter,
+            terminalEpoOutcomeAfter,
+            resolveHintByActivity,
+            recordConfidence,
+            addMonthsDeadline,
+            addStructuredOrReviewDeadline,
+            addAbsoluteDateEntry,
+            findNoOppositionRecord,
+            findR71Anchors,
+            findR71Anchor,
+            findRule716DisapprovalAnchor,
+            findRule62aAnchor,
+            findRule63Anchor,
+            findRule64Anchor,
+            findRule70aAnchor,
+            findArt94Anchor,
+            findMinutesFirstActionAnchor,
+            findRule702Anchor,
+            findRule161162Anchor,
+            findRule1641Anchor,
+            findRule1642Anchor,
+            findEuroPctSearchAnchor,
+            findSummonsAnchor,
+            findOralProceedingsEvent,
+            findRule112Anchor,
+            findGrantMentionAnchor,
+            findAppealableDecisionAnchor,
+            findOppositionRule791Anchor,
+            findOppositionRule793Anchor,
+            findOppositionOrexAnchor,
+            findOppositionRule821Anchor,
+            findOppositionRule822Anchor,
+            findOppositionRule823Anchor,
+            findOppositionPmapAnchor,
+            findLimitationRule952Anchor,
+            findLimitationRule953Anchor,
+            findLimitationLireAnchor,
+            rule161162Variant,
+          };
+        }
+        
+        function appendPdfDerivedDeadlines(ctx) {
+          const resolveHintByActivity = ctx.resolveHintByActivity;
+          for (const hint of ctx.pdfHints) {
+            const label = String(hint.label || 'PDF-derived deadline');
+            const sourceDate = String(hint.sourceDate || '');
+            const anchor = parseDateString(sourceDate) || hint.date;
+            const resolvedByActivity = resolveHintByActivity(label, anchor);
+            const resolved = !!hint.resolved || resolvedByActivity;
+            const baseMethod = String(hint.evidence || 'PDF parse');
+        
+            ctx.push({
+              label,
+              date: hint.date,
+              level: String(hint.level || 'bad'),
+              confidence: String(hint.confidence || 'high'),
+              sourceDate,
+              resolved,
+              fromPdf: true,
+              reviewOnly: String(hint.confidence || '').toLowerCase() === 'low',
+              method: resolvedByActivity && !hint.resolved
+                ? `${baseMethod} · resolved by subsequent activity`
+                : baseMethod,
+            });
+          }
+        }
+        
+        function appendSearchStageDeadlines(ctx) {
+          ctx.addMonthsDeadline({
+            record: ctx.findRule62aAnchor(),
+            label: 'Rule 62a invitation period',
+            months: 2,
+            level: 'bad',
+            internalKey: 'SEARCH_R62A_INVITATION',
+            phase: 'search',
+            namespace: 'first_instance',
+          });
+        
+          ctx.addMonthsDeadline({
+            record: ctx.findRule63Anchor(),
+            label: 'Rule 63 invitation period',
+            months: 2,
+            level: 'bad',
+            internalKey: 'SEARCH_R63_INVITATION',
+            phase: 'search',
+            namespace: 'first_instance',
+          });
+        
+          const rule64 = ctx.findRule64Anchor();
+          if (rule64 && !ctx.hasPdfHint(/Rule 64 additional search/i)) {
+            ctx.addStructuredOrReviewDeadline({
+              record: rule64,
+              label: 'Rule 64 additional search fees / unity selection',
+              level: 'bad',
+              internalKey: 'SEARCH_R64_ADDITIONAL_FEES',
+              phase: 'search',
+              namespace: 'first_instance',
+              method: 'Structured ST.36 Rule 64 deadline from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'Communication-specific fee/choice deadline; review explicit time limit from the communication/PDF.',
+            });
+          }
+        
+          const rule70a = ctx.findRule70aAnchor();
+          const rule702 = ctx.findRule702Anchor();
+          const combined70 = rule70a && rule702 && (sameDay(rule70a, rule702) || /rule\s*70\(2\)/i.test(`${rule70a.title} ${rule70a.detail}`));
+          if (combined70) {
+            ctx.addMonthsDeadline({
+              record: rule702,
+              label: 'Rule 70(2) / Rule 70a shared response period',
+              months: 6,
+              level: 'bad',
+              internalKey: 'POST_SEARCH_R70A_REPLY',
+              phase: 'post_search',
+              namespace: 'first_instance',
+              methodPrefix: 'Rule-based',
+            });
+            ctx._skipStandaloneRule702 = true;
+          } else if (rule70a && !ctx.hasPdfHint(/Rule 70a/i)) {
+            ctx.pushReviewItem({
+              label: 'Rule 70a reply to search opinion (manual review)',
+              record: rule70a,
+              level: 'warn',
+              internalKey: 'POST_SEARCH_R70A_REPLY',
+              phase: 'post_search',
+              namespace: 'first_instance',
+              method: 'Derived from the paired Rule 70 communication; review the governing communication/PDF for the actual shared due date.',
+            });
+          }
+        }
+        
+        function appendCoreCommunicationDeadlines(ctx) {
+          const r71Anchors = ctx.findR71Anchors();
+          const latestR71 = r71Anchors[0] || null;
+          const previousR71 = r71Anchors[1] || null;
+          const rule716 = ctx.findRule716DisapprovalAnchor();
+          const latestR71Date = structuredAnchorDate(latestR71);
+          const previousR71Date = structuredAnchorDate(previousR71);
+          const rule716Date = structuredAnchorDate(rule716);
+          const post713Branch = !!(latestR71 && ((previousR71Date && latestR71Date && previousR71Date.getTime() < latestR71Date.getTime()) || (rule716Date && latestR71Date && rule716Date.getTime() < latestR71Date.getTime())));
+        
+          ctx.addMonthsDeadline({
+            record: latestR71,
+            label: 'R71(3) response period',
+            months: 4,
+            level: 'bad',
+            confidence: 'high',
+            internalKey: post713Branch ? 'GRANT_POST_71_3_AMENDMENT' : 'GRANT_R71_3',
+            phase: 'grant',
+            namespace: 'first_instance',
+            extra: post713Branch ? { supersedesKey: 'GRANT_R71_3', branchContext: 'fresh Rule 71(3) issued after disapproval / amendment' } : {},
+            resolvedBy: (anchor, rec) => structuredReplyOrPaymentSeen(rec) || ctx.hasFeeSignalAfter(anchor, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections/i) || ctx.hasApplicantResponseAfter(anchor),
+          });
+        
+          const art94 = ctx.findArt94Anchor();
+          if (art94 && !ctx.hasPdfHint(/Art\. 94\(3\) response period/i)) {
+            ctx.addStructuredOrReviewDeadline({
+              record: art94,
+              label: 'Art. 94(3) response period',
+              reviewLabel: 'Art. 94(3) examination communication (manual review)',
+              level: 'warn',
+              internalKey: 'EXAMINATION_ART94_COMM',
+              phase: 'examination',
+              namespace: 'first_instance',
+              method: 'Structured ST.36 Art. 94(3) deadline from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'The communication is response-bearing, but the period is communication-specific unless the parsed document text or ST.36 fields yield an explicit date/period.',
+              resolvedBy: (anchor, rec) => structuredReplyOrPaymentSeen(rec) || ctx.hasApplicantResponseAfter(anchor, /reply|response|observations|arguments|amend|claims|request|further processing|re-establishment/i),
+            });
+          }
+        
+          const minutes = ctx.findMinutesFirstActionAnchor();
+          if (minutes) {
+            ctx.addStructuredOrReviewDeadline({
+              record: minutes,
+              label: 'Minutes-as-first-action examination communication',
+              reviewLabel: 'Minutes-as-first-action examination communication (manual review)',
+              level: 'warn',
+              internalKey: 'EXAMINATION_MINUTES_AS_FIRST_ACTION',
+              phase: 'examination',
+              namespace: 'first_instance',
+              method: 'Structured ST.36 deadline from first-action minutes / consultation record',
+              reviewMethod: 'Review the minutes/consultation text or structured fields to confirm whether they replace the first Art. 94(3) action and set a response period.',
+            });
+          }
+        
+          if (!ctx._skipStandaloneRule702) {
+            ctx.addMonthsDeadline({
+              record: ctx.findRule702Anchor(),
+              label: 'Rule 70(2) confirmation/response period',
+              months: 6,
+              level: 'warn',
+              internalKey: 'POST_SEARCH_R70_2_PROCEED',
+              phase: 'post_search',
+              namespace: 'first_instance',
+              methodPrefix: 'Rule-based',
+            });
+          }
+        
+          const rule161162 = ctx.findRule161162Anchor();
+          if (rule161162) {
+            const variant = ctx.rule161162Variant(rule161162);
+            const label = variant === 'mandatory'
+              ? 'Rule 161/162 mandatory response period'
+              : (variant === 'voluntary'
+                ? 'Rule 161/162 voluntary amendment / claims-fee period'
+                : 'Rule 161/162 response period');
+            ctx.addMonthsDeadline({
+              record: rule161162,
+              label,
+              months: 6,
+              level: 'bad',
+              confidence: variant === 'generic' ? 'low' : '',
+              internalKey: variant === 'mandatory' ? 'EUROPCT_R161_162_MANDATORY' : (variant === 'voluntary' ? 'EUROPCT_R161_162_VOLUNTARY' : 'EUROPCT_R161_162'),
+              phase: 'regional_phase_entry',
+              namespace: 'first_instance',
+              resolvedBy: (anchor, rec) => structuredReplyOrPaymentSeen(rec) || ctx.hasApplicantResponseAfter(anchor, /reply|response|amend|claims|observations|arguments/i) || ctx.hasFeeSignalAfter(anchor, /claims fee|fee payment received/i),
+              methodPrefix: 'Rule-based',
+              reviewOnly: variant === 'generic',
+            });
+          }
+        
+          const rule1641 = ctx.findRule1641Anchor();
+          if (ctx.isEuroPct && rule1641) {
+            ctx.addMonthsDeadline({
+              record: rule1641,
+              label: 'Rule 164(1) additional search fees',
+              months: 2,
+              level: 'bad',
+              internalKey: 'EUROPCT_R164_1_FEES',
+              phase: 'supplementary_search',
+              namespace: 'first_instance',
+              methodPrefix: 'Rule-based',
+            });
+          }
+        
+          const rule1642 = ctx.findRule1642Anchor();
+          if (ctx.isEuroPct && rule1642) {
+            ctx.addStructuredOrReviewDeadline({
+              record: rule1642,
+              label: 'Rule 164(2) unsearched-inventions communication',
+              reviewLabel: 'Rule 164(2) unsearched-inventions communication (manual review)',
+              level: 'bad',
+              internalKey: 'EUROPCT_R164_2_UNSEARCHED',
+              phase: 'examination_start',
+              namespace: 'first_instance',
+              method: 'Structured ST.36 Rule 164(2) deadline from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'The fee/selection period is communication-specific; review the communication/PDF or ST.36 fields for the governing due date.',
+            });
+          }
+        
+          const examSummons = ctx.findSummonsAnchor('examination');
+          if (examSummons && !ctx.hasPdfHint(/Rule 116 final date|Oral proceedings date/i)) {
+            ctx.addStructuredOrReviewDeadline({
+              record: examSummons,
+              label: 'Rule 116 final date',
+              reviewLabel: 'Examination summons / Rule 116 review',
+              level: 'warn',
+              internalKey: 'EXAMINATION_SUMMONS',
+              phase: 'examination',
+              namespace: 'first_instance',
+              method: 'Structured ST.36 summons final date from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'Summons require annex parsing: store the oral-proceedings date and any Rule 116 final written-submissions date.',
+            });
+          }
+        
+          const examOral = ctx.findOralProceedingsEvent('examination');
+          if (examOral && !ctx.hasPdfHint(/Oral proceedings date/i)) {
+            ctx.addAbsoluteDateEntry({
+              record: examOral,
+              label: 'Oral proceedings date',
+              level: 'warn',
+              internalKey: 'ORAL_PROCEEDINGS_EVENT',
+              phase: 'examination',
+              namespace: 'first_instance',
+              method: 'Stored from oral-proceedings event chronology.',
+            });
+          }
+        }
+        
+        function appendDirectOrPctDeadlines(ctx) {
+          if (!ctx.isEuroPct) {
+            return;
+          }
+        
+          const base31Date = ctx.priorityDate || ctx.filingDate;
+          if (!base31Date) return;
+        
+          const calc31 = addCalendarMonthsDetailed(base31Date, 31);
+          const due31 = calc31.date;
+          const isr = ctx.findEuroPctSearchAnchor();
+          const isrDate = parseDateString(isr?.dateStr || '');
+          const calcIsr = isrDate ? addCalendarMonthsDetailed(isrDate, 6) : null;
+          const isrPlus6 = calcIsr?.date || null;
+          const dueLater = isrPlus6 && isrPlus6 > due31 ? isrPlus6 : due31;
+          const dueLaterRolled = isrPlus6 && isrPlus6 > due31 ? !!calcIsr?.rolledOver : calc31.rolledOver;
+          const dueLaterRollNote = isrPlus6 && isrPlus6 > due31
+            ? (calcIsr?.rolledOver ? `day ${calcIsr.fromDay}→${calcIsr.toDay}` : '')
+            : (calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '');
+        
+          ctx.push({
+            label: 'Euro-PCT entry acts (31-month stop)',
+            date: due31,
+            level: 'bad',
+            confidence: 'high',
+            sourceDate: ctx.priorityDate ? ctx.main.priorities?.[0]?.dateStr || '' : ctx.main.filingDate || '',
+            resolved: ctx.hasFeeSignalAfter(base31Date, /translation|entry into european phase|rule 159|filing fee|page fee|request for examination/i),
+            method: 'Rule-based: priority/filing date +31 months',
+            rolledOver: calc31.rolledOver,
+            rolloverNote: calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '',
+            namespace: 'first_instance',
+            phase: 'regional_phase_entry',
+          });
+        
+          ctx.push({
+            label: 'Euro-PCT exam/designation deadline (later-of formula)',
+            date: dueLater,
+            level: 'bad',
+            confidence: isrDate ? 'medium' : 'low',
+            sourceDate: isrDate ? `${formatDate(base31Date)} / ${isr?.dateStr || ''}` : formatDate(base31Date),
+            resolved: ctx.hasFeeSignalAfter(base31Date, /request for examination|examination fee|designation fee|extension fee|validation fee/i),
+            reviewOnly: !isrDate,
+            method: isrDate ? 'Heuristic: max(31 months from priority/filing, qualifying ISR/WO issue date +6 months)' : 'Rule-based: 31 months from priority/filing (no qualifying ISR/WO date found)',
+            rolledOver: dueLaterRolled,
+            rolloverNote: dueLaterRollNote,
+            namespace: 'first_instance',
+            phase: 'regional_phase_entry',
+          });
+        }
+        
+        function appendLossOfRightsAndRemedyDeadlines(ctx) {
+          const rule112 = ctx.findRule112Anchor();
+          if (rule112) {
+            const underlyingMissedAct = inferMissedActFromReason(`${rule112.stepDescriptionName || ''} ${rule112.detail || ''} ${rule112.title || ''}`);
+            ctx.addMonthsDeadline({
+              record: rule112,
+              label: 'Rule 112 decision-request review window',
+              months: 2,
+              level: 'warn',
+              confidence: 'low',
+              reviewOnly: true,
+              internalKey: 'LOSS_OF_RIGHTS_R112',
+              phase: 'loss_of_rights',
+              namespace: 'first_instance',
+              methodPrefix: 'Conditional EPC remedy',
+              extra: underlyingMissedAct ? { underlyingMissedAct } : {},
+              resolvedBy: (anchor, rec) => structuredReplyOrPaymentSeen(rec) || ctx.hasApplicantResponseAfter(anchor, /request for decision|further processing|re-establishment|decision request/i),
+            });
+          }
+        }
+        
+        function appendOppositionAndLimitationDeadlines(ctx) {
+          const r791 = ctx.findOppositionRule791Anchor();
+          if (r791) {
+            ctx.addMonthsDeadline({
+              record: r791,
+              label: 'Opposition Rule 79(1) proprietor reply',
+              months: 4,
+              level: 'bad',
+              internalKey: 'OPPOSITION_R79_1_PROPRIETOR_REPLY',
+              phase: 'opposition',
+              namespace: 'opposition',
+              methodPrefix: 'Rule-based',
+            });
+          }
+        
+          const r793 = ctx.findOppositionRule793Anchor();
+          if (r793 && !ctx.hasPdfHint(/Rule 79\(3\)/i)) {
+            ctx.addStructuredOrReviewDeadline({
+              record: r793,
+              label: 'Opposition Rule 79(3) party-reply communication',
+              reviewLabel: 'Opposition Rule 79(3) party-reply communication (manual review)',
+              level: 'warn',
+              internalKey: 'OPPOSITION_R79_3_OTHER_PARTIES_REPLY',
+              phase: 'opposition',
+              namespace: 'opposition',
+              method: 'Structured ST.36 opposition reply deadline from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'The party-reply period is communication-specific; review the communication/PDF or ST.36 fields for the due date.',
+            });
+          }
+        
+          const orex = ctx.findOppositionOrexAnchor();
+          if (orex && !r791 && !r793 && !ctx.hasPdfHint(/Opposition/i)) {
+            ctx.addStructuredOrReviewDeadline({
+              record: orex,
+              label: 'Opposition division communication',
+              reviewLabel: 'Opposition division communication (manual review)',
+              level: 'warn',
+              internalKey: 'OPPOSITION_DIVISION_COMMUNICATION',
+              phase: 'opposition',
+              namespace: 'opposition',
+              method: 'Structured ST.36 opposition deadline from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'Generic OREX-style opposition communication detected; review the communication text or ST.36 fields for the governing deadline.',
+            });
+          }
+        
+          const oppSummons = ctx.findSummonsAnchor('opposition');
+          if (oppSummons && !ctx.hasPdfHint(/Rule 116 final date|Oral proceedings date/i)) {
+            ctx.addStructuredOrReviewDeadline({
+              record: oppSummons,
+              label: 'Rule 116 final date',
+              reviewLabel: 'Opposition summons / Rule 116 review',
+              level: 'warn',
+              internalKey: 'OPPOSITION_SUMMONS',
+              phase: 'opposition',
+              namespace: 'opposition',
+              method: 'Structured ST.36 summons final date from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'Summons require annex parsing: store the oral-proceedings date and any Rule 116 final written-submissions date.',
+            });
+          }
+        
+          const oppOral = ctx.findOralProceedingsEvent('opposition');
+          if (oppOral && !ctx.hasPdfHint(/Oral proceedings date/i)) {
+            ctx.addAbsoluteDateEntry({
+              record: oppOral,
+              label: 'Opposition oral proceedings date',
+              level: 'warn',
+              internalKey: 'ORAL_PROCEEDINGS_EVENT',
+              phase: 'opposition',
+              namespace: 'opposition',
+              method: 'Stored from opposition oral-proceedings event chronology.',
+            });
+          }
+        
+          const r821 = ctx.findOppositionRule821Anchor();
+          if (r821) {
+            ctx.addMonthsDeadline({
+              record: r821,
+              label: 'Opposition Rule 82(1) maintenance-text observations',
+              months: 2,
+              level: 'warn',
+              internalKey: 'OPPOSITION_R82_1_TEXT',
+              phase: 'opposition_endgame',
+              namespace: 'opposition',
+              methodPrefix: 'Rule-based',
+            });
+          }
+        
+          const r823 = ctx.findOppositionRule823Anchor();
+          const r822 = ctx.findOppositionRule822Anchor();
+          if (r822) {
+            ctx.addMonthsDeadline({
+              record: r822,
+              label: 'Opposition Rule 82(2) translations + publication fee',
+              months: 3,
+              level: 'bad',
+              internalKey: 'OPPOSITION_R82_2_TRANSLATIONS_FEE',
+              phase: 'opposition_endgame',
+              namespace: 'opposition',
+              methodPrefix: 'Rule-based',
+              supersededBy: (anchor) => ctx.findLaterRecordAfter(anchor, (r) => /rule\s*82\(3\)|further invitation|surcharge/.test(`${r.title} ${r.detail}`)),
+            });
+          }
+        
+          if (r823) {
+            ctx.addMonthsDeadline({
+              record: r823,
+              label: 'Opposition Rule 82(3) surcharge period',
+              months: 2,
+              level: 'bad',
+              internalKey: 'OPPOSITION_R82_3_SURCHARGE',
+              phase: 'opposition_endgame',
+              namespace: 'opposition',
+              methodPrefix: 'Rule-based',
+            });
+          }
+        
+          const pmap = ctx.findOppositionPmapAnchor();
+          if (pmap && !r821 && !r822 && !r823 && !ctx.hasPdfHint(/Rule 82/i)) {
+            ctx.addStructuredOrReviewDeadline({
+              record: pmap,
+              label: 'Opposition Rule 82 branch',
+              reviewLabel: 'Opposition Rule 82 branch (manual review)',
+              level: 'bad',
+              internalKey: 'OPPOSITION_R82_BRANCH',
+              phase: 'opposition_endgame',
+              namespace: 'opposition',
+              method: 'Structured ST.36 Rule 82 branch from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'PMAP-style maintenance branch detected; review the communication text or ST.36 fields to distinguish Rule 82(1)/(2)/(3) and its governing due date.',
+            });
+          }
+        
+          const l952 = ctx.findLimitationRule952Anchor();
+          if (l952) {
+            ctx.addMonthsDeadline({
+              record: l952,
+              label: 'Limitation Rule 95(2) correction period',
+              months: 2,
+              level: 'warn',
+              internalKey: 'LIMITATION_R95_2_DEFICIENCIES',
+              phase: 'limitation',
+              namespace: 'limitation',
+              methodPrefix: 'Rule-based',
+            });
+          }
+        
+          const l953 = ctx.findLimitationRule953Anchor();
+          if (l953) {
+            ctx.addMonthsDeadline({
+              record: l953,
+              label: 'Limitation Rule 95(3) translations + fee',
+              months: 3,
+              level: 'bad',
+              internalKey: 'LIMITATION_R95_3_ALLOWABLE',
+              phase: 'limitation',
+              namespace: 'limitation',
+              methodPrefix: 'Rule-based',
+            });
+          }
+        
+          const lire = ctx.findLimitationLireAnchor();
+          if (lire && !l952 && !l953 && !ctx.hasPdfHint(/Rule 95/i)) {
+            ctx.addStructuredOrReviewDeadline({
+              record: lire,
+              label: 'Limitation communication',
+              reviewLabel: 'Limitation communication (manual review)',
+              level: 'warn',
+              internalKey: 'LIMITATION_COMMUNICATION',
+              phase: 'limitation',
+              namespace: 'limitation',
+              method: 'Structured ST.36 limitation deadline from DATE_OF_DISPATCH + time-limit in record',
+              reviewMethod: 'Limitation communication detected; review the communication text or ST.36 fields to distinguish the applicable Rule 95 branch and due date.',
+            });
+          }
+        }
+        
+        function appendPostGrantDeadlines(ctx) {
+          const noOpposition = ctx.findNoOppositionRecord();
+          const noOppositionDate = parseDateString(noOpposition?.dateStr || '');
+          const closedByNoOpposition = (dueDate) => !!(noOppositionDate && dueDate && noOppositionDate.getTime() >= dueDate.getTime());
+        
+          const grantMention = ctx.findGrantMentionAnchor();
+          if (grantMention) {
+            const anchor = parseDateString(grantMention.dateStr);
+            if (anchor) {
+              const calcOpp = addCalendarMonthsDetailed(anchor, 9);
+              ctx.push({
+                label: 'Opposition period (third-party monitor)',
+                date: calcOpp.date,
+                level: 'warn',
+                confidence: 'high',
+                sourceDate: grantMention.dateStr,
+                resolved: closedByNoOpposition(calcOpp.date),
+                method: 'Rule-based: grant mention +9 months',
+                rolledOver: calcOpp.rolledOver,
+                rolloverNote: calcOpp.rolledOver ? `day ${calcOpp.fromDay}→${calcOpp.toDay}` : '',
+                namespace: 'opposition',
+                phase: 'post_grant',
+              });
+              const calcUe = addCalendarMonthsDetailed(anchor, 1);
+              ctx.push({
+                label: 'Unitary effect request window',
+                date: calcUe.date,
+                level: 'warn',
+                confidence: 'high',
+                sourceDate: grantMention.dateStr,
+                resolved: ctx.hasAfter(anchor, (r) => /unitary effect/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcUe.date),
+                method: 'Rule-based: grant mention +1 month',
+                rolledOver: calcUe.rolledOver,
+                rolloverNote: calcUe.rolledOver ? `day ${calcUe.fromDay}→${calcUe.toDay}` : '',
+                namespace: 'unitary_patent',
+                internalKey: 'UNITARY_PATENT_EVENT',
+                phase: 'up',
+              });
+            }
+          }
+        
+          const decision = ctx.findAppealableDecisionAnchor();
+          if (decision) {
+            const anchor = structuredAnchorDate(decision);
+            if (anchor) {
+              const decisionLow = normalize(`${decision.title || ''} ${decision.detail || ''}`).toLowerCase();
+              const decisionAnchorKey = /refusal|decision to refuse|refusal of the application/.test(decisionLow) ? 'DECISION_REFUSAL' : '';
+              if (decisionAnchorKey) {
+                ctx.push({
+                  label: 'Refusal decision / appeal anchor',
+                  date: anchor,
+                  level: 'info',
+                  confidence: ctx.recordConfidence ? ctx.recordConfidence(decision, 'high') : 'high',
+                  sourceDate: decision.dispatchDate || decision.dateStr,
+                  resolved: false,
+                  anchorOnly: true,
+                  namespace: 'appeal',
+                  internalKey: decisionAnchorKey,
+                  phase: 'decision',
+                  method: 'Decision anchor routed to appeal branch.',
+                });
+              }
+              const calcNotice = addCalendarMonthsDetailed(anchor, 2);
+              ctx.push({
+                label: 'Appeal notice + fee',
+                date: calcNotice.date,
+                level: 'bad',
+                confidence: 'high',
+                sourceDate: decision.dispatchDate || decision.dateStr,
+                resolved: ctx.hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcNotice.date),
+                method: 'Rule-based: decision date +2 months',
+                rolledOver: calcNotice.rolledOver,
+                rolloverNote: calcNotice.rolledOver ? `day ${calcNotice.fromDay}→${calcNotice.toDay}` : '',
+                namespace: 'appeal',
+                internalKey: 'APPEAL_EVENT',
+                anchorInternalKey: decisionAnchorKey,
+                phase: 'appeal',
+              });
+              const calcGrounds = addCalendarMonthsDetailed(anchor, 4);
+              ctx.push({
+                label: 'Appeal grounds',
+                date: calcGrounds.date,
+                level: 'bad',
+                confidence: 'high',
+                sourceDate: decision.dispatchDate || decision.dateStr,
+                resolved: ctx.hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcGrounds.date),
+                method: 'Rule-based: decision date +4 months',
+                rolledOver: calcGrounds.rolledOver,
+                rolloverNote: calcGrounds.rolledOver ? `day ${calcGrounds.fromDay}→${calcGrounds.toDay}` : '',
+                namespace: 'appeal',
+                internalKey: 'APPEAL_EVENT',
+                anchorInternalKey: decisionAnchorKey,
+                phase: 'appeal',
+              });
+            }
+          }
+        }
+        
+        function appendReferenceDeadlines(ctx) {
+          if (ctx.priorityDate) {
+            const calcPriority = addCalendarMonthsDetailed(ctx.priorityDate, 12);
+            const due = calcPriority.date;
+            if (due > new Date()) {
+              ctx.push({
+                label: 'Priority year ends',
+                date: due,
+                level: 'warn',
+                confidence: 'high',
+                sourceDate: ctx.main.priorities?.[0]?.dateStr || '',
+                resolved: false,
+                method: 'Rule-based: earliest priority date +12 months',
+                rolledOver: calcPriority.rolledOver,
+                rolloverNote: calcPriority.rolledOver ? `day ${calcPriority.fromDay}→${calcPriority.toDay}` : '',
+              });
+            }
+          }
+        
+          if (ctx.filingDate) {
+            const calcTerm = addCalendarMonthsDetailed(ctx.filingDate, 12 * 20);
+            ctx.push({
+              label: '20-year term from filing (reference)',
+              date: calcTerm.date,
+              level: 'info',
+              confidence: 'high',
+              reference: true,
+              resolved: false,
+              method: 'Rule-based: filing date +20 years',
+              rolledOver: calcTerm.rolledOver,
+              rolloverNote: calcTerm.rolledOver ? `day ${calcTerm.fromDay}→${calcTerm.toDay}` : '',
+            });
+          }
+        }
+        
+        function inferProceduralDeadlinesFromSources({ main = {}, docs = [], eventHistory = {}, legal = {}, pdfData = {} } = {}) {
+          const ctx = buildDeadlineComputationContext({ main, docs, eventHistory, legal, pdfData });
+          appendPdfDerivedDeadlines(ctx);
+          appendSearchStageDeadlines(ctx);
+          appendCoreCommunicationDeadlines(ctx);
+          appendDirectOrPctDeadlines(ctx);
+          appendLossOfRightsAndRemedyDeadlines(ctx);
+          appendOppositionAndLimitationDeadlines(ctx);
+          appendPostGrantDeadlines(ctx);
+          appendReferenceDeadlines(ctx);
+          return dedupe(ctx.out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}|${d.reviewOnly ? 'review' : ''}|${d.internalKey || ''}|${d.namespace || ''}|${d.anchorOnly ? 'anchor' : ''}`);
+        }
+        
+        module.exports = {
+          addCalendarMonthsDetailed,
+          pdfHintsWithParsedDates,
+          isTerminalEpoOutcomeText,
+          buildDeadlineComputationContext,
+          appendPdfDerivedDeadlines,
+          appendSearchStageDeadlines,
+          appendCoreCommunicationDeadlines,
+          appendDirectOrPctDeadlines,
+          appendLossOfRightsAndRemedyDeadlines,
+          appendOppositionAndLimitationDeadlines,
+          appendPostGrantDeadlines,
+          appendReferenceDeadlines,
+          inferProceduralDeadlinesFromSources,
+          isActualGrantMentionText,
+        };
+        
+      },
+      "lib/epo_v2_pdf_parser": function(module, exports, require) {
+        const { parseDateString, normalize, dedupe, formatDate } = require('./epo_v2_utils');
+        const { addCalendarMonthsDetailed } = require('./epo_v2_deadline_signals');
+        
+        function normalizeDateString(raw) {
+          const t = String(raw || '').trim();
+          if (!t) return '';
+          const m = t.match(/(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})/);
+          if (!m) return '';
+          const d = String(m[1] || '').padStart(2, '0');
+          const mo = String(m[2] || '').padStart(2, '0');
+          const yRaw = String(m[3] || '');
+          const y = yRaw.length === 2 ? `20${yRaw}` : yRaw;
+          return `${d}.${mo}.${y}`;
+        }
+        
+        function parseSmallNumberToken(token) {
+          const t = String(token || '').trim().toLowerCase();
+          if (!t) return 0;
+          if (/^\d{1,2}$/.test(t)) return Number(t);
+          const map = {
+            one: 1,
+            two: 2,
+            three: 3,
+            four: 4,
+            five: 5,
+            six: 6,
+            seven: 7,
+            eight: 8,
+            nine: 9,
+            ten: 10,
+            eleven: 11,
+            twelve: 12,
+          };
+          return map[t] || 0;
+        }
+        
+        function extractExplicitDeadlineDateFromPdf(textBlock) {
+          const textRaw = String(textBlock || '');
+          if (!textRaw) return { dateStr: '', evidence: '' };
+        
+          const candidates = [];
+          const push = (rawDate, evidence, score = 100) => {
+            const dateStr = normalizeDateString(rawDate);
+            if (!dateStr) return;
+            candidates.push({ dateStr, evidence, score });
+          };
+        
+          for (const m of textRaw.matchAll(/(?:\bfinal\s+date\b[\s\S]{0,96}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 'Explicit final date found in PDF communication text', 130);
+          }
+          for (const m of textRaw.matchAll(/(?:\bdeadline\b[\s\S]{0,32}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 'Explicit deadline date found in PDF communication text', 120);
+          }
+          for (const m of textRaw.matchAll(/(?:\btime\s+limit\s+(?:expires?|expiring|ending)\b[\s\S]{0,24}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 'Explicit time-limit expiry date found in PDF communication text', 125);
+          }
+          for (const m of textRaw.matchAll(/(?:\bno\s+later\s+than\b|\bat\s+the\s+latest(?:\s+by|\s+on)?\b|\blatest\s+by\b)\s*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 'Explicit latest-by date found in PDF communication text', 135);
+          }
+        
+          if (!candidates.length) return { dateStr: '', evidence: '' };
+        
+          const best = candidates
+            .map((candidate) => ({ ...candidate, ts: parseDateString(candidate.dateStr)?.getTime() || 0 }))
+            .sort((a, b) => (b.score - a.score) || (b.ts - a.ts))[0];
+        
+          return { dateStr: best?.dateStr || '', evidence: best?.evidence || '' };
+        }
+        
+        function extractRegisteredLetterProofLine(textBlock) {
+          const raw = String(textBlock || '');
+          if (!raw) return { registeredLetterLine: '', proofLine: '' };
+        
+          const lines = raw
+            .split(/\r?\n/)
+            .map((line) => normalize(line))
+            .filter(Boolean);
+        
+          const idx = lines.findIndex((line) => /\bregistered\s+letter\b/i.test(line));
+          if (idx >= 0) {
+            const current = lines[idx] || '';
+            const tail = normalize(current.replace(/.*?\bregistered\s+letter\b[:\s\-]*/i, ''));
+            if (tail && !/\bregistered\s+letter\b/i.test(tail)) {
+              return { registeredLetterLine: current, proofLine: tail.slice(0, 180) };
+            }
+        
+            for (let i = idx + 1; i < Math.min(lines.length, idx + 10); i++) {
+              const line = normalize(lines[i]);
+              if (!line) continue;
+              if (/\bregistered\s+letter\b/i.test(line)) continue;
+              return { registeredLetterLine: current, proofLine: line };
+            }
+        
+            for (let i = Math.max(0, idx - 4); i < idx; i++) {
+              const line = normalize(lines[i]);
+              if (!line) continue;
+              if (/\bregistered\s+letter\b/i.test(line)) continue;
+              if (/\bepo\s*form\b|\(\d{2}\.\d{2}\.\d{4}\)/i.test(line)) {
+                return { registeredLetterLine: current, proofLine: line };
+              }
+            }
+        
+            return { registeredLetterLine: current, proofLine: '' };
+          }
+        
+          const inline = normalize(raw).match(/registered\s+letter\s*[:\-]?\s*([^\n\r]{3,180})/i);
+          if (inline?.[1]) {
+            const proof = normalize(String(inline[1] || '').split(/\s{2,}/)[0]);
+            if (proof) return { registeredLetterLine: 'Registered Letter', proofLine: proof };
+          }
+        
+          const nearby = normalize(raw).match(/(epo\s*form[^\n\r]{0,140}\(\d{2}\.\d{2}\.\d{4}\))/i);
+          if (nearby?.[1]) {
+            return { registeredLetterLine: 'Registered Letter', proofLine: normalize(nearby[1]) };
+          }
+        
+          return { registeredLetterLine: '', proofLine: '' };
+        }
+        
+        function extractCommunicationDateFromPdf(textBlock, context = {}) {
+          const textRaw = String(textBlock || '');
+          const docDateStr = normalizeDateString(context.docDateStr || '');
+          const candidates = [];
+        
+          const push = (rawDate, score, evidence, contextText = '') => {
+            const dateStr = normalizeDateString(rawDate);
+            if (!dateStr) return;
+            const veto = /final\s+date|deadline|latest\s+by|no\s+later\s+than|time\s+limit\s+(?:expires?|expiring|ending)/i;
+            if (veto.test(contextText || '')) return;
+            candidates.push({ dateStr, score, evidence });
+          };
+        
+          for (const m of textRaw.matchAll(/application\s*no\.?[\s\S]{0,120}?\bref\.?[\s\S]{0,80}?\bdate\b[^\d]{0,16}(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 185, 'Date extracted from Application/Ref/Date header table in PDF');
+          }
+          for (const m of textRaw.matchAll(/(?:date\s+of\s+(?:this\s+)?(?:communication|notification|letter)[\s\S]{0,20}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 180, 'Date of communication field found in PDF');
+          }
+          for (const m of textRaw.matchAll(/\bdate\b\s*[:\-]?\s*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            const idx = m.index || 0;
+            const snippet = textRaw.slice(Math.max(0, idx - 24), Math.min(textRaw.length, idx + String(m[0] || '').length + 24));
+            push(m[1], 150, 'Date field found in PDF communication header', snippet);
+          }
+          for (const m of textRaw.matchAll(/(?:communication(?:\s+pursuant\s+to[^\n]{0,40})?[^\n]{0,80}?\bdated\b[^\d]{0,12})(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 145, 'Dated communication line found in PDF');
+          }
+        
+          const registered = extractRegisteredLetterProofLine(textRaw);
+          const proofDate = normalizeDateString(String(registered.proofLine || '').match(/\b(\d{2}\.\d{2}\.\d{4})\b/)?.[1] || '');
+          if (proofDate) push(proofDate, 105, 'Date extracted from line below "Registered Letter" in PDF (dispatch proof context)');
+        
+          const registeredLineDate = normalizeDateString(String(registered.registeredLetterLine || '').match(/\b(\d{2}\.\d{2}\.\d{4})\b/)?.[1] || '');
+          if (registeredLineDate) push(registeredLineDate, 95, 'Date extracted from "Registered Letter" line in PDF (dispatch proof context)');
+        
+          for (const m of textRaw.matchAll(/epo\s*form[^\n\r]{0,80}\((\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})\)/gi)) {
+            push(m[1], 100, 'Date extracted from EPO form stamp near Registered Letter (dispatch proof context)');
+          }
+        
+          if (docDateStr) push(docDateStr, 30, 'Doclist date fallback for communication date');
+          if (!candidates.length) return { dateStr: '', evidence: '' };
+        
+          const best = candidates
+            .map((candidate) => ({
+              ...candidate,
+              bonus: docDateStr && candidate.dateStr === docDateStr ? 8 : 0,
+              ts: parseDateString(candidate.dateStr)?.getTime() || 0,
+            }))
+            .sort((a, b) => ((b.score + b.bonus) - (a.score + a.bonus)) || (b.ts - a.ts))[0];
+        
+          return { dateStr: best?.dateStr || '', evidence: best?.evidence || '' };
+        }
+        
+        function extractResponseMonthsFromPdf(textBlock) {
+          const textRaw = String(textBlock || '');
+          if (!textRaw) return { months: 0, evidence: '' };
+        
+          const candidates = [];
+          const push = (token, evidence, score) => {
+            const months = parseSmallNumberToken(token);
+            if (!Number.isFinite(months) || months <= 0 || months > 24) return;
+            candidates.push({ months, evidence, score });
+          };
+        
+          for (const m of textRaw.matchAll(/\bwithin\s+(?:a\s+)?(?:period|time\s+limit)\s+of\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
+            push(m[1], `Derived from "${String(m[0] || '').trim()}" in PDF text`, 130);
+          }
+          for (const m of textRaw.matchAll(/\b(?:period|time\s+limit)\s+of\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
+            push(m[1], `Derived from "${String(m[0] || '').trim()}" in PDF text`, 120);
+          }
+          for (const m of textRaw.matchAll(/\bwithin\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
+            push(m[1], `Derived from "${String(m[0] || '').trim()}" in PDF text`, 110);
+          }
+          for (const m of textRaw.matchAll(/\bof\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
+            push(m[1], `Derived from fragmented phrase "${String(m[0] || '').trim()}" in PDF text`, 70);
+          }
+          for (const m of textRaw.matchAll(/\b((?:2|3|4|5|6|two|three|four|five|six))\s+months?\b/gi)) {
+            push(m[1], `Derived from fragmented target phrase "${String(m[0] || '').trim()}" in PDF text`, 62);
+          }
+          for (const m of textRaw.matchAll(/\bmonths?\s*(?:of|:|-)?\s*((?:2|3|4|5|6|two|three|four|five|six))\b/gi)) {
+            push(m[1], `Derived from reversed fragmented target phrase "${String(m[0] || '').trim()}" in PDF text`, 58);
+          }
+        
+          if (!candidates.length) return { months: 0, evidence: '' };
+          const best = candidates.sort((a, b) => b.score - a.score)[0];
+          return { months: best?.months || 0, evidence: best?.evidence || '' };
+        }
+        
+        function extractOralProceedingsDateFromPdf(textBlock) {
+          const textRaw = String(textBlock || '');
+          if (!textRaw) return { dateStr: '', evidence: '' };
+        
+          const candidates = [];
+          const push = (rawDate, evidence, score = 100) => {
+            const dateStr = normalizeDateString(rawDate);
+            if (!dateStr) return;
+            candidates.push({ dateStr, evidence, score, ts: parseDateString(dateStr)?.getTime() || 0 });
+          };
+        
+          for (const m of textRaw.matchAll(/oral proceedings(?:\s+will)?(?:\s+take\s+place|\s+be\s+held|\s+are\s+appointed)?(?:\s+on|\s+for)?[^\d]{0,24}(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 'Oral-proceedings date found in PDF text', 140);
+          }
+          for (const m of textRaw.matchAll(/proceedings are appointed for[^\d]{0,24}(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 'Oral-proceedings appointment date found in PDF text', 145);
+          }
+          for (const m of textRaw.matchAll(/summons to oral proceedings[\s\S]{0,80}?(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+            push(m[1], 'Date found near summons-to-oral-proceedings heading in PDF text', 90);
+          }
+        
+          if (!candidates.length) return { dateStr: '', evidence: '' };
+          const best = candidates.sort((a, b) => (b.score - a.score) || (a.ts - b.ts))[0];
+          return { dateStr: best?.dateStr || '', evidence: best?.evidence || '' };
+        }
+        
+        function inferDeadlineCategoryFromContext(context = {}) {
+          const low = `${String(context.docTitle || '')} ${String(context.docProcedure || '')}`.toLowerCase();
+          if (!normalize(low)) return { category: '', evidence: '' };
+          if (/rule\s*71\s*\(\s*3\s*\)|intention to grant|text intended for grant/.test(low)) {
+            return { category: 'R71(3) response period', evidence: 'Inferred from document title/procedure metadata (Rule 71(3) / intention to grant signal)' };
+          }
+          if (/rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(low)) {
+            return { category: 'Rule 62a invitation period', evidence: 'Inferred from document title/procedure metadata (Rule 62a search-stage signal)' };
+          }
+          if (/rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(low)) {
+            return { category: 'Rule 63 invitation period', evidence: 'Inferred from document title/procedure metadata (Rule 63 search-stage signal)' };
+          }
+          if (/rule\s*64|additional search fee|further search fees|lack of unity/.test(low)) {
+            return { category: 'Rule 64 additional search fees / unity selection', evidence: 'Inferred from document title/procedure metadata (Rule 64 search-fee signal)' };
+          }
+          if (/rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(low)) {
+            return { category: 'Rule 70a reply to search opinion', evidence: 'Inferred from document title/procedure metadata (Rule 70a search-opinion reply signal)' };
+          }
+          if (/rule\s*70\(2\)|wish to proceed further|desire to proceed further/.test(low)) {
+            return { category: 'Rule 70(2) confirmation/response period', evidence: 'Inferred from document title/procedure metadata (Rule 70(2) proceed-further signal)' };
+          }
+          if (/\brule\s*116\b|summons to oral proceedings/.test(low)) {
+            return { category: 'Rule 116 final date', evidence: 'Inferred from document title/procedure metadata (Rule 116 / summons signal)' };
+          }
+          if (/\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)|communication pursuant to article 94\(3\)/.test(low)) {
+            return { category: 'Art. 94(3) response period', evidence: 'Inferred from document title/procedure metadata (explicit Art. 94(3) signal)' };
+          }
+          if (/minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low)) {
+            return { category: 'Minutes-as-first-action examination communication', evidence: 'Inferred from document title/procedure metadata (minutes / consultation first-action signal)' };
+          }
+          if (/\brule\s*161\b|\brule\s*162\b/.test(low)) {
+            return { category: 'Rule 161/162 response period', evidence: 'Inferred from document title/procedure metadata (Rule 161/162 signal)' };
+          }
+          if (/rule\s*164\(1\)|additional search fees|further search fees/.test(low)) {
+            return { category: 'Rule 164(1) additional search fees', evidence: 'Inferred from document title/procedure metadata (Rule 164(1) Euro-PCT search-fee signal)' };
+          }
+          if (/rule\s*164\(2\)|unsearched invention/.test(low)) {
+            return { category: 'Rule 164(2) unsearched-inventions communication', evidence: 'Inferred from document title/procedure metadata (Rule 164(2) unsearched-inventions signal)' };
+          }
+          if (/rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(low)) {
+            return { category: 'Opposition Rule 79(1) proprietor reply', evidence: 'Inferred from document title/procedure metadata (Rule 79(1) opposition signal)' };
+          }
+          if (/rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(low)) {
+            return { category: 'Opposition Rule 79(3) party-reply communication', evidence: 'Inferred from document title/procedure metadata (Rule 79(3) opposition signal)' };
+          }
+          if (/rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(low)) {
+            return { category: 'Opposition Rule 82(1) maintenance-text observations', evidence: 'Inferred from document title/procedure metadata (Rule 82(1) opposition signal)' };
+          }
+          if (/rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(low)) {
+            return { category: 'Opposition Rule 82(2) translations + publication fee', evidence: 'Inferred from document title/procedure metadata (Rule 82(2) opposition signal)' };
+          }
+          if (/rule\s*82\(3\)|further invitation|surcharge/.test(low)) {
+            return { category: 'Opposition Rule 82(3) surcharge period', evidence: 'Inferred from document title/procedure metadata (Rule 82(3) opposition signal)' };
+          }
+          if (/rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(low)) {
+            return { category: 'Limitation Rule 95(2) correction period', evidence: 'Inferred from document title/procedure metadata (Rule 95(2) limitation signal)' };
+          }
+          if (/rule\s*95\(3\)|allowable request|translations of the amended claims/.test(low)) {
+            return { category: 'Limitation Rule 95(3) translations + fee', evidence: 'Inferred from document title/procedure metadata (Rule 95(3) limitation signal)' };
+          }
+          if (/\bcommunication\b|\bnotification\b|\bsummons\b|\binvitation\b|\bofficial communication\b|\boffice action\b/.test(low)) {
+            return { category: 'Communication response period', evidence: 'Inferred from document title/procedure metadata (generic communication signal)' };
+          }
+          return { category: '', evidence: '' };
+        }
+        
+        function defaultResponseMonthsForCategory(category) {
+          const c = String(category || '').toLowerCase();
+          if (c.includes('rule 62a')) return 2;
+          if (c.includes('rule 63')) return 2;
+          if (c.includes('r71(3)')) return 4;
+          if (c.includes('rule 70(2)')) return 6;
+          if (c.includes('rule 161/162')) return 6;
+          if (c.includes('rule 164(1)')) return 2;
+          if (c.includes('rule 79(1)')) return 4;
+          if (c.includes('rule 82(1)')) return 2;
+          if (c.includes('rule 82(2)')) return 3;
+          if (c.includes('rule 82(3)')) return 2;
+          if (c.includes('rule 95(2)')) return 2;
+          if (c.includes('rule 95(3)')) return 3;
+          return 0;
+        }
+        
+        function parsePdfDeadlineHints(pdfText, context = {}) {
+          const textRaw = String(pdfText || '');
+          const textLower = textRaw.toLowerCase();
+          const docDateStr = normalizeDateString(context.docDateStr || '');
+        
+          const diagnostics = {
+            category: '',
+            categoryEvidence: '',
+            communicationDate: '',
+            communicationEvidence: '',
+            responseMonths: 0,
+            responseEvidence: '',
+            explicitDeadlineDate: '',
+            explicitDeadlineEvidence: '',
+            oralProceedingsDate: '',
+            oralProceedingsEvidence: '',
+            registeredLetterLine: '',
+            registeredLetterProofLine: '',
+          };
+        
+          if (!textLower) return { hints: [], diagnostics };
+        
+          const hints = [];
+          const pushHint = (hint) => {
+            const date = parseDateString(hint?.dateStr || '');
+            if (!date) return;
+            hints.push({
+              label: hint.label,
+              dateStr: formatDate(date),
+              sourceDate: hint.sourceDate || '',
+              confidence: hint.confidence || 'high',
+              level: hint.level || 'bad',
+              resolved: false,
+              source: 'PDF parse',
+              evidence: hint.evidence || '',
+            });
+          };
+        
+          const categoryFromText = /rule\s*71\s*\(\s*3\s*\)|intention to grant/.test(textLower)
+            ? 'R71(3) response period'
+            : /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(textLower)
+              ? 'Rule 62a invitation period'
+              : /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(textLower)
+                ? 'Rule 63 invitation period'
+                : /rule\s*64|additional search fee|further search fees|lack of unity/.test(textLower)
+                  ? 'Rule 64 additional search fees / unity selection'
+                  : /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(textLower)
+                    ? 'Rule 70a reply to search opinion'
+                    : /rule\s*70\(2\)|wish to proceed further|desire to proceed further/.test(textLower)
+                      ? 'Rule 70(2) confirmation/response period'
+                      : /\brule\s*116\b|summons to oral proceedings/.test(textLower)
+                        ? 'Rule 116 final date'
+                        : /\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)/.test(textLower)
+                          ? 'Art. 94(3) response period'
+                          : /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(textLower)
+                            ? 'Minutes-as-first-action examination communication'
+                            : /\brule\s*161\b|\brule\s*162\b/.test(textLower)
+                              ? 'Rule 161/162 response period'
+                              : /rule\s*164\(1\)|additional search fees|further search fees/.test(textLower)
+                                ? 'Rule 164(1) additional search fees'
+                                : /rule\s*164\(2\)|unsearched invention/.test(textLower)
+                                  ? 'Rule 164(2) unsearched-inventions communication'
+                                  : /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(textLower)
+                                    ? 'Opposition Rule 79(1) proprietor reply'
+                                    : /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(textLower)
+                                      ? 'Opposition Rule 79(3) party-reply communication'
+                                      : /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(textLower)
+                                        ? 'Opposition Rule 82(1) maintenance-text observations'
+                                        : /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(textLower)
+                                          ? 'Opposition Rule 82(2) translations + publication fee'
+                                          : /rule\s*82\(3\)|further invitation|surcharge/.test(textLower)
+                                            ? 'Opposition Rule 82(3) surcharge period'
+                                            : /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(textLower)
+                                              ? 'Limitation Rule 95(2) correction period'
+                                              : /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(textLower)
+                                                ? 'Limitation Rule 95(3) translations + fee'
+                                                : '';
+        
+          const categoryFromContext = inferDeadlineCategoryFromContext(context);
+          let category = categoryFromText || categoryFromContext.category;
+          diagnostics.category = category;
+          diagnostics.categoryEvidence = categoryFromText ? 'Detected from communication text' : (categoryFromContext.evidence || '');
+        
+          const registeredLetter = extractRegisteredLetterProofLine(textRaw);
+          diagnostics.registeredLetterLine = registeredLetter.registeredLetterLine || '';
+          diagnostics.registeredLetterProofLine = registeredLetter.proofLine || '';
+        
+          const communication = extractCommunicationDateFromPdf(textRaw, { docDateStr });
+          const communicationDateStr = communication.dateStr || docDateStr;
+          const communicationDate = parseDateString(communicationDateStr);
+          diagnostics.communicationDate = communicationDateStr || '';
+          diagnostics.communicationEvidence = communication.evidence || (docDateStr ? 'Doclist date fallback for communication date' : '');
+        
+          const oralProceedings = extractOralProceedingsDateFromPdf(textRaw);
+          diagnostics.oralProceedingsDate = oralProceedings.dateStr || '';
+          diagnostics.oralProceedingsEvidence = oralProceedings.evidence || '';
+        
+          const monthPeriod = extractResponseMonthsFromPdf(textRaw);
+          let responseMonths = monthPeriod.months || 0;
+          let responseEvidence = monthPeriod.evidence || '';
+          if (!responseMonths && category) {
+            const fallbackMonths = defaultResponseMonthsForCategory(category);
+            if (fallbackMonths > 0) {
+              responseMonths = fallbackMonths;
+              responseEvidence = `Default ${fallbackMonths}-month period inferred for ${category}${diagnostics.categoryEvidence ? ` (${diagnostics.categoryEvidence})` : ''}`;
+            }
+          }
+        
+          diagnostics.responseMonths = responseMonths;
+          diagnostics.responseEvidence = responseEvidence;
+        
+          const explicitDue = extractExplicitDeadlineDateFromPdf(textRaw);
+          diagnostics.explicitDeadlineDate = explicitDue.dateStr || '';
+          diagnostics.explicitDeadlineEvidence = explicitDue.evidence || '';
+        
+          const genericCommunicationSignal = /\bcommunication\b|\bnotification\b|\bsummons\b|\binvitation\b/.test(textLower);
+          if (!category && (monthPeriod.months || explicitDue.dateStr || genericCommunicationSignal) && communicationDateStr) {
+            category = 'Communication response period';
+            diagnostics.category = category;
+            diagnostics.categoryEvidence = monthPeriod.months || explicitDue.dateStr
+              ? 'Inferred from communication-period evidence in document text'
+              : 'Inferred from generic communication text signal';
+          }
+        
+          if (oralProceedings.dateStr) {
+            pushHint({
+              label: /opposition/i.test(String(context.docProcedure || '')) ? 'Opposition oral proceedings date' : 'Oral proceedings date',
+              dateStr: oralProceedings.dateStr,
+              sourceDate: communicationDateStr || docDateStr,
+              confidence: 'high',
+              level: 'warn',
+              evidence: oralProceedings.evidence,
+            });
+          }
+        
+          if (!category) return { hints: dedupe(hints, (hint) => `${hint.label}|${hint.dateStr}`), diagnostics };
+        
+          let explicitAdded = false;
+          if (explicitDue.dateStr) {
+            pushHint({
+              label: category,
+              dateStr: explicitDue.dateStr,
+              sourceDate: communicationDateStr || docDateStr,
+              confidence: 'high',
+              level: /rule\s*116|oral proceedings/i.test(category) ? 'warn' : 'bad',
+              evidence: explicitDue.evidence,
+            });
+            explicitAdded = true;
+          }
+        
+          if (!explicitAdded && responseMonths && communicationDate) {
+            const calc = addCalendarMonthsDetailed(communicationDate, responseMonths);
+            const communicationFromDocFallback = /doclist date fallback/i.test(String(diagnostics.communicationEvidence || ''));
+            const confidence = monthPeriod.months ? (communicationFromDocFallback ? 'medium' : 'high') : 'low';
+            pushHint({
+              label: category,
+              dateStr: formatDate(calc.date),
+              sourceDate: communicationDateStr,
+              confidence,
+              level: /rule\s*116|oral proceedings/i.test(category) ? 'warn' : 'bad',
+              evidence: `${responseEvidence || `Derived from ${responseMonths} month response period`} from communication date ${communicationDateStr}${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
+            });
+          }
+        
+          return { hints: dedupe(hints, (hint) => `${hint.label}|${hint.dateStr}`), diagnostics };
+        }
+        
+        module.exports = {
+          normalizeDateString,
+          parseSmallNumberToken,
+          extractExplicitDeadlineDateFromPdf,
+          extractRegisteredLetterProofLine,
+          extractCommunicationDateFromPdf,
+          extractResponseMonthsFromPdf,
+          extractOralProceedingsDateFromPdf,
+          inferDeadlineCategoryFromContext,
+          defaultResponseMonthsForCategory,
+          parsePdfDeadlineHints,
+        };
+        
+      },
+      "lib/epo_v2_timeline_signals": function(module, exports, require) {
+        const { normalize } = require('./epo_v2_utils');
+        
+        function dedupeCaseInsensitive(bits = []) {
+          return bits
+            .filter(Boolean)
+            .filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx);
+        }
+        
+        const TIMELINE_LEVEL_RULES = Object.freeze([
+          {
+            level: 'bad',
+            test: (low) => /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|revocation|lapsed|not maintained|request for re-establishment.*rejected|rights restored refused|withdrawn by applicant|deemed withdrawn/.test(low),
+          },
+          {
+            level: 'warn',
+            test: (low) => /deadline|time limit|final date|summons to oral proceedings|rule\s*116|article\s*94\(3\)|art\.?\s*94\(3\)|rule\s*71\(3\)|intention to grant|communication from the examining|communication under|opposition|third party observations|request for re-establishment|further processing/.test(low),
+          },
+          {
+            level: 'ok',
+            test: (low) => /mention of grant|patent granted|grant decision|fee paid|renewal paid|annual fee paid|validation|registered|recorded/.test(low),
+          },
+        ]);
+        
+        function classifyTimelineImportance(title, detail = '', source = '', actor = 'Other', baseLevel = 'info') {
+          const base = ['bad', 'warn', 'ok', 'info'].includes(baseLevel) ? baseLevel : 'info';
+          const low = normalize(`${title || ''}\n${detail || ''}\n${source || ''}\n${actor || ''}`).toLowerCase();
+          for (const rule of TIMELINE_LEVEL_RULES) {
+            if (rule.test(low)) return rule.level;
+            if (base === rule.level) return rule.level;
+          }
+          return 'info';
+        }
+        
+        const PACKET_EXPLANATION_MAP = Object.freeze({
+          'international search / iprp': 'ISA/IPRP packet from the international phase.',
+          'partial international search': 'Partial international search packet with the provisional opinion/search results.',
+          'european search package': 'European search report packet, including ESR opinion/strategy where present.',
+          'extended european search package': 'European search packet including an extended-ESR annex.',
+          'supplementary european search package': 'Supplementary European search packet for Euro-PCT regional phase entry.',
+          'intention to grant (r71(3) epc)': 'Rule 71(3) grant-intention packet, including text-for-grant documents.',
+          'response to intention to grant': 'Applicant response packet to the Rule 71(3) / grant-intention communication.',
+          'grant decision': 'Formal grant decision from the EPO.',
+          'further processing': 'Recovery packet showing further processing after a missed time limit.',
+          'euro-pct non-entry failure': 'Loss-of-rights packet showing failure to complete Euro-PCT entry acts in time.',
+          'grant-formalities failure': 'Loss-of-rights packet caused by missing grant-formality acts or payments.',
+          'fees / written-opinion failure': 'Loss-of-rights packet caused by fee non-payment and/or no reply to the written opinion.',
+          'written-opinion loss': 'Loss-of-rights packet caused by no reply to the written opinion.',
+        });
+        
+        function docPacketExplanation(label = '') {
+          return PACKET_EXPLANATION_MAP[normalize(label).toLowerCase()] || '';
+        }
+        
+        function timelineSubtitle(item = {}) {
+          const detailBits = String(item.detail || '')
+            .split(/\s*(?:·|\n)+\s*/)
+            .map((bit) => normalize(bit))
+            .filter(Boolean);
+          const actor = normalize(item.actor || '');
+          const explanation = normalize(item.explanation || '');
+          return dedupeCaseInsensitive([...detailBits, explanation, normalize(item.source || ''), actor && actor !== 'Other' ? actor : '']).join(' · ');
+        }
+        
+        function shouldAppendSingleRunLabel(itemDetail = '', groupLabel = '') {
+          const detail = normalize(itemDetail).toLowerCase();
+          const label = normalize(groupLabel).toLowerCase();
+          if (!label) return false;
+          if (!detail) return true;
+          if (detail.includes(label)) return false;
+          if (/^(examination|other|formalities \/ other)$/i.test(groupLabel)) return false;
+          return true;
+        }
+        
+        const COMPACT_TITLE_EXACT_MAP = new Map([
+          ['Text intended for grant (version for approval)', 'Grant text for approval'],
+          ['Text intended for grant (clean copy)', 'Grant text (clean copy)'],
+          ['Communication about intention to grant a European patent', 'Intention to grant'],
+          ['Annex to the communication about intention to grant a European patent', 'Grant communication annex'],
+          ['Bibliographic data of the European patent application', 'Bibliographic data'],
+          ['Request for correction/amendment of the text proposed for grant sent from 01.04.2012', 'Grant text correction request'],
+          ['Reminder period for payment of examination fee/designation fee and correction of deficiencies in Written Opinion/amendment', 'Exam / designation fee reminder'],
+          ['Communication regarding the transmission of the European search report', 'Search report transmission'],
+          ['Amendments received before examination', 'Amendments before examination'],
+        ]);
+        
+        const COMPACT_TITLE_REPLACEMENTS = Object.freeze([
+          [/\s+a European patent$/i, ''],
+          [/^New entry:\s*/i, ''],
+          [/^Deletion\s+-\s*/i, ''],
+          [/\s+sent from 01\.04\.2012$/i, ''],
+        ]);
+        
+        function compactOverviewTitle(title = '') {
+          const normalized = normalize(title);
+          if (!normalized) return '—';
+          if (COMPACT_TITLE_EXACT_MAP.has(normalized)) return COMPACT_TITLE_EXACT_MAP.get(normalized);
+          return COMPACT_TITLE_REPLACEMENTS.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), normalized).trim();
+        }
+        
+        module.exports = {
+          TIMELINE_LEVEL_RULES,
+          PACKET_EXPLANATION_MAP,
+          COMPACT_TITLE_EXACT_MAP,
+          COMPACT_TITLE_REPLACEMENTS,
+          classifyTimelineImportance,
+          docPacketExplanation,
+          timelineSubtitle,
+          shouldAppendSingleRunLabel,
+          compactOverviewTitle,
+        };
+        
+      },
+      "lib/epo_v2_overview_signals": function(module, exports, require) {
+        const { normalize } = require('./epo_v2_utils');
+        const { postureLossLabel, postureRecoveryLabel } = require('./epo_v2_posture_signals');
+        const { compactOverviewTitle } = require('./epo_v2_timeline_signals');
+        
+        function formatDaysHuman(days) {
+          const value = Math.abs(Number(days || 0));
+          const rounded = Number.isFinite(value) ? Math.round(value) : 0;
+          return `${rounded} day${rounded === 1 ? '' : 's'}`;
+        }
+        
+        function resolvedOverviewStatus(mainSourceStatus, statusSummary, posture) {
+          if (mainSourceStatus === 'notfound') return { simple: 'Not found', level: 'bad' };
+          if (mainSourceStatus === 'empty') return { simple: 'No main data', level: 'warn' };
+          return {
+            simple: posture?.currentLabel || statusSummary?.simple || 'Unknown',
+            level: posture?.currentLevel || statusSummary?.level || 'warn',
+          };
+        }
+        
+        function isMonitoringDeadline(deadline = {}) {
+          const label = normalize(deadline?.label || '').toLowerCase();
+          return /opposition period/.test(label) || /third-party monitor/.test(label);
+        }
+        
+        function isReviewDeadline(deadline = {}) {
+          if (!deadline || deadline.reference || deadline.anchorOnly) return false;
+          if (deadline.reviewOnly) return true;
+          if (!deadline.date || Number.isNaN(deadline.date?.getTime?.())) return true;
+          return String(deadline.confidence || '').toLowerCase() === 'low';
+        }
+        
+        function deadlinePresentationBuckets(deadlines = [], currentClosedPosture = false) {
+          const buckets = { active: [], monitoring: [], review: [], historical: [] };
+          for (const deadline of (deadlines || [])) {
+            if (deadline?.reference || deadline?.anchorOnly) continue;
+            if (currentClosedPosture) {
+              buckets.historical.push(deadline);
+              continue;
+            }
+            if (deadline?.resolved || deadline?.superseded) {
+              buckets.historical.push(deadline);
+              continue;
+            }
+            if (isMonitoringDeadline(deadline)) {
+              buckets.monitoring.push(deadline);
+              continue;
+            }
+            if (isReviewDeadline(deadline)) {
+              buckets.review.push(deadline);
+              continue;
+            }
+            buckets.active.push(deadline);
+          }
+          for (const key of Object.keys(buckets)) buckets[key].sort((a, b) => (a?.date?.getTime?.() || 0) - (b?.date?.getTime?.() || 0));
+          return buckets;
+        }
+        
+        function selectNextDeadline(deadlines = [], currentClosedPosture = false, now = new Date()) {
+          const actionable = deadlinePresentationBuckets(deadlines, currentClosedPosture).active;
+          if (!actionable.length) return null;
+          const upcoming = actionable.find((deadline) => deadline.date > now);
+          if (upcoming) return upcoming;
+          if (currentClosedPosture) return null;
+          return actionable[0] || null;
+        }
+        
+        function activeDeadlineNoteText(deadlines = [], currentClosedPosture = false, posture = null) {
+          const buckets = deadlinePresentationBuckets(deadlines, currentClosedPosture);
+          if (buckets.active.length && currentClosedPosture) {
+            return 'No active procedural deadline detected on the current withdrawn/closed posture; remaining clocks are historical, appellate, or low-confidence.';
+          }
+          if (buckets.active.length) return '';
+          if (buckets.monitoring.length) {
+            return 'No active applicant/EPO deadline detected; remaining clocks are third-party monitoring windows.';
+          }
+          if (buckets.review.length) {
+            return `No auto-remindable deadline detected; ${buckets.review.length} low-confidence or manual-review item${buckets.review.length === 1 ? '' : 's'} remain.`;
+          }
+          if (buckets.historical.some((deadline) => deadline.superseded) && currentClosedPosture) {
+            return 'No active procedural deadline detected; later loss-of-rights events superseded earlier response periods.';
+          }
+          if (buckets.historical.some((deadline) => deadline.resolved)) {
+            return posture?.recovered
+              ? 'No active procedural deadline detected; earlier response periods appear answered and the case later recovered from an adverse posture.'
+              : 'No active procedural deadline detected; earlier response periods appear already answered.';
+          }
+          return currentClosedPosture ? 'No active procedural deadline detected on the current withdrawn/closed posture.' : '';
+        }
+        
+        function capitalize(text = '') {
+          return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : '';
+        }
+        
+        function recoveryActionModel(posture = {}, waitingOn = '', waitingDays = null, latestApplicant = null) {
+          const loss = posture?.latestLoss || null;
+          const recovery = posture?.latestRecoveryDecision || posture?.latestRecovery || null;
+          const recoveryRequest = posture?.latestRecoveryRequest || null;
+          const grant = posture?.latestGrantDecision || null;
+          const lossText = loss ? capitalize(postureLossLabel(loss)) : 'Adverse posture';
+          const recoveryText = recovery
+            ? (compactOverviewTitle(recovery.title || recovery.detail || '') || capitalize(postureRecoveryLabel(recovery)))
+            : '';
+          const grantText = grant ? (compactOverviewTitle(grant.title || grant.detail || '') || 'Grant decision') : '';
+          const pendingApplicant = recoveryRequest || latestApplicant || null;
+          const applicantText = pendingApplicant
+            ? `${pendingApplicant.dateStr || '—'} · ${compactOverviewTitle(pendingApplicant.title || '')}`
+            : '';
+        
+          if (posture?.recovered && recovery) {
+            const summaryBits = [
+              loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
+              recovery?.dateStr ? `${recovery.dateStr} · ${recoveryText}` : recoveryText,
+              posture?.recoveredBeforeGrant && grant?.dateStr ? `${grant.dateStr} · ${grantText}` : '',
+            ].filter(Boolean);
+            return {
+              label: 'Recovery path',
+              badge: posture.recoveredBeforeGrant ? 'Recovered before grant' : 'Recovered',
+              level: 'ok',
+              summary: summaryBits.join(' → '),
+              note: posture.recoveredBeforeGrant
+                ? 'Earlier adverse posture was cured before the file returned to grant.'
+                : 'Earlier adverse posture was cured and the file later returned to the active track.',
+            };
+          }
+        
+          if (waitingOn === 'EPO recovery outcome') {
+            const summaryBits = [
+              loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
+              applicantText,
+            ].filter(Boolean);
+            return {
+              label: 'Recovery path',
+              badge: 'Recovery pending',
+              level: 'warn',
+              summary: summaryBits.join(' → '),
+              note: `${recoveryRequest ? 'Recovery has been requested' : 'Applicant appears to have responded'} after the adverse posture; monitor the EPO recovery outcome${waitingDays != null ? ` (${formatDaysHuman(waitingDays)} since applicant reply)` : ''}.`,
+            };
+          }
+        
+          if (posture?.currentClosed && loss) {
+            return {
+              label: 'Recovery path',
+              badge: 'Recovery options',
+              level: 'bad',
+              summary: loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
+              note: 'Adverse posture detected. Check further processing first; if unavailable, consider Rule 136 re-establishment.',
+            };
+          }
+        
+          return null;
+        }
+        
+        function certaintyLabel(baseLabel, confidence = '') {
+          const low = String(confidence || '').toLowerCase();
+          if (!low || low === 'high') return baseLabel;
+          return low === 'medium' ? `Likely ${baseLabel.toLowerCase()}` : `Estimated ${baseLabel.toLowerCase()}`;
+        }
+        
+        function overviewPresentationHints({ mainSourceStatus = '', posture = null, nextDeadline = null, renewal = null } = {}) {
+          const postureConfidence = String(mainSourceStatus || '').toLowerCase() === 'ok' && !posture?.partial ? 'high' : 'medium';
+          return {
+            postureLabel: certaintyLabel('Current posture', postureConfidence),
+            waitingLabel: certaintyLabel('Waiting on', nextDeadline?.confidence || postureConfidence),
+            nextDeadlineLabel: certaintyLabel('Next deadline', nextDeadline?.confidence || ''),
+            renewalLabel: certaintyLabel('Renewal status', renewal?.confidence || ''),
+            renewalNextFeeLabel: certaintyLabel('Next renewal fee', renewal?.confidence || ''),
+          };
+        }
+        
+        function buildActionableOverviewState({ mainSourceStatus = '', statusSummary = null, posture = null, deadlines = [], waitingOn = '', waitingDays = null, latestApplicant = null, renewal = null } = {}) {
+          const nextDeadline = selectNextDeadline(deadlines, !!posture?.currentClosed);
+          return {
+            status: resolvedOverviewStatus(mainSourceStatus, statusSummary, posture),
+            deadlineBuckets: deadlinePresentationBuckets(deadlines, !!posture?.currentClosed),
+            nextDeadline,
+            nextDeadlineNote: activeDeadlineNoteText(deadlines, !!posture?.currentClosed, posture),
+            recoveryAction: recoveryActionModel(posture, waitingOn, waitingDays, latestApplicant),
+            presentationHints: overviewPresentationHints({ mainSourceStatus, posture, nextDeadline, renewal }),
+          };
+        }
+        
+        module.exports = {
+          formatDaysHuman,
+          resolvedOverviewStatus,
+          isMonitoringDeadline,
+          deadlinePresentationBuckets,
+          selectNextDeadline,
+          activeDeadlineNoteText,
+          recoveryActionModel,
+          certaintyLabel,
+          overviewPresentationHints,
+          buildActionableOverviewState,
+        };
+        
+      },
+      "lib/epo_v2_upc_parser": function(module, exports, require) {
+        const { normalizeLower } = require('./epo_v2_utils');
+        
+        function normalizeUpcResultText(html = '') {
+          return normalizeLower(String(html || '').replace(/<[^>]+>/g, ' '));
+        }
+        
+        function parseUpcOptOutResult(html, patentNumber) {
+          const text = normalizeUpcResultText(html);
+          if (!text) return null;
+        
+          if (/no results found/.test(text)) {
+            return { patentNumber, optedOut: false, status: 'No opt-out found', source: 'UPC registry' };
+          }
+        
+          const patentRef = String(patentNumber || '').toLowerCase();
+          const hasPatentRef = patentRef && text.includes(patentRef);
+          if (!hasPatentRef) return null;
+        
+          const hasOptOutToken = /\bopt(?:ed)?[\s-]*out\b/.test(text);
+          const positiveSignal =
+            /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+(?:register(?:ed)?|enter(?:ed)?|effective)\b/.test(text)
+            || /\b(?:register(?:ed)?|enter(?:ed)?|effective)(?:\s+\w+){0,8}\s+opt(?:ed)?[\s-]*out\b/.test(text)
+            || /\bcase\s+type\s+opt(?:ed)?[\s-]*out\s+application\b/.test(text)
+            || /\bopt(?:ed)?[\s-]*out\s+application\b/.test(text);
+          const withdrawnSignal = /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+(?:withdrawn|removed|revoked)\b/.test(text);
+          const negativeSignal =
+            /\bnot\s+opt(?:ed)?[\s-]*out\b/.test(text)
+            || /\bno\s+opt(?:ed)?[\s-]*out\b/.test(text)
+            || /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+not\s+(?:been\s+)?(?:register(?:ed)?|enter(?:ed)?|effective)\b/.test(text);
+        
+          if (withdrawnSignal) {
+            return { patentNumber, optedOut: false, status: 'Opt-out withdrawn', source: 'UPC registry' };
+          }
+        
+          if (hasOptOutToken && positiveSignal && !negativeSignal) {
+            return { patentNumber, optedOut: true, status: 'Opted out', source: 'UPC registry' };
+          }
+        
+          return null;
+        }
+        
+        module.exports = {
+          normalizeUpcResultText,
+          parseUpcOptOutResult,
+        };
+        
+      }
+    };
+    const __cache = Object.create(null);
+    function __resolve(fromId, request) {
+      if (!request.startsWith('.')) return request.replace(/\.js$/, '');
+      const fromDir = fromId ? pathPosixDirname(fromId) : '';
+      const joined = pathPosixNormalize(`${fromDir}/${request}`);
+      return joined.replace(/\.js$/, '');
     }
-  },
-  "byDescription": {
-    "amendments": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ABEX",
-      "sourceDescription": "Amendments",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "examination",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "application deemed to be withdrawn": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ADWI",
-      "sourceDescription": "Application deemed to be withdrawn",
-      "internalKey": "LOSS_OF_RIGHTS_R112",
-      "procedureFamily": "ALL_EP",
-      "phase": "loss_of_rights",
-      "classification": "consequence",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Link to underlying missed act using STEP_DESCRIPTION_NAME",
-      "parserNote": "Reason strings include missed examination reply, EESR reply, prior-art info, fees, etc."
-    },
-    "communication of observations of proprietor": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "DOBS",
-      "sourceDescription": "Communication of observations of proprietor",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "opposition",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "time-limit in record",
-      "parserNote": ""
-    },
-    "invitation to indicate the basis for amendments": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "EXRE",
-      "sourceDescription": "Invitation to indicate the basis for amendments",
-      "internalKey": "AMENDMENT_BASIS_INVITATION",
-      "procedureFamily": "ALL_EP",
-      "phase": "examination",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
-      "parserNote": "Good structured marker for Rule 137(4)-type issue."
-    },
-    "payment of national basic fee": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "FFEE",
-      "sourceDescription": "Payment of national basic fee",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "entry-regional-phase",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "interlocutory decision in opposition": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "IDOP",
-      "sourceDescription": "Interlocutory decision in opposition",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "opposition",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "decision",
-      "parserNote": ""
-    },
-    "intention to grant the patent": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "IGRA",
-      "sourceDescription": "Intention to grant the patent",
-      "internalKey": "GRANT_R71_3",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create 4-month candidate from DATE_OF_DISPATCH; prefer actual document despatch/date",
-      "parserNote": "Also stores grant fee / print fee / translation dates."
-    },
-    "disapproval of the communication of intention to grant the patent": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "IGRE",
-      "sourceDescription": "Disapproval of the communication of intention to grant the patent",
-      "internalKey": "GRANT_R71_6_DISAPPROVAL",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "incoming-response",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use as applicant action affecting grant branch",
-      "parserNote": "May lead to fresh Rule 71(3) or resumed examination."
-    },
-    "international searching authority": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ISAT",
-      "sourceDescription": "International searching authority",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "entry-regional-phase",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "communication from the examining division in a limitation procedure": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "LIRE",
-      "sourceDescription": "Communication from the examining division in a limitation procedure",
-      "internalKey": "LIMITATION_COMMUNICATION",
-      "procedureFamily": "LIMITATION_REVOCATION",
-      "phase": "limitation",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
-      "parserNote": "Limitation-specific communication family."
-    },
-    "oral proceedings": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ORAL",
-      "sourceDescription": "Oral proceedings",
-      "internalKey": "ORAL_PROCEEDINGS_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "examination/opposition/appeal",
-      "classification": "hearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Store OP date(s); parse annex separately for Rule 116 final date",
-      "parserNote": "The event itself is not enough for final-date logic."
-    },
-    "communication from the opposition division": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "OREX",
-      "sourceDescription": "Communication from the opposition division",
-      "internalKey": "OPPOSITION_DIVISION_COMMUNICATION",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create deadline from DATE_OF_DISPATCH + time-limit in record",
-      "parserNote": "Strong structured marker for opposition communications."
-    },
-    "invitation to provide information on prior art": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PART",
-      "sourceDescription": "Invitation to provide information on prior art",
-      "internalKey": "PRIOR_ART_INFORMATION_INVITATION",
-      "procedureFamily": "ALL_EP",
-      "phase": "examination",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create deadline from DATE_OF_DISPATCH + available time-limit/manual review",
-      "parserNote": "Often relevant to later ADWI / RFPR routing."
-    },
-    "penalty fee / additional fee": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PFEE",
-      "sourceDescription": "Penalty fee / additional fee",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "examination",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "time-limit in record",
-      "parserNote": ""
-    },
-    "preparation for maintenance of the patent in an amended form": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PMAP",
-      "sourceDescription": "Preparation for maintenance of the patent in an amended form",
-      "internalKey": "OPPOSITION_R82_BRANCH",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_endgame",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use DATE_OF_DISPATCH as Rule 82 branch anchor and track payment",
-      "parserNote": "Maps well to Rule 82(1)/(2) maintenance logic."
-    },
-    "preliminary examination - pct ii": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PREX",
-      "sourceDescription": "Preliminary examination - PCT II",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "international-examination",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "language of the procedure": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "PROL",
-      "sourceDescription": "Language of the procedure",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "all",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "request for accelerated examination": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "RAEX",
-      "sourceDescription": "Request for accelerated examination",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "examination",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "rejection of the request for revocation of the patent": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "REJR",
-      "sourceDescription": "Rejection of the request for revocation of the patent",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "revocation",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "decision",
-      "parserNote": ""
-    },
-    "renewal fee payment": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "RFEE",
-      "sourceDescription": "Renewal fee payment",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "all",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "none",
-      "parserNote": ""
-    },
-    "request for further processing": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "RFPR",
-      "sourceDescription": "Request for further processing",
-      "internalKey": "FURTHER_PROCESSING_REQUEST",
-      "procedureFamily": "ALL_EP",
-      "phase": "remedial",
-      "classification": "remedial",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Attach to missed act using STEP_DESCRIPTION_NAME and record result",
-      "parserNote": "Central remedial branch for many missed deadlines."
-    },
-    "fee for a supplementary search": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "SFEE",
-      "sourceDescription": "Fee for a supplementary search",
-      "internalKey": "SUPPLEMENTARY_SEARCH_FEE_PAYMENT",
-      "procedureFamily": "EURO_PCT",
-      "phase": "regional_phase_entry",
-      "classification": "payment",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use as Euro-PCT entry/compliance signal, not communication deadline",
-      "parserNote": "One of the regional-phase acts."
-    },
-    "translation of the application": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "TRAN",
-      "sourceDescription": "Translation of the application",
-      "internalKey": "EURO_PCT_TRANSLATION_RECEIVED",
-      "procedureFamily": "EURO_PCT",
-      "phase": "regional_phase_entry",
-      "classification": "filing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use as Euro-PCT entry/compliance signal",
-      "parserNote": "One of the regional-phase acts."
-    },
-    "first communication from the examining division": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "DDIV",
-      "sourceDescription": "First communication from the examining division",
-      "internalKey": "FIRST_EXAM_COMM_DIVISIONAL_MARKER",
-      "procedureFamily": "ALL_EP",
-      "phase": "examination",
-      "classification": "marker",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Use for divisional-window logic and examination chronology",
-      "parserNote": "Not necessarily the full text of the communication."
-    },
-    "withdrawal during international phase - procedure closed": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "WINT",
-      "sourceDescription": "Withdrawal during international phase - procedure closed",
-      "internalKey": "",
-      "procedureFamily": "",
-      "phase": "entry-regional-phase",
-      "classification": "",
-      "preferredSurface": "st36/all_documents",
-      "codexAction": "procedure closed",
-      "parserNote": ""
-    },
-    "despatch of invitation to pay additional claims fees": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "ACOR",
-      "sourceDescription": "Despatch of invitation to pay additional claims fees",
-      "internalKey": "ADDITIONAL_CLAIMS_FEE_INVITATION_AFTER_ALLOWED_AMENDMENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "deadline-bearing",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Create fee deadline from DATE_OF_DISPATCH + time-limit in record",
-      "parserNote": "Grant-stage edge case after allowed amendment/correction."
-    },
-    "request for correction of the decision to grant filed": {
-      "codeNamespace": "procedural_step",
-      "sourceCode": "CDEC",
-      "sourceDescription": "Request for correction of the decision to grant filed",
-      "internalKey": "CORRECTION_REQUEST_AFTER_GRANT_DECISION",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "incoming-request",
-      "preferredSurface": "all_documents/ST36 procedural-data",
-      "codexAction": "Store as branch affecting post-grant decision correction",
-      "parserNote": "Do not confuse with Rule 71(3) amendment branch."
-    },
-    "publication in section i.1 ep bulletin": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009012",
-      "sourceDescription": "Publication in section I.1 EP Bulletin",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change or deletion - publication of a document": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199EPPU",
-      "sourceDescription": "Change or deletion - publication of A document",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change - publication of search report": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0008199SEPU",
-      "sourceDescription": "Change - publication of search report",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "publication of search report": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009013",
-      "sourceDescription": "Publication of search report",
-      "internalKey": "SEARCH_REPORT_PUBLICATION",
-      "procedureFamily": "EP_DIRECT",
-      "phase": "search",
-      "classification": "informational",
-      "preferredSurface": "event_history/all_documents",
-      "codexAction": "No standalone deadline; pair with Rule 70/70a path",
-      "parserNote": "Use publication event as anchor for search-stage awareness, not reply deadline."
-    },
-    "publication of international search report": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009015",
-      "sourceDescription": "Publication of international search report",
-      "internalKey": "ISR_PUBLICATION",
-      "procedureFamily": "EURO_PCT",
-      "phase": "pre-regional-phase",
-      "classification": "informational",
-      "preferredSurface": "event_history/all_documents",
-      "codexAction": "No EP reply deadline from this event alone",
-      "parserNote": "Useful for PCT chronology only."
-    },
-    "supplementary search report": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009016",
-      "sourceDescription": "Supplementary search report",
-      "internalKey": "SUPPLEMENTARY_SEARCH_REPORT_PUBLICATION",
-      "procedureFamily": "EURO_PCT",
-      "phase": "search",
-      "classification": "informational",
-      "preferredSurface": "event_history/all_documents",
-      "codexAction": "No standalone deadline; pair with downstream communication",
-      "parserNote": "Useful for Euro-PCT search chronology."
-    },
-    "change or deletion - publication of search report": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199SEPU",
-      "sourceDescription": "Change or deletion - publication of search report",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "(expected) grant": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009210",
-      "sourceDescription": "(Expected) grant",
-      "internalKey": "EXPECTED_GRANT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "expected B1 publication"
-    },
-    "change or deletion - publication of b1 document": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299EPPU",
-      "sourceDescription": "Change or deletion - publication of B1 document",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "patent maintained (b2 publication)": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009272",
-      "sourceDescription": "Patent maintained (B2 publication)",
-      "internalKey": "OPPOSITION_B2_PUBLICATION",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_endgame",
-      "classification": "publication",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Close Rule 82 branch once publication confirmed",
-      "parserNote": "Publication, not the underlying communication itself."
-    },
-    "change - publication of b2 document": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299PMAP",
-      "sourceDescription": "Change - publication of B2 document",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change or deletion - publication of b2 document": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009399EPPU",
-      "sourceDescription": "Change or deletion - publication of B2 document",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "(expected) limited patent specification": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009410",
-      "sourceDescription": "(Expected) limited patent specification",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change or deletion - publication of limited patent specification": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009499EPPU",
-      "sourceDescription": "Change or deletion - publication of limited patent specification",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change - withdrawal": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299WDRA",
-      "sourceDescription": "Change - withdrawal",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "withdrawal of application": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009182",
-      "sourceDescription": "Withdrawal of application",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change or deletion - application deemed withdrawn": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299ADWI",
-      "sourceDescription": "Change or deletion - application deemed withdrawn",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change - refusal": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299REFU",
-      "sourceDescription": "Change - refusal",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "refusal of application": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009181",
-      "sourceDescription": "Refusal of application",
-      "internalKey": "REFUSAL_DECISION_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "decision",
-      "classification": "decision",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Route to appeal branch",
-      "parserNote": "Do not treat as ordinary office action."
-    },
-    "new entry: communication of intention to grant a patent": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSNIGR1",
-      "sourceDescription": "New entry: Communication of intention to grant a patent",
-      "internalKey": "GRANT_R71_3_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "deadline-bearing",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Create 4-month candidate, but confirm exact despatch/date from document",
-      "parserNote": "Use all_documents for legal date and supersession logic."
-    },
-    "change: communication of intention to grant a patent": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSCIGR1",
-      "sourceDescription": "Change: Communication of intention to grant a patent",
-      "internalKey": "GRANT_R71_3_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "deadline-bearing",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Refresh 4-month candidate, but confirm exact despatch/date from document",
-      "parserNote": "Treat as update to Rule 71(3) state."
-    },
-    "deletion: communication of intention to grant a patent": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSDIGR1",
-      "sourceDescription": "Deletion: Communication of intention to grant a patent",
-      "internalKey": "GRANT_R71_3_EVENT",
-      "procedureFamily": "ALL_EP",
-      "phase": "grant",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "deleted Rule 71(3) event"
-    },
-    "no opposition filed within time limit": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009261",
-      "sourceDescription": "No opposition filed within time limit",
-      "internalKey": "NO_OPPOSITION_FILED",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_end",
-      "classification": "status",
-      "preferredSurface": "event_history/about_this_file",
-      "codexAction": "Close opposition watch for the patent",
-      "parserNote": "Post-grant status update."
-    },
-    "change - no opposition filed": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299DELT",
-      "sourceDescription": "Change - no opposition filed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change - opposition filed": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0008299OPPO",
-      "sourceDescription": "Change - opposition filed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "opposition filed": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009260",
-      "sourceDescription": "Opposition filed",
-      "internalKey": "OPPOSITION_FILED",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition",
-      "classification": "status",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Create opposition case state; next real deadline usually from Rule 79/OREX/DOBS",
-      "parserNote": "Not itself the proprietor reply communication."
-    },
-    "opposition withdrawn": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009264",
-      "sourceDescription": "Opposition withdrawn",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "opposition deemed not to have been filed": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299OPPB",
-      "sourceDescription": "Opposition deemed not to have been filed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change - opposition data/opponent's data or that of the opponent's representative": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299OPPO",
-      "sourceDescription": "Change - opposition data/opponent's data or that of the opponent's representative",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "opposition rejected": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009273",
-      "sourceDescription": "Opposition rejected",
-      "internalKey": "OPPOSITION_REJECTED",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_decision",
-      "classification": "decision",
-      "preferredSurface": "event_history/about_this_file/all_documents",
-      "codexAction": "Route to appeal branch",
-      "parserNote": "Decision event."
-    },
-    "change - rejection of opposition": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299REJO",
-      "sourceDescription": "Change - rejection of opposition",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "opposition inadmissible": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299OPPA",
-      "sourceDescription": "Opposition inadmissible",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "revocation of patent": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009271",
-      "sourceDescription": "Revocation of patent",
-      "internalKey": "OPPOSITION_REVOCATION",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_decision",
-      "classification": "decision",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "revocation in opposition"
-    },
-    "change - revocation of patent": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299REVO",
-      "sourceDescription": "Change - revocation of patent",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "patent revoked on request of proprietor": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009220",
-      "sourceDescription": "Patent revoked on request of proprietor",
-      "internalKey": "PROPRIETOR_REVOCATION",
-      "procedureFamily": "LIMITATION_REVOCATION",
-      "phase": "revocation_request",
-      "classification": "decision",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "proprietor revocation"
-    },
-    "opposition procedure terminated - date of legal effect published": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009276",
-      "sourceDescription": "Opposition procedure terminated - date of legal effect published",
-      "internalKey": "OPPOSITION_TERMINATED",
-      "procedureFamily": "POST_GRANT_OPPOSITION",
-      "phase": "opposition_closed",
-      "classification": "status",
-      "preferredSurface": "event_history/about_this_file",
-      "codexAction": "Close opposition case state",
-      "parserNote": "Termination marker."
-    },
-    "change - opposition procedure terminated": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299OPPC",
-      "sourceDescription": "Change - opposition procedure terminated",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "new entry: renewal fee paid": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSNRFE2",
-      "sourceDescription": "New entry: Renewal fee paid",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change: renewal fee paid": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSCRFE2",
-      "sourceDescription": "Change: Renewal fee paid",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "deletion: renewal fee paid": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "EPIDOSDRFE2",
-      "sourceDescription": "Deletion: Renewal fee paid",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "lapse of the patent in a contracting state": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009250",
-      "sourceDescription": "Lapse of the patent in a contracting state",
-      "internalKey": "NATIONAL_LAPSE",
-      "procedureFamily": "POST_GRANT_NATIONAL",
-      "phase": "post_grant_national",
-      "classification": "status",
-      "preferredSurface": "event_history/about_this_file/federated register",
-      "codexAction": "Update national status only",
-      "parserNote": "National post-grant layer, not central EP procedure."
-    },
-    "change - lapse in a contracting state": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009299LAPS",
-      "sourceDescription": "Change - lapse in a contracting state",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change - licence": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009199LREG",
-      "sourceDescription": "Change - licence",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "licence": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009341",
-      "sourceDescription": "Licence",
-      "internalKey": "LICENCE_EVENT",
-      "procedureFamily": "POST_GRANT_NATIONAL",
-      "phase": "post_grant_national",
-      "classification": "status",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "licence data"
-    },
-    "request for unitary effect withdrawn": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009702UREQ10",
-      "sourceDescription": "Request for unitary effect withdrawn",
-      "internalKey": "UP_REQUEST_WITHDRAWN",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_request",
-      "classification": "status",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "request for unitary effect withdrawn"
-    },
-    "change or deletion – date of withdrawal of request for unitary effect": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UREQ10",
-      "sourceDescription": "Change or deletion – Date of withdrawal of request for unitary effect",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "decision on the request for unitary effect": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009701UREQ02",
-      "sourceDescription": "Decision on the request for unitary effect",
-      "internalKey": "UP_REQUEST_DECISION",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_request",
-      "classification": "decision",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "decision on unitary effect request"
-    },
-    "change or deletion – date of decision on the request for unitary effect": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UREQ02",
-      "sourceDescription": "Change or deletion – Date of decision on the request for unitary effect",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "filing of request for unitary effect": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009700UREQ01",
-      "sourceDescription": "Filing of request for unitary effect",
-      "internalKey": "UP_REQUEST_FILED",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_request",
-      "classification": "status",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "unitary effect request filed"
-    },
-    "change: date of filing of request for unitary request": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UREQ01",
-      "sourceDescription": "Change: Date of filing of request for unitary request",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "unitary effect lapsed": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009705LAPS22",
-      "sourceDescription": "Unitary effect lapsed",
-      "internalKey": "UP_LAPSE",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_post_registration",
-      "classification": "consequence",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "unitary effect lapsed"
-    },
-    "change or deletion: unitary effect lapse date": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799LAPS22",
-      "sourceDescription": "Change or deletion: unitary effect lapse date",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "request for re-establishment of rights filed": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009706REES22",
-      "sourceDescription": "Request for re-establishment of rights filed",
-      "internalKey": "UP_REESTABLISHMENT_REQUEST",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_post_registration",
-      "classification": "remedial branch",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "re-establishment request filed"
-    },
-    "change or deletion: date of request for re-establishment of rights": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799REES22",
-      "sourceDescription": "Change or deletion: Date of request for re-establishment of rights",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "renewal fees not paid: unitary patent protection lapsed": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009704UDLA02",
-      "sourceDescription": "Renewal fees not paid: Unitary Patent Protection lapsed",
-      "internalKey": "UP_LAPSE_RENEWAL",
-      "procedureFamily": "UNITARY_PATENT",
-      "phase": "up_post_registration",
-      "classification": "consequence",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "branch to consequence/decision logic",
-      "parserNote": "UP lapse for unpaid renewal fee"
-    },
-    "change: renewal fees not paid: unitary patent protection lapsed": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UDLA02",
-      "sourceDescription": "Change: Renewal fees not paid: Unitary Patent Protection lapsed",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
-    },
-    "change or deletion – date of registration of unitary patent protection": {
-      "codeNamespace": "register_main_event",
-      "sourceCode": "0009799UREG01",
-      "sourceDescription": "Change or deletion – Date of registration of Unitary Patent Protection",
-      "internalKey": "UNMAPPED_MAIN_EVENT",
-      "procedureFamily": "UNKNOWN",
-      "phase": "unknown",
-      "classification": "informational",
-      "preferredSurface": "event_history + about_this_file + all_documents",
-      "codexAction": "monitor",
-      "parserNote": "map in your own taxonomy"
+    function pathPosixDirname(value) {
+      const normalized = String(value || '').replace(/\/+/g, '/');
+      const idx = normalized.lastIndexOf('/');
+      return idx >= 0 ? normalized.slice(0, idx) : '';
     }
+    function pathPosixNormalize(value) {
+      const input = String(value || '').replace(/\/+/g, '/');
+      const out = [];
+      for (const part of input.split('/')) {
+        if (!part || part === '.') continue;
+        if (part === '..') { out.pop(); continue; }
+        out.push(part);
+      }
+      return out.join('/');
+    }
+    function __require(request, fromId = "") {
+      const target = __resolve(fromId, request);
+      if (__cache[target]) return __cache[target].exports;
+      const factory = __factories[target];
+      if (!factory) throw new Error(`Unknown bundled module: ${request} from ${fromId}`);
+      const module = { exports: {} };
+      __cache[target] = module;
+      factory(module, module.exports, (child) => __require(child, target));
+      return module.exports;
+    }
+    return {
+      codex: __require("lib/epo_codex_data"),
+      utils: __require("lib/epo_v2_utils"),
+      docSignals: __require("lib/epo_v2_doc_signals"),
+      packet: __require("lib/epo_v2_packet_signals"),
+      status: __require("lib/epo_v2_status_signals"),
+      doclist: __require("lib/epo_v2_doclist_parser"),
+      docClass: __require("lib/epo_v2_document_classification"),
+      refs: __require("lib/epo_v2_reference_parsers"),
+      terr: __require("lib/epo_v2_territorial_parser"),
+      terrSignals: __require("lib/epo_v2_territorial_signals"),
+      main: __require("lib/epo_v2_main_parser"),
+      procedural: __require("lib/epo_v2_procedural_parser"),
+      posture: __require("lib/epo_v2_posture_signals"),
+      deadlines: __require("lib/epo_v2_deadline_signals"),
+      pdf: __require("lib/epo_v2_pdf_parser"),
+      timeline: __require("lib/epo_v2_timeline_signals"),
+      overview: __require("lib/epo_v2_overview_signals"),
+      upc: __require("lib/epo_v2_upc_parser"),
+    };
+  })();
+
+  const EPO_CODEX_DATA = __EPRP_MODULES.codex.EPO_CODEX_DATA;
+  const NORMALIZED_DOC_SIGNAL_RULES = __EPRP_MODULES.docSignals.NORMALIZED_DOC_SIGNAL_RULES;
+  const PACKET_SIGNAL_PRECEDENCE = __EPRP_MODULES.packet.PACKET_SIGNAL_PRECEDENCE;
+  const STANDALONE_PACKET_BUNDLES = __EPRP_MODULES.packet.STANDALONE_PACKET_BUNDLES;
+  const STATUS_STAGE_RULES = __EPRP_MODULES.status.STATUS_STAGE_RULES;
+  const STATUS_SUMMARY_RULES = __EPRP_MODULES.status.STATUS_SUMMARY_RULES;
+  const POSTURE_LOSS_LABEL_RULES = __EPRP_MODULES.posture.POSTURE_LOSS_LABEL_RULES;
+  const POSTURE_RECOVERY_LABEL_RULES = __EPRP_MODULES.posture.POSTURE_RECOVERY_LABEL_RULES;
+  const TIMELINE_LEVEL_RULES = __EPRP_MODULES.timeline.TIMELINE_LEVEL_RULES;
+  const PACKET_EXPLANATION_MAP = __EPRP_MODULES.timeline.PACKET_EXPLANATION_MAP;
+  const COMPACT_TITLE_EXACT_MAP = __EPRP_MODULES.timeline.COMPACT_TITLE_EXACT_MAP;
+  const COMPACT_TITLE_REPLACEMENTS = __EPRP_MODULES.timeline.COMPACT_TITLE_REPLACEMENTS;
+
+  function parseApplicationType(...args) { return __EPRP_MODULES.docClass.parseApplicationType(...args); }
+  function classifyDocument(...args) { return __EPRP_MODULES.docClass.classifyDocument(...args); }
+  function refineDocumentClassification(...args) { return __EPRP_MODULES.docClass.refineDocumentClassification(...args); }
+  function bodyText(...args) { return __EPRP_MODULES.terr.bodyText(...args); }
+  function fieldByLabel(...args) { return __EPRP_MODULES.terr.fieldByLabel(...args); }
+  function rowLabelValuePairs(...args) { return __EPRP_MODULES.terr.rowLabelValuePairs(...args); }
+  function bestTable(...args) { return __EPRP_MODULES.doclist.bestTable(...args); }
+  function doclistTable(...args) { return __EPRP_MODULES.doclist.doclistTable(...args); }
+  function tableColumnMap(...args) { return __EPRP_MODULES.doclist.tableColumnMap(...args); }
+  function doclistEntryFromRow(...args) { return __EPRP_MODULES.doclist.doclistEntryFromRow(...args); }
+  function parseApplicationField(...args) { return __EPRP_MODULES.main.parseApplicationField(...args); }
+  function parseMainPublications(...args) { return __EPRP_MODULES.main.parseMainPublications(...args); }
+  function extractEpNumbersByHeader(...args) { return __EPRP_MODULES.main.extractEpNumbersByHeader(...args); }
+  function parsePriority(...args) { return __EPRP_MODULES.main.parsePriority(...args); }
+  function parseRecentEvents(...args) { return __EPRP_MODULES.main.parseRecentEvents(...args); }
+  function cleanTitle(...args) { return __EPRP_MODULES.main.cleanTitle(...args); }
+  function pickApplicantLine(...args) { return __EPRP_MODULES.main.pickApplicantLine(...args); }
+  function extractTitle(...args) { return __EPRP_MODULES.main.extractTitle(...args); }
+  function normalizePublicationNumber(...args) { return __EPRP_MODULES.refs.normalizePublicationNumber(...args); }
+  function splitPublicationNumber(...args) { return __EPRP_MODULES.refs.splitPublicationNumber(...args); }
+  function parsePublications(...args) { return __EPRP_MODULES.refs.parsePublications(...args); }
+  function normalizeCodexDescription(...args) { return __EPRP_MODULES.procedural.normalizeCodexDescription(...args); }
+  function normalizeStructuredLabel(...args) { return __EPRP_MODULES.procedural.normalizeStructuredLabel(...args); }
+  function normalizeStructuredDate(...args) { return __EPRP_MODULES.procedural.normalizeStructuredDate(...args); }
+  function parseStructuredTimeLimit(...args) { return __EPRP_MODULES.procedural.parseStructuredTimeLimit(...args); }
+  function legalCodeRecord(...args) { return __EPRP_MODULES.procedural.legalCodeRecord(...args); }
+  function codexDescriptionRecord(...args) { return __EPRP_MODULES.procedural.codexDescriptionRecord(...args); }
+  function normalizeCodexSignal(...args) { return __EPRP_MODULES.procedural.normalizeCodexSignal(...args); }
+  function parseDatedRowsFromDocument(...args) { return __EPRP_MODULES.procedural.parseDatedRowsFromDocument(...args); }
+  function extractLegalEventBlocks(doc, url = "") { return __EPRP_MODULES.procedural.extractLegalEventBlocksFromDocument(doc, url); }
+  function summarizeStatus(...args) { return __EPRP_MODULES.status.summarizeStatusText(...args); }
+  function inferStatusStage(...args) { return __EPRP_MODULES.status.inferStatusStageFromText(...args); }
+  function normalizedDocSignal(title = "", procedure = "") { return __EPRP_MODULES.docSignals.classifyDocSignal({ title, procedure }); }
+  function packetSignalBundle(...args) { return __EPRP_MODULES.packet.packetSignalBundle(...args); }
+  function standalonePacketBundle(...args) { return __EPRP_MODULES.packet.standalonePacketBundle(...args); }
+  function normalizedPacketSignal(...args) { return __EPRP_MODULES.packet.classifyPacketSignal(...args); }
+  function postureLossLabel(...args) { return __EPRP_MODULES.posture.postureLossLabel(...args); }
+  function postureRecoveryLabel(...args) { return __EPRP_MODULES.posture.postureRecoveryLabel(...args); }
+  function postureRecord(...args) { return __EPRP_MODULES.posture.postureRecord(...args); }
+  function postureRecordByCodex(...args) { return __EPRP_MODULES.posture.postureRecordByCodex(...args); }
+  function postureRecordDate(...args) { return __EPRP_MODULES.posture.postureRecordDate(...args); }
+  function proceduralPostureModel(main, docs, eventHistory = {}, legal = {}) { return __EPRP_MODULES.posture.deriveProceduralPostureFromSources({ statusRaw: main?.statusRaw || "", docs, eventHistory, legal }); }
+  function addCalendarMonthsDetailed(...args) { return __EPRP_MODULES.deadlines.addCalendarMonthsDetailed(...args); }
+  function buildDeadlineRecords(docs, eventHistory = {}, legal = {}) { return __EPRP_MODULES.posture.buildProceduralRecords(docs, eventHistory, legal); }
+  function inferProceduralDeadlines(main, docs, eventHistory = {}, legal = {}, pdfData = {}) { return __EPRP_MODULES.deadlines.inferProceduralDeadlinesFromSources({ main, docs, eventHistory, legal, pdfData }); }
+  function normalizeDateString(...args) { return __EPRP_MODULES.pdf.normalizeDateString(...args); }
+  function parsePdfDeadlineHints(...args) { return __EPRP_MODULES.pdf.parsePdfDeadlineHints(...args); }
+  function parseUpcOptOutResult(...args) { return __EPRP_MODULES.upc.parseUpcOptOutResult(...args); }
+  function timelineAttorneyImportance(...args) { return __EPRP_MODULES.timeline.classifyTimelineImportance(...args); }
+  function docPacketExplanation(...args) { return __EPRP_MODULES.timeline.docPacketExplanation(...args); }
+  function timelineSubtitleText(...args) { return __EPRP_MODULES.timeline.timelineSubtitle(...args); }
+  function shouldAppendSingleRunLabel(...args) { return __EPRP_MODULES.timeline.shouldAppendSingleRunLabel(...args); }
+  function compactOverviewTitle(...args) { return __EPRP_MODULES.timeline.compactOverviewTitle(...args); }
+  function resolvedOverviewStatus(...args) { return __EPRP_MODULES.overview.resolvedOverviewStatus(...args); }
+  function deadlinePresentationBuckets(...args) { return __EPRP_MODULES.overview.deadlinePresentationBuckets(...args); }
+  function selectNextDeadline(...args) { return __EPRP_MODULES.overview.selectNextDeadline(...args); }
+  function activeDeadlineNoteText(...args) { return __EPRP_MODULES.overview.activeDeadlineNoteText(...args); }
+  function recoveryActionModel(...args) { return __EPRP_MODULES.overview.recoveryActionModel(...args); }
+
+  function parseMain(doc, caseNo = "") {
+    const main = __EPRP_MODULES.main.parseMainRawFromDocument(doc, caseNo);
+    const statusSummary = __EPRP_MODULES.status.summarizeStatusText(main.statusRaw || "");
+    return {
+      ...main,
+      statusSimple: statusSummary.simple,
+      statusLevel: statusSummary.level,
+      statusStage: __EPRP_MODULES.status.inferStatusStageFromText(main.statusRaw || ""),
+      applicationType: __EPRP_MODULES.docClass.parseApplicationType(main),
+    };
   }
-});
+
+  function parseDoclist(doc) {
+    const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();
+    const fallbackUrl = sourceUrl(fallbackCaseNo, "doclist");
+    const parsed = __EPRP_MODULES.doclist.parseDoclistFromDocument(doc, { fallbackUrl });
+    const docs = (Array.isArray(parsed.docs) ? parsed.docs : []).map((entry) => ({
+      ...entry,
+      ...__EPRP_MODULES.docClass.refineDocumentClassification(entry.title, entry.procedure, __EPRP_MODULES.docClass.classifyDocument(entry.title, entry.procedure)),
+    })).sort(__EPRP_MODULES.utils.compareDateDesc);
+    return { docs, parseStats: parsed.parseStats || null };
+  }
+
+  function parseFamily(doc) { return __EPRP_MODULES.refs.parseFamilyFromDocument(doc); }
+  function parseLegal(doc, caseNo) { return __EPRP_MODULES.procedural.parseLegalFromDocument(doc, sourceUrl(caseNo, "legal")); }
+  function parseEventHistory(doc, caseNo) { return __EPRP_MODULES.procedural.parseEventHistoryFromDocument(doc, sourceUrl(caseNo, "event")); }
+  function parseFederated(doc, caseNo = "") { return __EPRP_MODULES.terr.parseFederatedFromDocument(doc, caseNo); }
+  function parseCitations(doc) { return __EPRP_MODULES.refs.parseCitationsFromDocument(doc); }
+  function parseUe(doc) { return __EPRP_MODULES.terr.parseUeFromDocument(doc); }
+
+
+
 
   const SOURCES = [
     { key: 'main', slug: 'main', title: 'EP About this file' },
@@ -2451,9 +6767,7 @@
     return out;
   }
 
-  function bodyText(doc) {
-    return normalize(doc?.body?.innerText || doc?.body?.textContent || '');
-  }
+  
 
   function parseHtml(html) {
     return new DOMParser().parseFromString(html || '', 'text/html');
@@ -3265,51 +7579,9 @@
     return dedupe(sectionRowsByHeader(doc, headerRegex).map((rows) => rows.map((r) => text(r)).join('\n').trim()).filter(Boolean), (x) => x);
   }
 
-  function rowLabelValuePairs(row) {
-    const pairs = {};
-    let currentKey = '';
-    for (const cell of row.querySelectorAll('th,td')) {
-      const raw = normalize(text(cell));
-      const tag = String(cell.tagName || '').toUpperCase();
-      const cls = String(cell.className || '').toLowerCase();
-      const isLabel = tag === 'TH' || /\bth\b/.test(cls) || cls.includes('header');
-      if (isLabel) {
-        currentKey = raw.replace(/:\s*$/, '').trim();
-        if (currentKey && !(currentKey in pairs)) pairs[currentKey] = '';
-        continue;
-      }
-      if (!currentKey) continue;
-      if (raw) pairs[currentKey] = pairs[currentKey] ? `${pairs[currentKey]} ${raw}`.trim() : raw;
-      currentKey = '';
-    }
-    return pairs;
-  }
+  
 
-  function fieldByLabel(doc, regexes) {
-    for (const row of doc.querySelectorAll('tr')) {
-      const cells = [...row.querySelectorAll('th,td')].map(text);
-      if (cells.length < 2) continue;
-      for (let i = 0; i < cells.length - 1; i++) {
-        if (!regexes.some((re) => re.test(cells[i] || ''))) continue;
-        const value = cells.slice(i + 1).filter(Boolean).join('\n').trim();
-        if (value) return value;
-      }
-    }
-    for (const dl of doc.querySelectorAll('dl')) {
-      const children = [...dl.children];
-      for (let i = 0; i < children.length; i++) {
-        if (children[i]?.tagName !== 'DT') continue;
-        if (!regexes.some((re) => re.test(text(children[i])))) continue;
-        const values = [];
-        for (let j = i + 1; j < children.length && children[j]?.tagName !== 'DT'; j++) {
-          if (children[j]?.tagName === 'DD') values.push(text(children[j]));
-        }
-        const value = values.filter(Boolean).join('\n').trim();
-        if (value) return value;
-      }
-    }
-    return '';
-  }
+  
 
   function fieldTailByLabel(doc, regexes) {
     for (const row of doc.querySelectorAll('tr')) {
@@ -3338,10 +7610,7 @@
       .replace(/\bDatabase last updated on\b\s*\d{2}\.\d{2}\.\d{4}\b/gi, ' '));
   }
 
-  function parseApplicationField(raw) {
-    const m = normalize(raw).match(/(\d{6,10}\.\d)[\s\S]{0,70}?(\d{2}\.\d{2}\.\d{4})\b/);
-    return { filingDate: m?.[2] || '' };
-  }
+  
 
   function pairCandidates(doc) {
     const out = [];
@@ -3411,186 +7680,19 @@
     });
   }
 
-  function parseMainPublications(doc, role = 'EP (this file)') {
-    const out = [];
+  
 
-    const push = (rawNo, rawKind, rawDate) => {
-      const parsed = splitPublicationNumber(rawNo, rawKind);
-      const dateStr = String(rawDate || '').match(DATE_RE)?.[1] || '';
-      if (!parsed.no || !dateStr) return;
-      out.push({ no: parsed.no, kind: parsed.kind, dateStr, role });
-    };
+  
 
-    for (const rows of sectionRowsByHeader(doc, /^Publication\b/i)) {
-      let currentType = '';
-      let currentNo = '';
-      let currentDate = '';
-
-      const flush = () => {
-        if (!currentNo || !currentDate) return;
-        push(currentNo, currentType, currentDate);
-        currentType = '';
-        currentNo = '';
-        currentDate = '';
-      };
-
-      for (const row of rows) {
-        const cells = [...row.querySelectorAll('th,td')].map(text).filter(Boolean);
-        for (let i = 0; i < cells.length - 1; i++) {
-          const label = cells[i];
-          const value = cells.slice(i + 1).join(' ');
-          if (/^Type:?$/i.test(label)) {
-            currentType = value.match(/\b([A-Z]\d)\b/)?.[1] || currentType;
-          } else if (/^No\.:?$/i.test(label)) {
-            currentNo = value;
-          } else if (/^Date:?$/i.test(label)) {
-            currentDate = value;
-            flush();
-          }
-        }
-      }
-
-      flush();
-    }
-
-    return dedupe(out, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
-  }
-
-  function extractEpNumbersByHeader(doc, headerRegex) {
-    const values = [];
-    for (const chunk of sectionTextsByHeader(doc, headerRegex)) {
-      for (const m of chunk.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)) {
-        values.push(String(m[1] || '').toUpperCase());
-      }
-    }
-    return dedupe(values, (x) => x);
-  }
-
-  function parsePriority(raw, pageText = '') {
-    const out = [];
-    const rawText = dedupeMultiline(raw);
-    const rawLines = String(rawText || '').split('\n').map((v) => v.trim()).filter(Boolean);
-
-    const push = (no, dateStr) => {
-      const n = String(no || '').replace(/\s+/g, '').toUpperCase();
-      const d = String(dateStr || '').trim();
-      if (!n || !d) return;
-      out.push({ no: n, dateStr: d });
-    };
-
-    // Priority IDs are usually country-code + numeric-ish body (e.g. GB20230019788).
-    const parseLine = (line, loose = false) => {
-      const re = loose
-        ? /\b([A-Z]{2}[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i
-        : /\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/i;
-      const m = String(line || '').match(re);
-      if (!m) return null;
-      return { no: m[1], dateStr: m[2] };
-    };
-
-    for (const line of rawLines) {
-      const parsed = parseLine(line, false) || parseLine(line, true);
-      if (!parsed) continue;
-      push(parsed.no, parsed.dateStr);
-    }
-
-    if (!out.length && rawText) {
-      for (const m of rawText.matchAll(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,120}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
-        push(m[1], m[2]);
-      }
-
-      // Last-resort pairing for layouts where number/date are split across cells/lines.
-      if (!out.length) {
-        const ids = [...rawText.matchAll(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b/gi)].map((m) => String(m[1] || ''));
-        const dates = [...rawText.matchAll(/\b(\d{2}\.\d{2}\.\d{4})\b/g)].map((m) => String(m[1] || ''));
-        if (ids[0] && dates[0]) push(ids[0], dates[0]);
-      }
-    }
-
-    if (!out.length && pageText) {
-      const section = String(pageText).match(/Priority\s+number,\s*date([\s\S]{0,500}?)(?=\b(?:Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event)\b|$)/i)?.[1] || '';
-      for (const m of section.matchAll(/\b([A-Z]{2}\d[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
-        push(m[1], m[2]);
-      }
-      if (!out.length) {
-        for (const m of section.matchAll(/\b([A-Z]{2}[0-9A-Z\/\-]{4,})\b[\s\S]{0,80}?\b(\d{2}\.\d{2}\.\d{4})\b/gi)) {
-          push(m[1], m[2]);
-        }
-      }
-    }
-
-    return dedupe(out, (i) => `${i.no}|${i.dateStr}`);
-  }
+  
 
   const CITATION_PHASE_ORDER = ['Search', 'International search', 'Examination', 'Opposition', 'Appeal', 'by applicant'];
 
-  function normalizePublicationNumber(raw) {
-    return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  }
+  
 
-  function splitPublicationNumber(rawNo, rawKind = '') {
-    let no = normalizePublicationNumber(rawNo);
-    let kind = String(rawKind || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  
 
-    if (kind && no.endsWith(kind) && no.length > kind.length + 5) {
-      no = no.slice(0, -kind.length);
-    }
-
-    if (!kind) {
-      const m = no.match(/^(.*?)([A-Z]\d)$/);
-      if (m && m[1].length >= 7) {
-        no = m[1];
-        kind = m[2];
-      }
-    }
-
-    return { no, kind };
-  }
-
-  function parsePublications(textBlock, role = '') {
-    const out = [];
-    const pubPrefixes = /^(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)/;
-
-    const push = (rawNo, rawKind, rawDate) => {
-      const parsed = splitPublicationNumber(rawNo, rawKind);
-      const dateStr = String(rawDate || '').match(DATE_RE)?.[1] || '';
-      if (!parsed.no || !dateStr) return;
-      if (!pubPrefixes.test(parsed.no)) return;
-      if (!/\d/.test(parsed.no.slice(2))) return;
-
-      out.push({ no: parsed.no, kind: parsed.kind, dateStr, role });
-    };
-
-    const text = String(textBlock || '');
-    const numberPattern = '((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)(?:[\\s.\\-\\/]*[A-Z0-9]){5,18})';
-    let m;
-
-    const strictNumberBeforeDate = new RegExp(`\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?\\s+(\\d{2}\\.\\d{2}\\.\\d{4})\\b`, 'gi');
-    while ((m = strictNumberBeforeDate.exec(text)) !== null) {
-      push(m[1], m[2], m[3]);
-    }
-
-    if (!out.length) {
-      const strictDateBeforeNumber = new RegExp(`\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b\\s+${numberPattern}\\b(?:\\s+([A-Z]\\d))?`, 'gi');
-      while ((m = strictDateBeforeNumber.exec(text)) !== null) {
-        push(m[2], m[3], m[1]);
-      }
-    }
-
-    if (!out.length) {
-      const reNumberBeforeDate = new RegExp(`\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?[\\s\\S]{0,50}?\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b`, 'gi');
-      while ((m = reNumberBeforeDate.exec(text)) !== null) {
-        push(m[1], m[2], m[3]);
-      }
-
-      const reDateBeforeNumber = new RegExp(`\\b(\\d{2}\\.\\d{2}\\.\\d{4})\\b[\\s\\S]{0,50}?\\b${numberPattern}\\b(?:\\s+([A-Z]\\d))?`, 'gi');
-      while ((m = reDateBeforeNumber.exec(text)) !== null) {
-        push(m[2], m[3], m[1]);
-      }
-    }
-
-    return dedupe(out, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`);
-  }
+  
 
   function inferPublicationsFromDocs(docs = []) {
     const out = [];
@@ -3686,24 +7788,7 @@
     };
   }
 
-  function parseRecentEvents(raw) {
-    const lines = String(raw || '').split('\n').map((v) => v.trim()).filter(Boolean);
-    const out = [];
-    let current = null;
-    for (const line of lines) {
-      const dm = line.match(/^\s*(\d{2}\.\d{2}\.\d{4})\b\s*(.*)$/);
-      if (dm) {
-        if (current?.dateStr && current?.title) out.push(normalizeRecentEventEntry(current));
-        current = { dateStr: dm[1], title: String(dm[2] || '').trim(), detail: '', source: 'Main page' };
-        continue;
-      }
-      if (!current) continue;
-      if (!current.title) current.title = line;
-      else current.detail = current.detail ? `${current.detail} · ${line}` : line;
-    }
-    if (current?.dateStr && current?.title) out.push(normalizeRecentEventEntry(current));
-    return dedupe(out, (e) => `${e.dateStr}|${e.title}|${e.detail}`);
-  }
+  
 
   function matchStatusRule(text, rules, fallback) {
     const normalizedText = normalize(text);
@@ -3714,44 +7799,13 @@
     return typeof fallback === 'function' ? fallback(normalizedText, low) : fallback;
   }
 
-  const STATUS_STAGE_RULES = Object.freeze([
-    { test: (low) => /revoked|refused|withdrawn|deemed to be withdrawn|lapsed|expired|closed/.test(low), value: 'Closed' },
-    { test: (low) => /no opposition filed within time limit/.test(low), value: 'Post-grant' },
-    { test: (low) => /patent has been granted|the patent has been granted|grant decision|decision to grant/.test(low), value: 'Granted' },
-    { test: (low) => /grant of patent is intended|rule\s*71\(3\)|intention to grant/.test(low), value: 'R71 / grant intended' },
-    { test: (low) => /article\s*94\(3\)|art\.\s*94\(3\)|examining division|request for examination was made|examination/.test(low), value: 'Examination' },
-    { test: (low) => /search report|search opinion|written opinion|\bsearch\b/.test(low), value: 'Search' },
-    { test: (low) => /filing/.test(low), value: 'Filing' },
-    { test: (low) => /published|publication/.test(low), value: 'Post-publication' },
-  ]);
+  
 
-  const STATUS_SUMMARY_RULES = Object.freeze([
-    { test: (low) => !low, value: { simple: 'Unknown', level: 'warn' } },
-    { test: (low) => /no opposition filed within time limit/.test(low), value: { simple: 'Granted (no opposition)', level: 'ok' } },
-    { test: (low, raw) => /grant of patent is intended|rule\s*71\(3\)/i.test(raw), value: { simple: 'Grant intended (R71(3))', level: 'warn' } },
-    { test: (low) => /patent has been granted|the patent has been granted/.test(low), value: { simple: 'Granted', level: 'ok' } },
-    { test: (low) => /application deemed to be withdrawn.*non-entry into european phase/.test(low), value: { simple: 'Deemed withdrawn (non-entry)', level: 'bad' } },
-    { test: (low) => /application deemed to be withdrawn.*translations of claims\/payment missing/.test(low), value: { simple: 'Deemed withdrawn (grant formalities)', level: 'bad' } },
-    { test: (low) => /application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(low), value: { simple: 'Deemed withdrawn (fees / no WO reply)', level: 'bad' } },
-    { test: (low) => /application deemed to be withdrawn.*non-reply to written opinion/.test(low), value: { simple: 'Deemed withdrawn (no WO reply)', level: 'bad' } },
-    { test: (low) => /deemed to be withdrawn/.test(low), value: { simple: 'Deemed withdrawn', level: 'bad' } },
-    { test: (low) => /withdrawn by applicant|application withdrawn/.test(low), value: { simple: 'Withdrawn', level: 'bad' } },
-    { test: (low) => /revoked|refused|expired|lapsed/.test(low), value: { simple: 'Closed', level: 'bad' } },
-    { test: (low) => /application has been published|has been published/.test(low), value: { simple: 'Published', level: 'info' } },
-    { test: (low) => /request for examination was made|examination/.test(low), value: { simple: 'Examination', level: 'info' } },
-    { test: (low) => /search/.test(low), value: { simple: 'Search', level: 'info' } },
-  ]);
+  
 
-  function inferStatusStage(statusRaw) {
-    return matchStatusRule(statusRaw, STATUS_STAGE_RULES, '');
-  }
+  
 
-  function summarizeStatus(raw) {
-    return matchStatusRule(raw, STATUS_SUMMARY_RULES, (normalizedRaw) => {
-      const oneLine = normalize(String(normalizedRaw || '').split('\n')[0] || normalizedRaw);
-      return { simple: oneLine || 'Unknown', level: 'info' };
-    });
-  }
+  
 
   function familyRoleSummary(mainData = {}) {
     const parentCase = normalize(mainData.parentCase || '').toUpperCase();
@@ -3787,65 +7841,13 @@
     };
   }
 
-  function resolvedOverviewStatus(mainSourceStatus, statusSummary, posture) {
-    if (mainSourceStatus === 'notfound') return { simple: 'Not found', level: 'bad' };
-    if (mainSourceStatus === 'empty') return { simple: 'No main data', level: 'warn' };
-    return {
-      simple: posture?.currentLabel || statusSummary?.simple || 'Unknown',
-      level: posture?.currentLevel || statusSummary?.level || 'warn',
-    };
-  }
+  
 
-  function parseApplicationType(mainData) {
-    const appNo = mainData.appNo || '';
-    const priorities = Array.isArray(mainData.priorities) ? mainData.priorities : [];
-    const internationalAppNo = normalize(mainData.internationalAppNo || '').toUpperCase();
-    const statusRaw = normalize(mainData.statusRaw || '');
+  
 
-    const hasExplicitPctMarker =
-      /\bPCT\/[A-Z]{2}\d{4}\/\d{5,}\b/i.test(internationalAppNo)
-      || /\bWO\d{4}[A-Z]{2}\d{3,}\b/i.test(internationalAppNo)
-      || /\b(?:E\/PCT|EURO-?PCT|regional phase)\b/i.test(statusRaw);
+  
 
-    if (hasExplicitPctMarker || priorities.some((p) => /^WO\d{4}[A-Z]{2}\d{3,}$/i.test(String(p?.no || '')))) {
-      return 'E/PCT regional phase';
-    }
-    if (mainData.isDivisional || mainData.parentCase) return 'Divisional';
-    if (priorities.length > 0) return 'EP convention filing';
-    if (/^EP\d+$/i.test(appNo)) return 'EP direct first filing';
-    return 'Unknown';
-  }
-
-  function cleanTitle(raw) {
-    const v = dedupeMultiline(raw)
-      .replace(/^\s*(?:English|German|French)\s*:\s*/i, '')
-      .replace(/\s*\[[^\]]+\]\s*$/g, '')
-      .trim();
-    return v;
-  }
-
-  function pickApplicantLine(raw) {
-    const out = [];
-    const lines = dedupeMultiline(raw)
-      .split('\n')
-      .map((line) => normalize(line))
-      .filter(Boolean);
-
-    for (let line of lines) {
-      if (/^for all designated states$/i.test(line)) continue;
-      if (/^\[[^\]]+\]$/.test(line)) continue;
-
-      if (/^for all designated states\b/i.test(line)) {
-        line = line.replace(/^for all designated states\b[:\s-]*/i, '').trim();
-        if (!line) continue;
-      }
-
-      if (/^(applicant|for applicant)\s*[:\-]?\s*$/i.test(line)) continue;
-      out.push(line);
-    }
-
-    return out[0] || '';
-  }
+  
 
   function formatDaysHuman(days) {
     if (!Number.isFinite(days)) return '—';
@@ -3857,98 +7859,9 @@
     return `${sign}${years}y ${rem}d`;
   }
 
-  function extractTitle(doc) {
-    const rawTitle = dedupeMultiline(fieldByLabel(doc, [/^Title$/i]));
-    const page = bodyText(doc);
-    if (rawTitle) {
-      const englishLine = rawTitle.split('\n').map((x) => x.trim()).find((line) => /^English\s*:/i.test(line));
-      if (englishLine) return cleanTitle(englishLine.replace(/^English\s*:\s*/i, ''));
+  
 
-      const englishFromPage = page.match(/\bEnglish\s*:\s*([^\n\r\[]+)/i);
-      if (englishFromPage?.[1]) return cleanTitle(englishFromPage[1]);
-    }
-
-    for (const el of [...doc.querySelectorAll('h1,h2,h3,strong,b,a')].slice(0, 120)) {
-      const m = text(el).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
-      if (m?.[1]) return cleanTitle(m[1]);
-    }
-
-    if (rawTitle) {
-      const cleanedLines = rawTitle
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line && !/^(German|French)\s*:/i.test(line));
-      if (cleanedLines.length) return cleanTitle(cleanedLines[0]);
-    }
-
-    const fromBody = bodyText(doc).match(/\bEP\d{6,12}\s*-\s*([^\[\n\r]+?)(?:\s*\[|$)/i);
-    return cleanTitle(fromBody?.[1] || '');
-  }
-
-  function parseMain(doc, caseNo) {
-    const pageText = bodyText(doc);
-    const appSections = sectionTextsByHeader(doc, /^Application number/i);
-    const publicationSections = sectionTextsByHeader(doc, /^Publication\b/i);
-    const appField = appSections[0] || fieldByLabel(doc, [/^Application number/i]) || fallbackAppField(doc, pageText);
-    const statusField = dedupeMultiline(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
-    const priorityField = fieldByLabel(doc, [/^Priority\b/i]) || fallbackPriorityField(doc, pageText);
-    const publicationField = publicationSections.join('\n') || fieldByLabel(doc, [/^Publication\b/i]) || fallbackPublicationField(doc, pageText);
-    const recentEventField = fieldByLabel(doc, [/^Most recent event\b/i]) || fallbackRecentEventField(doc);
-
-    const appInfo = parseApplicationField(appField);
-    const priorities = parsePriority(priorityField, pageText);
-    const status = summarizeStatus(statusField);
-
-    const parentCandidates = extractEpNumbersByHeader(doc, /\bParent application(?:\(s\))?\b/i);
-    const parentMatch = pageText.match(/\bparent\s+application(?:\(s\))?[^\n]{0,140}\b(EP\d{6,12})\b/i);
-    const parentCase = parentCandidates[0] || (parentMatch ? parentMatch[1].toUpperCase() : '');
-
-    const divisionalChildrenFromHeader = extractEpNumbersByHeader(doc, /\bDivisional application(?:\(s\))?\b/i);
-    const divisionalSection = String(pageText).match(/Divisional\s+application(?:\(s\))?[\s\S]{0,400}/i)?.[0] || '';
-    const divisionalChildAppsFromText = [...divisionalSection.matchAll(/\b(EP\d{8})(?:\.\d)?\b\s*(?:&nbsp;|\s)*\//gi)].map((m) => String(m[1] || '').toUpperCase());
-    const divisionalChildrenFromText = [...divisionalSection.matchAll(/\b(EP\d{6,12})(?:\.\d)?\b/gi)].map((m) => String(m[1] || '').toUpperCase());
-    const divisionalChildren = dedupe((divisionalChildAppsFromText.length ? divisionalChildAppsFromText : [...divisionalChildrenFromHeader, ...divisionalChildrenFromText]), (x) => x);
-    const mainPublications = parseMainPublications(doc, 'EP (this file)');
-
-    const internationalField = dedupeMultiline(fieldByLabel(doc, [/^International application\b/i, /^International publication\b/i, /^PCT application\b/i]));
-    const internationalSectionFromPage = String(pageText).match(/International\s+application(?:\s+number)?[\s\S]{0,220}/i)?.[0] || '';
-    const pctScopeText = `${appSections.join('\n')}\n${String(appField || '')}\n${internationalField}\n${internationalSectionFromPage}\n${pageText}`;
-    const woMatch = pctScopeText.match(/\b(WO\d{4}(?:[A-Z]{2})?\d{3,})\b/i);
-    const pctMatch = pctScopeText.match(/\b(PCT\/[A-Z]{2}\d{4}\/\d{5,})\b/i);
-    const internationalAppNo = (woMatch?.[1] || pctMatch?.[1] || '').toUpperCase();
-    const isEuroPct = !!internationalAppNo;
-
-    const titleField = normalize(fieldByLabel(doc, [/^Title$/i]));
-    const applicantField = normalize(fieldByLabel(doc, [/^Applicant/i]) || fallbackPartyField(doc, 'applicant'));
-    const representativeField = normalize(fieldByLabel(doc, [/^Representative/i]) || fallbackPartyField(doc, 'representative'));
-
-    const fallbackApplicant = normalize((pageText.match(/\bApplicant\s*(?:\n|:)\s*([^\n]+)/i)?.[1]) || '');
-
-    const divisionalMarker = /\bdivisional application\b/i.test(`${String(statusField || '')}\n${pageText}`);
-
-    const result = {
-      appNo: caseNo,
-      title: extractTitle(doc) || cleanTitle(titleField),
-      applicant: pickApplicantLine(applicantField) || normalize(applicantField.split('\n').find(Boolean) || '') || fallbackApplicant,
-      representative: normalize(representativeField.split('\n').find(Boolean) || ''),
-      filingDate: appInfo.filingDate,
-      priorities,
-      priorityText: priorities.map((p) => `${p.no} · ${p.dateStr}`).join('\n'),
-      statusRaw: normalize(statusField),
-      statusSimple: status.simple,
-      statusLevel: status.level,
-      statusStage: inferStatusStage(statusField),
-      recentEvents: parseRecentEvents(recentEventField),
-      publications: mainPublications.length ? mainPublications : parsePublications(publicationField, 'EP (this file)'),
-      internationalAppNo,
-      isEuroPct,
-      isDivisional: !!parentCase || divisionalMarker,
-      parentCase,
-      divisionalChildren: divisionalChildren.filter((ep) => ep !== caseNo),
-    };
-    result.applicationType = parseApplicationType(result);
-    return result;
-  }
+  
 
   function structuralTableScore(table) {
     const rows = [...table.querySelectorAll('tr')];
@@ -3979,152 +7892,18 @@
     return (rowsWithDates * 3) + (rowsWithLinks * 3) + datedCells + linkCells;
   }
 
-  function bestTable(doc, hints) {
-    let best = null;
-    let score = 0;
-    for (const table of doc.querySelectorAll('table')) {
-      const headerText = text(table.querySelector('thead') || table).toLowerCase();
-      let s = structuralTableScore(table);
-      for (const hint of hints) if (headerText.includes(hint.toLowerCase())) s += 5;
-      if (s > score) {
-        score = s;
-        best = table;
-      }
-    }
-    return score > 0 ? best : null;
-  }
+  
 
   const DOCLIST_TABLE_HINT_SETS = Object.freeze([
     ['date', 'document'],
     ['document type'],
   ]);
 
-  function doclistTable(doc) {
-    for (const hints of DOCLIST_TABLE_HINT_SETS) {
-      const table = bestTable(doc, hints);
-      if (table) return table;
-    }
-    return null;
-  }
+  
 
-  function tableColumnMap(table) {
-    const map = {};
-    const headerRow = table.querySelector('thead tr') || table.querySelector('tr');
-    const headers = [...(headerRow?.querySelectorAll('th,td') || [])].map(text);
-    headers.forEach((h, idx) => {
-      const low = h.toLowerCase();
-      if (/^date$/.test(low)) map.date = idx;
-      if (low.includes('document type') || low === 'document') map.document = idx;
-      if (low.includes('procedure')) map.procedure = idx;
-      if (low.includes('number') && low.includes('page')) map.pages = idx;
-    });
+  
 
-    const bodyRows = [...table.querySelectorAll('tbody tr, tr')].filter((row) => row.querySelector('td'));
-    const width = Math.max(0, ...bodyRows.map((row) => row.querySelectorAll('td').length));
-    const stats = Array.from({ length: width }, () => ({ dateHits: 0, linkHits: 0, textHits: 0, numberHits: 0 }));
-    for (const row of bodyRows.slice(0, 24)) {
-      [...row.querySelectorAll('td')].forEach((cell, idx) => {
-        const value = text(cell);
-        if (!value) return;
-        if (DATE_RE.test(value)) stats[idx].dateHits += 1;
-        if (cell.querySelector('a')) stats[idx].linkHits += 1;
-        if (value.length >= 12) stats[idx].textHits += 1;
-        if (/^\d{1,4}$/.test(value)) stats[idx].numberHits += 1;
-      });
-    }
-
-    if (map.date == null) {
-      map.date = stats.map((stat, idx) => ({ idx, score: stat.dateHits * 4 + stat.linkHits })).sort((a, b) => b.score - a.score)[0]?.idx;
-    }
-    if (map.document == null) {
-      map.document = stats.map((stat, idx) => ({ idx, score: stat.linkHits * 5 + stat.textHits * 2 - (idx === map.date ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
-    }
-    if (map.procedure == null) {
-      map.procedure = stats.map((stat, idx) => ({ idx, score: stat.textHits - (idx === map.date || idx === map.document ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
-    }
-    if (map.pages == null) {
-      map.pages = stats.map((stat, idx) => ({ idx, score: stat.numberHits * 4 + stat.textHits - (idx === map.date || idx === map.document || idx === map.procedure ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
-    }
-    return map;
-  }
-
-  function classifyDocument(title, procedure = '') {
-    const t = String(title || '').toLowerCase();
-    const p = String(procedure || '').toLowerCase();
-
-    const isSearchResponseContext =
-      /search\s*\/\s*examination|search\s*and\s*examination|search report|search opinion/.test(p)
-      || /after receipt of \(?(?:european\)? )?search report|before examination/.test(t);
-
-    const isGrantContext = /rule\s*71\(3\)|intention to grant|text intended for grant|text proposed for grant|proposed for grant/.test(`${t} ${p}`);
-    const isGrantCommunicationTitle = /text intended for grant|communication about intention to grant|annex to the communication about intention to grant|intention to grant/.test(t);
-    const isGrantResponse = isGrantContext
-      && !isGrantCommunicationTitle
-      && /amend|correction|request|claims|description|translation|approval|text proposed for grant/.test(t);
-
-    const normalizedSignal = normalizedDocSignal(title, procedure);
-    if (normalizedSignal) {
-      if (normalizedSignal.family === 'search') {
-        return { bundle: 'Search package', level: normalizedSignal.level, actor: normalizedSignal.actor };
-      }
-      if (normalizedSignal.bundle === 'Intention to grant (R71(3) EPC)') {
-        return { bundle: 'Grant package', level: normalizedSignal.level, actor: normalizedSignal.actor };
-      }
-      return { bundle: normalizedSignal.bundle, level: normalizedSignal.level, actor: normalizedSignal.actor };
-    }
-
-    const isLossOfRights = /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|communication under rule\s*112\(1\)|rule\s*112\(1\)|noting of loss of rights|application refused|application rejected/.test(`${t} ${p}`);
-    if (isLossOfRights) {
-      return { bundle: 'Examination', level: 'bad', actor: 'EPO' };
-    }
-
-    if (/by applicant|amendment by applicant|filed by applicant|from applicant/.test(p)) {
-      if (isGrantResponse) {
-        return { bundle: 'Grant package', level: 'warn', actor: 'Applicant' };
-      }
-      if (isSearchResponseContext && !isGrantContext && /amend|claims|description|letter|annotations|subsequently filed items/.test(t)) {
-        return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
-      }
-      if (/request for grant|description|claims|drawings|designation of inventor|priority document|annex/.test(t)) {
-        return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
-      }
-      return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
-    }
-
-    if (/acknowledgement of receipt|receipt of electronic submission|auto-acknowledgement/.test(t) || /acknowledgement/.test(p)) {
-      return { bundle: 'Other', level: 'info', actor: 'System' };
-    }
-
-    if (isGrantResponse) {
-      return { bundle: 'Grant package', level: 'warn', actor: 'Applicant' };
-    }
-
-    if (isSearchResponseContext && !isGrantContext && /amend|claims|description|letter accompanying subsequently filed items|annotations|amendments received before examination/.test(t)) {
-      return { bundle: 'Response to search', level: 'info', actor: 'Applicant' };
-    }
-
-    if (/amended claims filed|amendment by applicant|claims and\/or description|filed after receipt/i.test(t)) {
-      return isGrantContext
-        ? { bundle: 'Grant package', level: 'warn', actor: 'Applicant' }
-        : { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
-    }
-
-    if (/search report|search opinion|written opinion|search strategy|esr/.test(t)) return { bundle: 'Search package', level: 'info', actor: 'EPO' };
-    if (/rule\s*71\(3\)|intention to grant|text intended for grant|mention of grant/.test(t)) return { bundle: 'Grant package', level: 'warn', actor: 'EPO' };
-    if (/annex to (?:the )?communication|communication annex|annex.*examining division/.test(t)) {
-      return /intention to grant|rule\s*71\(3\)/.test(t)
-        ? { bundle: 'Grant package', level: 'warn', actor: 'EPO' }
-        : { bundle: 'Examination', level: 'info', actor: 'EPO' };
-    }
-    if (/article\s*94\(3\)|art\.\s*94\(3\)|communication from the examining|examining division has become responsible/.test(t)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
-    if (/renewal|annual fee/.test(t)) return { bundle: 'Renewal', level: 'ok', actor: 'Applicant' };
-    if (/request for grant|description|claims|drawings|designation of inventor|priority document/.test(t)) return { bundle: 'Filing package', level: 'info', actor: 'Applicant' };
-    if (/reply|response|arguments|observations|letter|filed by applicant|submission|request/.test(t)) return { bundle: 'Applicant filings', level: 'info', actor: 'Applicant' };
-    if (/opposition|third party/.test(t) || /third party/.test(p)) return { bundle: 'Opposition', level: 'warn', actor: 'Third party' };
-
-    if (/examining division|epo|office/.test(p)) return { bundle: 'Examination', level: 'info', actor: 'EPO' };
-    return { bundle: 'Other', level: 'info', actor: 'Other' };
-  }
+  
 
   function doclistBundleLabel(bundle) {
     if (bundle === 'Grant package' || bundle === 'Grant communication') return 'Intention to grant (R71(3) EPC)';
@@ -4161,65 +7940,9 @@
     return result;
   }
 
-  function doclistEntryFromRow(row, map = {}, fallbackUrl = '', rowOrder = 0, parseStats = null) {
-    const cells = [...row.querySelectorAll('td')];
-    if (!cells.length) {
-      noteParseDrop(parseStats, 'missing-cells');
-      return null;
-    }
-    if (!row.querySelector("input[type='checkbox']")) {
-      noteParseDrop(parseStats, 'missing-checkbox');
-      return null;
-    }
-    const rowText = cells.map(text).filter(Boolean).join(' ') || text(row);
-    const dm = rowText.match(DATE_RE);
-    if (!dm) {
-      noteParseDrop(parseStats, 'missing-date');
-      return null;
-    }
-    const dateStr = dm[1];
+  
 
-    const getCell = (i) => (i != null && i < cells.length ? text(cells[i]) : '');
-    let title = getCell(map.document);
-    if (!title) title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || '';
-    if (!title) {
-      noteParseDrop(parseStats, 'missing-title');
-      return null;
-    }
-
-    const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || fallbackUrl;
-    const procedure = getCell(map.procedure);
-    const pages = getCell(map.pages);
-    return { dateStr, title, procedure, pages, rowOrder, url, source: 'All documents' };
-  }
-
-  function parseDoclist(doc) {
-    const parseStats = createParseStats('doclist');
-    const table = doclistTable(doc);
-    if (!table) return { docs: [], parseStats };
-    parseStats.tableFound = true;
-    const map = tableColumnMap(table);
-    const docs = [];
-    const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();
-    const fallbackUrl = sourceUrl(fallbackCaseNo, 'doclist');
-
-    let rowOrder = 0;
-    for (const row of table.querySelectorAll('tr')) {
-      if (!row.querySelector('td')) continue;
-      parseStats.rowsSeen += 1;
-      const entry = doclistEntryFromRow(row, map, fallbackUrl, rowOrder, parseStats);
-      if (!entry) continue;
-      rowOrder += 1;
-      parseStats.rowsAccepted += 1;
-      const cls = refineDocumentClassification(entry.title, entry.procedure, classifyDocument(entry.title, entry.procedure));
-      docs.push({
-        ...entry,
-        ...cls,
-      });
-    }
-
-    return { docs: docs.sort(compareDateDesc), parseStats };
-  }
+  
 
   function applyDoclistFilter(table, query) {
     const q = normalize(query).toLowerCase();
@@ -4324,19 +8047,7 @@
     return blocks;
   }
 
-  function refineDocumentClassification(title = '', procedure = '', cls = {}) {
-    const t = normalize(title).toLowerCase();
-    const p = normalize(procedure).toLowerCase();
-    const merged = `${t} ${p}`;
-    if (/reminder to observe due time limit|communication concerning the reminder|invitation pursuant to rule\s*45|communication under rule\s*112\(1\)|loss of rights|notification of forthcoming publication|transmission of the certificate|mention of grant|decision to grant|communication to designated inventor|search started|examining division becomes responsible|examination started|publication of the mention of the grant|grant of a european patent/.test(merged)) {
-      return {
-        bundle: /loss of rights|rule\s*112\(1\)|deemed to be withdrawn/.test(merged) ? 'Examination' : (cls.bundle || 'Other'),
-        level: /loss of rights|rule\s*112\(1\)|deemed to be withdrawn/.test(merged) ? 'bad' : (cls.level || 'info'),
-        actor: 'EPO',
-      };
-    }
-    return cls;
-  }
+  
 
   function doclistEntryModel(entry = {}) {
     const title = String(entry.title || '');
@@ -4581,25 +8292,7 @@
     return null;
   }
 
-  const NORMALIZED_DOC_SIGNAL_RULES = Object.freeze([
-    { test: (t) => /decision to allow further processing/.test(t), signal: { family: 'remedial', bundle: 'Further processing', actor: 'EPO', level: 'warn', reason: 'further-processing decision' } },
-    { test: (t) => /decision to grant a european patent/.test(t), signal: { family: 'grant', bundle: 'Grant decision', actor: 'EPO', level: 'ok', reason: 'grant decision' } },
-    { test: (t) => /transmission of the certificate for a european patent pursuant to rule\s*74/.test(t), signal: { family: 'post_grant', bundle: 'Patent certificate', actor: 'EPO', level: 'ok', reason: 'rule-74 certificate' } },
-    { test: (t) => /grant of extension of time limit/.test(t), signal: { family: 'remedial', bundle: 'Extension of time limit', actor: 'EPO', level: 'info', reason: 'extension of time limit' } },
-    { test: (t) => /application deemed to be withdrawn.*non-entry into european phase/.test(t), signal: { family: 'loss_of_rights', bundle: 'Euro-PCT non-entry failure', actor: 'EPO', level: 'bad', reason: 'non-entry into EP phase' } },
-    { test: (t) => /application deemed to be withdrawn.*translations of claims\/payment missing/.test(t), signal: { family: 'loss_of_rights', bundle: 'Grant-formalities failure', actor: 'EPO', level: 'bad', reason: 'grant formalities missing' } },
-    { test: (t) => /application deemed to be withdrawn.*non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(t), signal: { family: 'loss_of_rights', bundle: 'Fees / written-opinion failure', actor: 'EPO', level: 'bad', reason: 'fees plus written-opinion failure' } },
-    { test: (t) => /application deemed to be withdrawn.*non-reply to written opinion/.test(t), signal: { family: 'loss_of_rights', bundle: 'Written-opinion loss', actor: 'EPO', level: 'bad', reason: 'written opinion not answered' } },
-    { test: (t) => /loss of rights|rule\s*112\(1\)/.test(t), signal: { family: 'loss_of_rights', bundle: 'Loss-of-rights communication', actor: 'EPO', level: 'bad', reason: 'rule 112 / loss-of-rights notice' } },
-    { test: (t) => /document annexed to the extended european search report|extended european search report/.test(t), signal: { family: 'search', bundle: 'Extended European search package', actor: 'EPO', level: 'info', reason: 'extended search report annex' } },
-    { test: (t) => /supplementary european search report/.test(t), signal: { family: 'search', bundle: 'Supplementary European search package', actor: 'EPO', level: 'info', reason: 'supplementary ESR' } },
-    { test: (t) => /international preliminary report on patentability|written opinion of the isa|isr: cited documents/.test(t), signal: { family: 'search', bundle: 'International search / IPRP', actor: 'EPO', level: 'info', reason: 'IPRP / ISA packet' } },
-    { test: (t) => /partial international search report|provisional opinion accompanying the partial search results/.test(t), signal: { family: 'search', bundle: 'Partial international search', actor: 'EPO', level: 'info', reason: 'partial ISR packet' } },
-    { test: (t) => /communication regarding the transmission of the european search report|european search opinion|european search report|information on search strategy/.test(t), signal: { family: 'search', bundle: 'European search package', actor: 'EPO', level: 'info', reason: 'European search packet' } },
-    { test: (t) => /rule\s*71\(3\)|intention to grant|text intended for grant|mention of grant/.test(t), signal: { family: 'grant', bundle: 'Intention to grant (R71(3) EPC)', actor: 'EPO', level: 'warn', reason: 'R71 / grant-intended packet' } },
-    { test: (t) => /oral proceedings|summons to oral proceedings/.test(t), signal: { family: 'hearing', bundle: 'Oral proceedings', actor: 'EPO', level: 'warn', reason: 'oral proceedings event' } },
-    { test: (t, p) => /opposition|third party/.test(t) || /third party/.test(p), signal: { family: 'opposition', bundle: 'Opposition', actor: 'Third party', level: 'warn', reason: 'opposition / third-party filing' } },
-  ]);
+  
 
   function normalizedDocSignalFromRules(title = '', procedure = '') {
     const t = normalize(title).toLowerCase();
@@ -4610,70 +8303,17 @@
     return null;
   }
 
-  function normalizedDocSignal(title = '', procedure = '') {
-    const codexSignal = docSignalFromCodexRecord(codexDescriptionRecord(title), title, procedure);
-    if (codexSignal) return codexSignal;
-    return normalizedDocSignalFromRules(title, procedure);
-  }
+  
 
-  const PACKET_SIGNAL_PRECEDENCE = Object.freeze([
-    'Euro-PCT non-entry failure',
-    'Grant-formalities failure',
-    'Fees / written-opinion failure',
-    'Written-opinion loss',
-    'Loss-of-rights communication',
-    'Further processing',
-    'Grant decision',
-    'Patent certificate',
-    'Extension of time limit',
-    'Extended European search package',
-    'Supplementary European search package',
-    'International search / IPRP',
-    'Partial international search',
-    'European search package',
-    'Intention to grant (R71(3) EPC)',
-    'Opposition',
-    'Oral proceedings',
-    'Search package',
-  ]);
+  
 
-  const STANDALONE_PACKET_BUNDLES = new Set([
-    'Further processing',
-    'Grant decision',
-    'Patent certificate',
-    'Extension of time limit',
-    'Euro-PCT non-entry failure',
-    'Grant-formalities failure',
-    'Fees / written-opinion failure',
-    'Written-opinion loss',
-    'Loss-of-rights communication',
-    'Opposition',
-    'Oral proceedings',
-  ]);
+  
 
-  function packetSignalBundle(signal) {
-    return signal?.bundle || '';
-  }
+  
 
-  function standalonePacketBundle(signal) {
-    const bundle = packetSignalBundle(signal);
-    return STANDALONE_PACKET_BUNDLES.has(bundle) ? bundle : '';
-  }
+  
 
-  function normalizedPacketSignal(models = []) {
-    const signals = (models || [])
-      .map((model) => normalizedDocSignal(model?.title || '', model?.procedure || ''))
-      .filter(Boolean);
-
-    if (!signals.length) return null;
-
-    for (const bundle of PACKET_SIGNAL_PRECEDENCE) {
-      const match = signals.find((signal) => signal.bundle === bundle);
-      if (match) return { ...match, source: 'normalized-packet-signal' };
-    }
-
-    return { ...signals[0], source: 'normalized-packet-signal' };
-  }
+  
 
   function searchRunLabel(run) {
     const bundle = String(run?.bundle || run?.groupKind || 'Other');
@@ -4840,27 +8480,11 @@
     return parseDatedRowsFromDocument(doc, url);
   }
 
-  function normalizeCodexDescription(value = '') {
-    return normalize(value).toLowerCase();
-  }
+  
 
-  function normalizeStructuredLabel(value = '') {
-    return normalize(value).toLowerCase().replace(/[_-]+/g, ' ');
-  }
+  
 
-  function normalizeStructuredDate(value = '') {
-    const raw = normalize(value);
-    if (!raw) return '';
-    const compact = raw.match(/^(19|20)\d{6}$/)?.[0] || '';
-    if (compact) return `${compact.slice(6, 8)}.${compact.slice(4, 6)}.${compact.slice(0, 4)}`;
-    const dated = raw.match(/(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})/);
-    if (!dated) return '';
-    const dd = String(dated[1] || '').padStart(2, '0');
-    const mm = String(dated[2] || '').padStart(2, '0');
-    const yyRaw = String(dated[3] || '');
-    const yyyy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
-    return `${dd}.${mm}.${yyyy}`;
-  }
+  
 
   function parseSmallNumberToken(token = '') {
     const t = normalize(String(token || '')).toLowerCase();
@@ -4882,401 +8506,29 @@
     }[t] || 0;
   }
 
-  function parseStructuredTimeLimit(value = '') {
-    const raw = normalize(value);
-    if (!raw) return { raw: '', months: 0, dateStr: '' };
-    const dateStr = normalizeStructuredDate(raw);
-    const monthToken = raw.match(/(?:within\s+)?(?:a\s+)?(?:period|time\s+limit)?\s*(?:of\s+)?([a-z]+|\d{1,2})\s+months?/i)?.[1] || '';
-    const months = parseSmallNumberToken(monthToken);
-    return { raw, months, dateStr };
-  }
+  
 
-  function legalCodeRecord(code) {
-    return code ? (EPO_CODEX_DATA.byCode[String(code).toUpperCase()] || null) : null;
-  }
+  
 
-  function codexDescriptionRecord(description = '') {
-    const key = normalizeCodexDescription(description);
-    return key ? (EPO_CODEX_DATA.byDescription[key] || null) : null;
-  }
+  
 
-  function normalizeCodexSignal(raw = {}) {
-    const sourceCode = normalize(raw.sourceCode || '').toUpperCase();
-    const sourceDescription = normalize(raw.sourceDescription || '');
-    const exact = legalCodeRecord(sourceCode);
-    if (exact) return { ...raw, matchStrategy: 'exact-code', codexRecord: exact };
-    const fallback = codexDescriptionRecord(sourceDescription);
-    if (fallback) return { ...raw, matchStrategy: 'description-fallback', codexRecord: fallback };
-    return { ...raw, matchStrategy: 'unmapped', codexRecord: null };
-  }
+  
 
-  function parseDatedRowsFromDocument(doc, url = '') {
-    const parseStats = createParseStats('procedural-rows');
-    const rows = [];
-    for (const tr of doc.querySelectorAll('tr')) {
-      const cells = [...tr.querySelectorAll('th,td')].map(text).filter(Boolean);
-      if (cells.length < 2) continue;
-      const dateCell = cells.find((value) => DATE_RE.test(value));
-      if (!dateCell) continue;
-      parseStats.rowsSeen += 1;
-      const dateStr = dateCell.match(DATE_RE)[1];
-      let payload = cells.filter((value, idx) => {
-        if (idx === 0 && DATE_RE.test(value)) return false;
-        return !/^(date|event|status|publication|document|document type)$/i.test(value);
-      });
-      if (!payload[0]) {
-        noteParseDrop(parseStats, 'missing-payload');
-        continue;
-      }
-      if (/^event\s*date\s*:?$/i.test(payload[0]) && payload[1]) payload = payload.slice(1);
-      if (!payload[0] || /^\d{2}\.\d{2}\.\d{4}$/.test(payload[0])) {
-        noteParseDrop(parseStats, 'missing-title');
-        continue;
-      }
-      rows.push({ dateStr, title: payload[0], detail: payload.slice(1).join(' · '), url });
-    }
-    const deduped = dedupe(rows, (row) => `${row.dateStr}|${row.title}|${row.detail}`).sort(compareDateDesc);
-    parseStats.rowsAccepted = deduped.length;
-    if (rows.length > deduped.length) {
-      const duplicateCount = rows.length - deduped.length;
-      parseStats.rowsDropped += duplicateCount;
-      parseStats.rowsDroppedByReason.duplicate = (parseStats.rowsDroppedByReason.duplicate || 0) + duplicateCount;
-    }
-    return attachParseStats(deduped, parseStats);
-  }
+  
 
-  function extractLegalEventBlocks(doc, url) {
-    const blocks = [];
-    let current = null;
+  
 
-    const pushCurrent = () => {
-      if (!current) return;
-      if (!current.codexKey && current.title) {
-        const matched = normalizeCodexSignal({ sourceDescription: current.title });
-        current.matchStrategy = current.matchStrategy || matched.matchStrategy;
-        if (matched.codexRecord) {
-          current.codexKey = matched.codexRecord.internalKey;
-          current.codexPhase = matched.codexRecord.phase;
-          current.codexClass = matched.codexRecord.classification;
-        }
-      }
-      if (current.paymentDates?.length) current.paymentDate = current.paymentDates[current.paymentDates.length - 1] || '';
-      if (current.dateStr || current.title || current.detail) blocks.push(current);
-      current = null;
-    };
+  
 
-    for (const row of doc.querySelectorAll('tr')) {
-      const cells = [...row.querySelectorAll('th,td')].map(text).filter(Boolean);
-      if (!cells.length) continue;
-      const label = cells[0];
-      const value = normalize(cells.slice(1).join(' · '));
-      const labelKey = normalizeStructuredLabel(label);
+  
 
-      if (/^event date:?$/i.test(label) && DATE_RE.test(value)) {
-        pushCurrent();
-        current = {
-          dateStr: value.match(DATE_RE)?.[1] || '',
-          title: '',
-          detail: '',
-          url,
-          freeFormatText: '',
-          effectiveDate: '',
-          originalCode: '',
-          codexKey: '',
-          codexPhase: '',
-          codexClass: '',
-          stepDescriptionName: '',
-          dispatchDate: '',
-          replyDate: '',
-          paymentDate: '',
-          paymentDates: [],
-          requestDate: '',
-          resultDate: '',
-          timeLimitRaw: '',
-          timeLimitMonths: 0,
-          timeLimitDate: '',
-        };
-        continue;
-      }
+  
 
-      if (!current) continue;
-      if (/^event description:?$/i.test(label)) {
-        current.title = value;
-        continue;
-      }
-      if (/^free format text:?$/i.test(label)) {
-        current.freeFormatText = value;
-        current.detail = current.detail ? `${current.detail} · ${value}` : value;
-        const originalCode = normalize(value.match(/ORIGINAL CODE:\s*([A-Z0-9]+)/i)?.[1] || '').toUpperCase();
-        const matched = normalizeCodexSignal({ sourceCode: originalCode, sourceDescription: current.title || value });
-        if (originalCode) current.originalCode = originalCode;
-        current.matchStrategy = matched.matchStrategy;
-        if (matched.codexRecord) {
-          current.codexKey = matched.codexRecord.internalKey;
-          current.codexPhase = matched.codexRecord.phase;
-          current.codexClass = matched.codexRecord.classification;
-        }
-        continue;
-      }
-      if (/^effective date:?$/i.test(label)) {
-        current.effectiveDate = normalizeStructuredDate(value) || value;
-        current.detail = current.detail ? `${current.detail} · Effective DATE ${value}` : `Effective DATE ${value}`;
-        continue;
-      }
-      if (/^original code:?$/i.test(label)) {
-        const originalCode = value.toUpperCase();
-        const matched = normalizeCodexSignal({ sourceCode: originalCode, sourceDescription: current.title || current.detail || value });
-        current.originalCode = originalCode;
-        current.matchStrategy = matched.matchStrategy;
-        if (matched.codexRecord) {
-          current.codexKey = matched.codexRecord.internalKey;
-          current.codexPhase = matched.codexRecord.phase;
-          current.codexClass = matched.codexRecord.classification;
-        }
-        continue;
-      }
-      if (/^step description name:?$/.test(labelKey)) {
-        current.stepDescriptionName = value;
-        continue;
-      }
-      if (/^date of dispatch:?$/.test(labelKey) || /^dispatch date:?$/.test(labelKey)) {
-        current.dispatchDate = normalizeStructuredDate(value) || value;
-        continue;
-      }
-      if (/^date of reply:?$/.test(labelKey)) {
-        current.replyDate = normalizeStructuredDate(value) || value;
-        continue;
-      }
-      if (/^date of payment\d*:?$/.test(labelKey) || /^date of payment:?$/.test(labelKey)) {
-        const dateStr = normalizeStructuredDate(value) || value;
-        if (dateStr) current.paymentDates.push(dateStr);
-        current.paymentDate = current.paymentDates[current.paymentDates.length - 1] || '';
-        continue;
-      }
-      if (/^date of request:?$/.test(labelKey)) {
-        current.requestDate = normalizeStructuredDate(value) || value;
-        continue;
-      }
-      if (/^result date:?$/.test(labelKey)) {
-        current.resultDate = normalizeStructuredDate(value) || value;
-        continue;
-      }
-      if (/^time limit:?$/.test(labelKey) || /^time limit in record:?$/.test(labelKey) || /^time limit value:?$/.test(labelKey)) {
-        const parsed = parseStructuredTimeLimit(value);
-        current.timeLimitRaw = parsed.raw;
-        current.timeLimitMonths = parsed.months;
-        current.timeLimitDate = parsed.dateStr;
-        continue;
-      }
-    }
+  
 
-    pushCurrent();
-    return dedupe(blocks, (event) => `${event.dateStr}|${event.title}|${event.detail}|${event.originalCode}|${event.dispatchDate}|${event.timeLimitRaw}`).sort(compareDateDesc);
-  }
+  
 
-  function parseFamily(doc) {
-    const publications = [];
-    const rows = [...doc.querySelectorAll('tr')];
-    let inPublicationBlock = false;
-
-    for (const row of rows) {
-      const cells = [...row.querySelectorAll('td,th')].map((cell) => normalize(text(cell)));
-      if (!cells.length) continue;
-
-      if (/^publication no\.?$/i.test(cells[0] || '')) {
-        inPublicationBlock = true;
-        continue;
-      }
-      if (/^priority number$/i.test(cells[0] || '')) {
-        inPublicationBlock = false;
-        continue;
-      }
-      if (!inPublicationBlock) continue;
-      if (!/^(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)/i.test(cells[0] || '')) continue;
-
-      const dateStr = cells.find((value) => DATE_RE.test(value || '')) || '';
-      const kind = cells.find((value) => /^[A-Z]\d?$/.test(value || '')) || '';
-      const parsed = splitPublicationNumber(cells[0], kind);
-      if (!parsed.no || !dateStr) continue;
-      publications.push({ no: parsed.no, kind: parsed.kind, dateStr: dateStr.match(DATE_RE)?.[1] || '', role: 'Family' });
-    }
-
-    return {
-      publications: publications.length
-        ? dedupe(publications, (p) => `${p.no}${p.kind}|${p.dateStr}|${p.role}`)
-        : parsePublications(bodyText(doc), 'Family'),
-    };
-  }
-
-  function parseLegal(doc, caseNo) {
-    const events = parseDatedRows(doc, sourceUrl(caseNo, 'legal'));
-    const codedEvents = extractLegalEventBlocks(doc, sourceUrl(caseNo, 'legal'));
-    const renewals = [];
-    for (const e of events) {
-      const low = `${e.title} ${e.detail}`.toLowerCase();
-      if (!/renewal|annual fee|year\s*\d+/.test(low)) continue;
-      const ym = low.match(/year\s*(\d+)/i) || low.match(/(\d+)(?:st|nd|rd|th)\s*year/i);
-      renewals.push({ dateStr: e.dateStr, title: e.title, detail: e.detail, year: ym ? +ym[1] : null });
-    }
-    return {
-      events,
-      codedEvents,
-      renewals: renewals.sort(compareDateDesc),
-      parseStats: { ...(events.parseStats || createParseStats('legal')), source: 'legal' },
-    };
-  }
-
-  function parseEventHistory(doc, caseNo) {
-    const rawEvents = parseDatedRows(doc, sourceUrl(caseNo, 'event'));
-    const events = rawEvents.map((event) => {
-      const matched = normalizeCodexSignal({ sourceDescription: event.title || '' });
-      if (!matched.codexRecord) return event;
-      return {
-        ...event,
-        codexKey: matched.codexRecord.internalKey,
-        codexPhase: matched.codexRecord.phase,
-        codexClass: matched.codexRecord.classification,
-        matchStrategy: matched.matchStrategy,
-      };
-    });
-    return {
-      events,
-      parseStats: { ...(rawEvents.parseStats || createParseStats('event')), source: 'event' },
-    };
-  }
-
-  function parseUe(doc) {
-    const pageText = bodyText(doc);
-    const status = cleanUeStatusValue(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
-    const renewalPaidYears = [...new Set([...doc.querySelectorAll('tr')]
-      .map((row) => {
-        const match = normalize(text(row)).match(/renewal fee unitary effect year\s*0*(\d{1,2})\b/i);
-        return match ? Number(match[1] || 0) : 0;
-      })
-      .filter(Boolean))].sort((a, b) => b - a);
-    let ueStatus = '';
-    let upcOptOut = '';
-
-    if (/unitary effect registered|registered as a unitary patent/i.test(pageText)) ueStatus = 'Unitary effect registered';
-    else if (/request.*unitary effect|unitary effect.*request/i.test(pageText)) ueStatus = 'UE requested';
-    else if (status) ueStatus = status;
-
-    if (/opt[\s-]*out.*registered|opted[\s-]*out/i.test(pageText)) upcOptOut = 'Opted out';
-    else if (/opt[\s-]*out.*withdrawn|opt[\s-]*out.*removed/i.test(pageText)) upcOptOut = 'Opt-out withdrawn';
-    else if (/no\s*opt[\s-]*out|not\s*opted/i.test(pageText)) upcOptOut = 'No opt-out';
-
-    const memberStateLabels = [/^Member States? covered by Unitary/i, /^Participating member states?$/i];
-    const memberStates = cleanMemberStatesValue(
-      fieldTailByLabel(doc, memberStateLabels)
-      || fieldByLabel(doc, memberStateLabels)
-    );
-
-    return {
-      statusRaw: status,
-      ueStatus,
-      upcOptOut,
-      memberStates,
-      renewalPaidYears,
-      highestRenewalPaidYear: renewalPaidYears[0] || null,
-      text: pageText,
-    };
-  }
-
-  function parseFederated(doc, caseNo) {
-    const states = [];
-    const summary = {
-      appNo: caseNo,
-      fullPublicationNo: '',
-      applicantProprietor: '',
-      status: '',
-      upMemberStates: '',
-      invalidationDate: '',
-      renewalFeesPaidUntil: '',
-      recordUpdated: '',
-    };
-
-    const captureSummary = (pairs) => {
-      if (!summary.appNo && pairs['EP application number']) summary.appNo = pairs['EP application number'];
-      if (!summary.fullPublicationNo && pairs['Full publication number']) summary.fullPublicationNo = pairs['Full publication number'];
-      if (!summary.applicantProprietor && pairs['Applicant / proprietor']) summary.applicantProprietor = pairs['Applicant / proprietor'];
-      if (!summary.status && pairs.Status) summary.status = pairs.Status;
-      if (!summary.upMemberStates && pairs['Member States covered by Unitary Patent Protection']) summary.upMemberStates = pairs['Member States covered by Unitary Patent Protection'];
-      if (!summary.invalidationDate && pairs['Invalidation date']) summary.invalidationDate = pairs['Invalidation date'];
-      if (!summary.renewalFeesPaidUntil && pairs['Renewal fees paid until']) summary.renewalFeesPaidUntil = pairs['Renewal fees paid until'];
-      if (!summary.recordUpdated && pairs['Record last updated']) summary.recordUpdated = pairs['Record last updated'];
-    };
-
-    for (const row of doc.querySelectorAll('tr')) {
-      const pairs = rowLabelValuePairs(row);
-      if (Object.keys(pairs).length < 1) continue;
-      captureSummary(pairs);
-      if (!pairs.State) continue;
-      states.push({
-        state: pairs.State,
-        nationalPublicationNo: pairs['National publication number'] || '',
-        publicationDate: pairs['Publication date'] || '',
-        upMemberStates: pairs['Member States covered by Unitary Patent Protection'] || '',
-        invalidationDate: pairs['Invalidation date'] || '',
-        renewalFeesPaidUntil: pairs['Renewal fees paid until'] || '',
-        recordUpdated: pairs['Record last updated'] || '',
-        notInForceSince: pairs['Not in force since'] || '',
-        status: pairs.Status || summary.status || '',
-      });
-    }
-
-    return {
-      ...summary,
-      states,
-      notableStates: states.filter((s) => normalize(s.notInForceSince || '') || /lapse|revok|terminated|not in force/i.test(`${s.status || ''} ${s.nationalPublicationNo || ''}`)),
-    };
-  }
-
-  function parseCitations(doc) {
-    const entries = [];
-    let phase = '';
-    let currentType = '';
-
-    for (const row of doc.querySelectorAll('tr')) {
-      const cells = [...row.querySelectorAll('th,td')].map((cell) => normalize(text(cell))).filter(Boolean);
-      if (!cells.length) continue;
-
-      if (/^Cited in$/i.test(cells[0] || '') && cells[1]) {
-        phase = cells[1];
-        continue;
-      }
-      if (/^Type:?$/i.test(cells[0] || '')) {
-        currentType = cells[1] || '';
-        continue;
-      }
-      if (!/^Publication No\.:?$/i.test(cells[0] || '')) continue;
-
-      const raw = cells.slice(1).join(' ');
-      const pubMatch = raw.match(/\b((?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)\d{4,})\b/i);
-      if (!pubMatch?.[1]) continue;
-      const categoryMatches = [...raw.matchAll(/\[([A-Z]{1,4})\]/g)].map((m) => String(m[1] || ''));
-      const applicant = raw.match(/\(([^)]+)\)/)?.[1] || '';
-      entries.push({
-        phase: phase || 'Other',
-        type: currentType || 'Patent literature',
-        publicationNo: String(pubMatch[1] || '').toUpperCase(),
-        categories: dedupe(categoryMatches, (x) => x),
-        applicant,
-        detail: raw,
-      });
-    }
-
-    const byPhase = {};
-    for (const entry of entries) {
-      (byPhase[entry.phase] ||= []).push(entry);
-    }
-    const phases = Object.keys(byPhase).sort((a, b) => {
-      const ai = CITATION_PHASE_ORDER.indexOf(a);
-      const bi = CITATION_PHASE_ORDER.indexOf(b);
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.localeCompare(b);
-    }).map((name) => ({ name, entries: byPhase[name] }));
-
-    return { entries, phases };
-  }
+  
 
   function parseSource(key, doc, caseNo) {
     switch (key) {
@@ -5757,39 +9009,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     });
   }
 
-  function parseUpcOptOutResult(html, patentNumber) {
-    const t = normalize((html || '').replace(/<[^>]+>/g, ' ')).toLowerCase();
-    if (!t) return null;
-    if (/no results found/.test(t)) {
-      return { patentNumber, optedOut: false, status: 'No opt-out found', source: 'UPC registry' };
-    }
-
-    const pn = String(patentNumber || '').toLowerCase();
-    const hasPatentRef = pn && t.includes(pn);
-    if (!hasPatentRef) return null;
-
-    const hasOptOutToken = /\bopt(?:ed)?[\s-]*out\b/.test(t);
-    const positiveSignal =
-      /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+(?:register(?:ed)?|enter(?:ed)?|effective)\b/.test(t)
-      || /\b(?:register(?:ed)?|enter(?:ed)?|effective)(?:\s+\w+){0,8}\s+opt(?:ed)?[\s-]*out\b/.test(t)
-      || /\bcase\s+type\s+opt(?:ed)?[\s-]*out\s+application\b/.test(t)
-      || /\bopt(?:ed)?[\s-]*out\s+application\b/.test(t);
-    const withdrawnSignal = /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+(?:withdrawn|removed|revoked)\b/.test(t);
-    const negativeSignal =
-      /\bnot\s+opt(?:ed)?[\s-]*out\b/.test(t)
-      || /\bno\s+opt(?:ed)?[\s-]*out\b/.test(t)
-      || /\bopt(?:ed)?[\s-]*out(?:\s+\w+){0,8}\s+not\s+(?:been\s+)?(?:register(?:ed)?|enter(?:ed)?|effective)\b/.test(t);
-
-    if (withdrawnSignal) {
-      return { patentNumber, optedOut: false, status: 'Opt-out withdrawn', source: 'UPC registry' };
-    }
-
-    if (hasOptOutToken && positiveSignal && !negativeSignal) {
-      return { patentNumber, optedOut: true, status: 'Opted out', source: 'UPC registry' };
-    }
-
-    return null;
-  }
+  
 
   function upcCandidateNumbers(caseNo) {
     const { c, docs } = caseSnapshot(caseNo);
@@ -5879,17 +9099,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     });
   }
 
-  function normalizeDateString(raw) {
-    const t = String(raw || '').trim();
-    if (!t) return '';
-    const m = t.match(/(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})/);
-    if (!m) return '';
-    const d = String(m[1] || '').padStart(2, '0');
-    const mo = String(m[2] || '').padStart(2, '0');
-    const yRaw = String(m[3] || '');
-    const y = yRaw.length === 2 ? `20${yRaw}` : yRaw;
-    return `${d}.${mo}.${y}`;
-  }
+  
 
   function parseSmallNumberToken(token) {
     const t = String(token || '').trim().toLowerCase();
@@ -6192,172 +9402,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return 0;
   }
 
-  function parsePdfDeadlineHints(pdfText, context = {}) {
-    const textRaw = String(pdfText || '');
-    const textLower = textRaw.toLowerCase();
-    const docDateStr = normalizeDateString(context.docDateStr || '');
-
-    const diagnostics = {
-      category: '',
-      categoryEvidence: '',
-      communicationDate: '',
-      communicationEvidence: '',
-      responseMonths: 0,
-      responseEvidence: '',
-      explicitDeadlineDate: '',
-      explicitDeadlineEvidence: '',
-      oralProceedingsDate: '',
-      oralProceedingsEvidence: '',
-      registeredLetterLine: '',
-      registeredLetterProofLine: '',
-    };
-
-    if (!textLower) return { hints: [], diagnostics };
-
-    const hints = [];
-    const pushHint = (hint) => {
-      const date = parseDateString(hint?.dateStr || '');
-      if (!date) return;
-      hints.push({
-        label: hint.label,
-        dateStr: formatDate(date),
-        sourceDate: hint.sourceDate || '',
-        confidence: hint.confidence || 'high',
-        level: hint.level || 'bad',
-        resolved: false,
-        source: 'PDF parse',
-        evidence: hint.evidence || '',
-      });
-    };
-
-    const categoryFromText = /rule\s*71\s*\(\s*3\s*\)|intention to grant/.test(textLower)
-      ? 'R71(3) response period'
-      : /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(textLower)
-        ? 'Rule 62a invitation period'
-        : /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(textLower)
-          ? 'Rule 63 invitation period'
-          : /rule\s*64|additional search fee|further search fees|lack of unity/.test(textLower)
-            ? 'Rule 64 additional search fees / unity selection'
-            : /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(textLower)
-              ? 'Rule 70a reply to search opinion'
-              : /rule\s*70\(2\)|wish to proceed further|desire to proceed further/.test(textLower)
-                ? 'Rule 70(2) confirmation/response period'
-                : /\brule\s*116\b|summons to oral proceedings/.test(textLower)
-                  ? 'Rule 116 final date'
-                  : /\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)/.test(textLower)
-                    ? 'Art. 94(3) response period'
-                    : /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(textLower)
-                      ? 'Minutes-as-first-action examination communication'
-                      : /\brule\s*161\b|\brule\s*162\b/.test(textLower)
-                        ? 'Rule 161/162 response period'
-                        : /rule\s*164\(1\)|additional search fees|further search fees/.test(textLower)
-                          ? 'Rule 164(1) additional search fees'
-                          : /rule\s*164\(2\)|unsearched invention/.test(textLower)
-                            ? 'Rule 164(2) unsearched-inventions communication'
-                            : /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(textLower)
-                              ? 'Opposition Rule 79(1) proprietor reply'
-                              : /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(textLower)
-                                ? 'Opposition Rule 79(3) party-reply communication'
-                                : /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(textLower)
-                                  ? 'Opposition Rule 82(1) maintenance-text observations'
-                                  : /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(textLower)
-                                    ? 'Opposition Rule 82(2) translations + publication fee'
-                                    : /rule\s*82\(3\)|further invitation|surcharge/.test(textLower)
-                                      ? 'Opposition Rule 82(3) surcharge period'
-                                      : /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(textLower)
-                                        ? 'Limitation Rule 95(2) correction period'
-                                        : /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(textLower)
-                                          ? 'Limitation Rule 95(3) translations + fee'
-                                          : '';
-
-    const categoryFromContext = inferDeadlineCategoryFromContext(context);
-    let category = categoryFromText || categoryFromContext.category;
-    diagnostics.category = category;
-    diagnostics.categoryEvidence = categoryFromText ? 'Detected from communication text' : (categoryFromContext.evidence || '');
-
-    const registeredLetter = extractRegisteredLetterProofLine(textRaw);
-    diagnostics.registeredLetterLine = registeredLetter.registeredLetterLine || '';
-    diagnostics.registeredLetterProofLine = registeredLetter.proofLine || '';
-
-    const communication = extractCommunicationDateFromPdf(textRaw, { docDateStr });
-    const communicationDateStr = communication.dateStr || docDateStr;
-    const communicationDate = parseDateString(communicationDateStr);
-    diagnostics.communicationDate = communicationDateStr || '';
-    diagnostics.communicationEvidence = communication.evidence || (docDateStr ? 'Doclist date fallback for communication date' : '');
-
-    const oralProceedings = extractOralProceedingsDateFromPdf(textRaw);
-    diagnostics.oralProceedingsDate = oralProceedings.dateStr || '';
-    diagnostics.oralProceedingsEvidence = oralProceedings.evidence || '';
-
-    const monthPeriod = extractResponseMonthsFromPdf(textRaw);
-    let responseMonths = monthPeriod.months || 0;
-    let responseEvidence = monthPeriod.evidence || '';
-    if (!responseMonths && category) {
-      const fallbackMonths = defaultResponseMonthsForCategory(category);
-      if (fallbackMonths > 0) {
-        responseMonths = fallbackMonths;
-        responseEvidence = `Default ${fallbackMonths}-month period inferred for ${category}${diagnostics.categoryEvidence ? ` (${diagnostics.categoryEvidence})` : ''}`;
-      }
-    }
-
-    diagnostics.responseMonths = responseMonths;
-    diagnostics.responseEvidence = responseEvidence;
-
-    const explicitDue = extractExplicitDeadlineDateFromPdf(textRaw);
-    diagnostics.explicitDeadlineDate = explicitDue.dateStr || '';
-    diagnostics.explicitDeadlineEvidence = explicitDue.evidence || '';
-
-    const genericCommunicationSignal = /\bcommunication\b|\bnotification\b|\bsummons\b|\binvitation\b/.test(textLower);
-    if (!category && (monthPeriod.months || explicitDue.dateStr || genericCommunicationSignal) && communicationDateStr) {
-      category = 'Communication response period';
-      diagnostics.category = category;
-      diagnostics.categoryEvidence = monthPeriod.months || explicitDue.dateStr
-        ? 'Inferred from communication-period evidence in document text'
-        : 'Inferred from generic communication text signal';
-    }
-
-    if (oralProceedings.dateStr) {
-      pushHint({
-        label: /opposition/i.test(String(context.docProcedure || '')) ? 'Opposition oral proceedings date' : 'Oral proceedings date',
-        dateStr: oralProceedings.dateStr,
-        sourceDate: communicationDateStr || docDateStr,
-        confidence: 'high',
-        level: 'warn',
-        evidence: oralProceedings.evidence,
-      });
-    }
-
-    if (!category) return { hints: dedupe(hints, (hint) => `${hint.label}|${hint.dateStr}`), diagnostics };
-
-    let explicitAdded = false;
-    if (explicitDue.dateStr) {
-      pushHint({
-        label: category,
-        dateStr: explicitDue.dateStr,
-        sourceDate: communicationDateStr || docDateStr,
-        confidence: 'high',
-        level: /rule\s*116|oral proceedings/i.test(category) ? 'warn' : 'bad',
-        evidence: explicitDue.evidence,
-      });
-      explicitAdded = true;
-    }
-
-    if (!explicitAdded && responseMonths && communicationDate) {
-      const calc = addCalendarMonthsDetailed(communicationDate, responseMonths);
-      const communicationFromDocFallback = /doclist date fallback/i.test(String(diagnostics.communicationEvidence || ''));
-      const confidence = monthPeriod.months ? (communicationFromDocFallback ? 'medium' : 'high') : 'low';
-      pushHint({
-        label: category,
-        dateStr: formatDate(calc.date),
-        sourceDate: communicationDateStr,
-        confidence,
-        level: /rule\s*116|oral proceedings/i.test(category) ? 'warn' : 'bad',
-        evidence: `${responseEvidence || `Derived from ${responseMonths} month response period`} from communication date ${communicationDateStr}${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
-      });
-    }
-
-    return { hints: dedupe(hints, (hint) => `${hint.label}|${hint.dateStr}`), diagnostics };
-  }
+  
 
   function normalizePdfDocumentUrl(rawUrl) {
     const absolutize = (candidate) => {
@@ -7247,27 +10292,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     }
   }
 
-  function addCalendarMonthsDetailed(date, months) {
-    const src = new Date(date);
-    if (Number.isNaN(src.getTime())) return { date: new Date(NaN), rolledOver: false, fromDay: 0, toDay: 0 };
-
-    const srcDay = src.getDate();
-    const srcMonth = src.getMonth();
-    const srcYear = src.getFullYear();
-    const rawMonth = srcMonth + Number(months || 0);
-
-    const targetYear = srcYear + Math.floor(rawMonth / 12);
-    const targetMonth = ((rawMonth % 12) + 12) % 12;
-    const lastDay = endOfMonth(targetYear, targetMonth).getDate();
-    const targetDay = Math.min(srcDay, lastDay);
-
-    return {
-      date: new Date(targetYear, targetMonth, targetDay),
-      rolledOver: srcDay !== targetDay,
-      fromDay: srcDay,
-      toDay: targetDay,
-    };
-  }
+  
 
   function addMonths(date, months) {
     return addCalendarMonthsDetailed(date, months).date;
@@ -7284,200 +10309,19 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return endOfMonth(anniversaryYear, filingDate.getMonth());
   }
 
-  function buildDeadlineRecords(docs, eventHistory = {}, legal = {}) {
-    const sortedDocs = [...(docs || [])].sort(compareDateDesc);
-    const sortedEvents = dedupe([...(eventHistory.events || []), ...(legal.events || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}`).sort(compareDateDesc);
-    const sortedCodedEvents = dedupe([...(legal.codedEvents || [])], (e) => `${e.dateStr}|${e.title}|${e.detail}|${e.originalCode}|${e.codexKey}`).sort(compareDateDesc);
-    return dedupe([
-      ...sortedDocs.map((d) => ({
-        dateStr: d.dateStr,
-        title: d.title || '',
-        detail: d.procedure || d.detail || '',
-        actor: d.actor || 'Other',
-        source: 'Documents',
-      })),
-      ...sortedEvents.map((e) => ({
-        dateStr: e.dateStr,
-        title: e.title || '',
-        detail: e.detail || '',
-        actor: /applicant|filed by applicant|by applicant/i.test(`${e.title || ''} ${e.detail || ''}`) ? 'Applicant' : 'EPO',
-        source: 'Event',
-        codexKey: e.codexKey || '',
-        codexPhase: e.codexPhase || '',
-        codexClass: e.codexClass || '',
-      })),
-      ...sortedCodedEvents.map((e) => ({
-        dateStr: e.dateStr,
-        title: e.title || '',
-        detail: e.detail || '',
-        actor: /applicant|filed by applicant|by applicant/i.test(`${e.title || ''} ${e.detail || ''}`) ? 'Applicant' : 'EPO',
-        source: 'Coded legal event',
-        codexKey: e.codexKey || '',
-        codexPhase: e.codexPhase || '',
-        codexClass: e.codexClass || '',
-        originalCode: e.originalCode || '',
-        effectiveDate: e.effectiveDate || '',
-        freeFormatText: e.freeFormatText || '',
-        stepDescriptionName: e.stepDescriptionName || '',
-        dispatchDate: e.dispatchDate || '',
-        replyDate: e.replyDate || '',
-        paymentDate: e.paymentDate || '',
-        paymentDates: Array.isArray(e.paymentDates) ? [...e.paymentDates] : [],
-        requestDate: e.requestDate || '',
-        resultDate: e.resultDate || '',
-        timeLimitRaw: e.timeLimitRaw || '',
-        timeLimitMonths: Number(e.timeLimitMonths || 0),
-        timeLimitDate: e.timeLimitDate || '',
-      })),
-    ], (r) => `${r.dateStr}|${r.title}|${r.detail}|${r.source}|${r.codexKey || ''}`).sort(compareDateDesc);
-  }
+  
 
-  function postureRecord(records = [], regex) {
-    return (records || []).find((record) => regex.test(`${record.title || ''} ${record.detail || ''}`.toLowerCase())) || null;
-  }
+  
 
-  function postureRecordByCodex(records = [], internalKeys = []) {
-    const keys = new Set((internalKeys || []).filter(Boolean));
-    return (records || []).find((record) => record.codexKey && keys.has(record.codexKey)) || null;
-  }
+  
 
-  function postureRecordDate(record) {
-    return parseDateString(record?.dateStr || '');
-  }
+  
 
-  function postureLossLabel(record) {
-    const text = `${record?.title || ''} ${record?.detail || ''}`.toLowerCase();
-    if (/non-entry into european phase/.test(text)) return 'non-entry into European phase';
-    if (/translations of claims\/payment missing/.test(text)) return 'grant-formalities failure';
-    if (/non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(text)) return 'fees / written-opinion failure';
-    if (/non-reply to written opinion/.test(text)) return 'no reply to the written opinion';
-    if (/loss of rights|rule\s*112\(1\)/.test(text)) return 'loss-of-rights communication';
-    if (/withdrawn/.test(text)) return 'withdrawn posture';
-    return 'adverse procedural posture';
-  }
+  
 
-  function postureRecoveryLabel(record) {
-    const text = `${record?.title || ''} ${record?.detail || ''}`.toLowerCase();
-    if (/further processing/.test(text)) return 'further processing';
-    if (/re-establishment|rights re-established/.test(text)) return 're-establishment';
-    return 'recovery procedure';
-  }
+  
 
-  function proceduralPostureModel(main, docs, eventHistory = {}, legal = {}) {
-    const statusRaw = dedupeMultiline(main?.statusRaw || '');
-    const statusSummary = summarizeStatus(statusRaw);
-    const statusLow = statusRaw.toLowerCase();
-    const records = buildDeadlineRecords(docs, eventHistory, legal);
-    const latestLoss = postureRecordByCodex(records, ['LOSS_OF_RIGHTS_EVENT', 'APPLICATION_DEEMED_WITHDRAWN'])
-      || postureRecord(records, /application deemed to be withdrawn|deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|withdrawn by applicant|application withdrawn/);
-    const detailedLoss = postureRecord(records, /non-entry into european phase|translations of claims\/payment missing|non-payment of examination fee\/designation fee\/non-reply to written opinion|non-reply to written opinion/);
-    const effectiveLoss = detailedLoss || latestLoss;
-    const latestRecoveryDecision = postureRecordByCodex(records, ['FURTHER_PROCESSING_DECISION'])
-      || postureRecord(records, /decision on request for further processing|decision to allow further processing|re-establishment|rights re-established/);
-    const latestRecoveryRequest = postureRecordByCodex(records, ['FURTHER_PROCESSING_REQUEST'])
-      || postureRecord(records, /request for further processing/);
-    const latestRecovery = latestRecoveryDecision || latestRecoveryRequest;
-    const latestGrantDecision = postureRecordByCodex(records, ['EXPECTED_GRANT'])
-      || postureRecord(records, /decision to grant a european patent|mention of grant|patent granted|the patent has been granted/);
-    const latestNoOpposition = postureRecordByCodex(records, ['NO_OPPOSITION_FILED'])
-      || postureRecord(records, /no opposition filed within time limit/);
-    const latestR71 = postureRecordByCodex(records, ['GRANT_R71_3_EVENT'])
-      || postureRecord(records, /grant of patent is intended|intention to grant|rule\s*71\(3\)|text intended for grant/);
-    const latestSearchPublication = postureRecordByCodex(records, ['SEARCH_REPORT_PUBLICATION']);
-
-    const latestLossDate = postureRecordDate(latestLoss);
-    const latestRecoveryDecisionDate = postureRecordDate(latestRecoveryDecision);
-    const latestRecoveryRequestDate = postureRecordDate(latestRecoveryRequest);
-    const latestGrantDecisionDate = postureRecordDate(latestGrantDecision);
-    const recovered = !!(latestLossDate && latestRecoveryDecisionDate && latestRecoveryDecisionDate >= latestLossDate);
-    const recoveryPending = !!(latestLossDate && latestRecoveryRequestDate && latestRecoveryRequestDate >= latestLossDate && !recovered);
-    const recoveredBeforeGrant = !!(recovered && latestGrantDecisionDate && latestGrantDecisionDate >= latestRecoveryDecisionDate);
-    const currentClosed = statusSummary.level === 'bad';
-    const currentNoOpposition = /granted \(no opposition\)/i.test(statusSummary.simple || '') || /no opposition filed within time limit/i.test(statusLow) || !!latestNoOpposition;
-    const currentGranted = currentNoOpposition || /^granted$/i.test(statusSummary.simple || '') || /patent has been granted|the patent has been granted/i.test(statusLow) || !!latestGrantDecision;
-    const currentGrantIntended = /grant intended/i.test(statusSummary.simple || '') || /grant of patent is intended|rule\s*71\(3\)|intention to grant/i.test(statusLow) || !!latestR71;
-    const currentExamination = /request for examination was made|examination/.test(statusLow) && !currentClosed;
-    const currentSearch = (/published|search/.test(statusLow) || !!latestSearchPublication) && !currentClosed && !currentGrantIntended && !currentGranted;
-
-    let currentLabel = statusSummary.simple;
-    let currentLevel = statusSummary.level;
-    if (currentClosed && effectiveLoss) {
-      const lossText = `${effectiveLoss.title || ''} ${effectiveLoss.detail || ''}`.toLowerCase();
-      if (/non-entry into european phase/.test(lossText)) {
-        currentLabel = 'Deemed withdrawn (non-entry)';
-        currentLevel = 'bad';
-      } else if (/translations of claims\/payment missing/.test(lossText)) {
-        currentLabel = 'Deemed withdrawn (grant formalities)';
-        currentLevel = 'bad';
-      } else if (/non-payment of examination fee\/designation fee\/non-reply to written opinion/.test(lossText)) {
-        currentLabel = 'Deemed withdrawn (fees / no WO reply)';
-        currentLevel = 'bad';
-      } else if (/non-reply to written opinion/.test(lossText)) {
-        currentLabel = 'Deemed withdrawn (no WO reply)';
-        currentLevel = 'bad';
-      }
-    } else if (currentNoOpposition) {
-      currentLabel = 'Granted (no opposition)';
-      currentLevel = 'ok';
-    } else if (currentGranted) {
-      currentLabel = 'Granted';
-      currentLevel = 'ok';
-    } else if (currentGrantIntended) {
-      currentLabel = 'Grant intended (R71(3))';
-      currentLevel = 'warn';
-    } else if (currentExamination) {
-      currentLabel = 'Examination';
-      currentLevel = 'info';
-    } else if (currentSearch) {
-      currentLabel = 'Search';
-      currentLevel = 'info';
-    }
-
-    let note = '';
-    if (recoveredBeforeGrant) {
-      note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecoveryDecision)} before grant.`;
-    } else if (recovered) {
-      note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecoveryDecision)}.`;
-    } else if (recoveryPending) {
-      note = `Recovery requested via ${postureRecoveryLabel(latestRecoveryRequest)}; EPO outcome pending.`;
-    } else if (currentClosed && effectiveLoss) {
-      note = `Current controlling posture is ${postureLossLabel(effectiveLoss)}.`;
-    } else if (currentNoOpposition) {
-      note = 'Current controlling posture is granted with the opposition period closed.';
-    } else if (currentGranted) {
-      note = 'Current controlling posture is granted / post-grant.';
-    } else if (currentGrantIntended && latestR71) {
-      note = 'Current controlling posture is Rule 71(3) / intention-to-grant.';
-    } else if (currentExamination) {
-      note = 'Current controlling posture is active examination.';
-    } else if (currentSearch) {
-      note = 'Current controlling posture is search / publication stage.';
-    }
-
-    return {
-      label: currentLabel,
-      level: currentLevel,
-      currentLabel,
-      currentLevel,
-      note,
-      recovered,
-      recoveryPending,
-      recoveredBeforeGrant,
-      currentClosed,
-      currentGranted,
-      currentNoOpposition,
-      currentGrantIntended,
-      currentExamination,
-      currentSearch,
-      latestLoss: effectiveLoss,
-      latestRecovery,
-      latestRecoveryDecision,
-      latestRecoveryRequest,
-      latestGrantDecision,
-      latestNoOpposition,
-      latestR71,
-    };
-  }
+  
 
   function pdfHintsWithParsedDates(pdfData = {}) {
     return (Array.isArray(pdfData?.hints) ? pdfData.hints : [])
@@ -8769,18 +11613,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     }
   }
 
-  function inferProceduralDeadlines(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
-    const ctx = buildDeadlineComputationContext(main, docs, eventHistory, legal, pdfData);
-    appendPdfDerivedDeadlines(ctx);
-    appendSearchStageDeadlines(ctx);
-    appendCoreCommunicationDeadlines(ctx);
-    appendDirectOrPctDeadlines(ctx);
-    appendLossOfRightsAndRemedyDeadlines(ctx);
-    appendOppositionAndLimitationDeadlines(ctx);
-    appendPostGrantDeadlines(ctx);
-    appendReferenceDeadlines(ctx);
-    return dedupe(ctx.out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}|${d.reviewOnly ? 'review' : ''}|${d.internalKey || ''}|${d.namespace || ''}|${d.anchorOnly ? 'anchor' : ''}`);
-  }
+  
 
   function inferRenewalModel(main, legal, ue, federated = {}) {
     const now = new Date();
@@ -8872,63 +11705,11 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return String(deadline.confidence || '').toLowerCase() === 'low';
   }
 
-  function deadlinePresentationBuckets(deadlines = [], currentClosedPosture = false) {
-    const buckets = { active: [], monitoring: [], review: [], historical: [] };
-    for (const deadline of (deadlines || [])) {
-      if (deadline?.reference || deadline?.anchorOnly) continue;
-      if (currentClosedPosture) {
-        buckets.historical.push(deadline);
-        continue;
-      }
-      if (deadline?.resolved || deadline?.superseded) {
-        buckets.historical.push(deadline);
-        continue;
-      }
-      if (isMonitoringDeadline(deadline)) {
-        buckets.monitoring.push(deadline);
-        continue;
-      }
-      if (isReviewDeadline(deadline)) {
-        buckets.review.push(deadline);
-        continue;
-      }
-      buckets.active.push(deadline);
-    }
-    for (const key of Object.keys(buckets)) buckets[key].sort((a, b) => (a?.date?.getTime?.() || 0) - (b?.date?.getTime?.() || 0));
-    return buckets;
-  }
+  
 
-  function selectNextDeadline(deadlines = [], currentClosedPosture = false, now = new Date()) {
-    const actionable = deadlinePresentationBuckets(deadlines, currentClosedPosture).active;
-    if (!actionable.length) return null;
-    const upcoming = actionable.find((deadline) => deadline.date > now);
-    if (upcoming) return upcoming;
-    if (currentClosedPosture) return null;
-    return actionable[0] || null;
-  }
+  
 
-  function activeDeadlineNoteText(deadlines = [], currentClosedPosture = false, posture = null) {
-    const buckets = deadlinePresentationBuckets(deadlines, currentClosedPosture);
-    if (buckets.active.length && currentClosedPosture) {
-      return 'No active procedural deadline detected on the current withdrawn/closed posture; remaining clocks are historical, appellate, or low-confidence.';
-    }
-    if (buckets.active.length) return '';
-    if (buckets.monitoring.length) {
-      return 'No active applicant/EPO deadline detected; remaining clocks are third-party monitoring windows.';
-    }
-    if (buckets.review.length) {
-      return `No auto-remindable deadline detected; ${buckets.review.length} low-confidence or manual-review item${buckets.review.length === 1 ? '' : 's'} remain.`;
-    }
-    if (buckets.historical.some((deadline) => deadline.superseded) && currentClosedPosture) {
-      return 'No active procedural deadline detected; later loss-of-rights events superseded earlier response periods.';
-    }
-    if (buckets.historical.some((deadline) => deadline.resolved)) {
-      return posture?.recovered
-        ? 'No active procedural deadline detected; earlier response periods appear answered and the case later recovered from an adverse posture.'
-        : 'No active procedural deadline detected; earlier response periods appear already answered.';
-    }
-    return currentClosedPosture ? 'No active procedural deadline detected on the current withdrawn/closed posture.' : '';
-  }
+  
 
   function upcUePresentationModel(ue = {}, upcRegistry = null, federated = {}) {
     const ueStatusRaw = normalize(ue.ueStatus || ue.statusRaw || '');
@@ -9119,30 +11900,9 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return 'info';
   }
 
-  const TIMELINE_LEVEL_RULES = Object.freeze([
-    {
-      level: 'bad',
-      test: (low) => /deemed to be withdrawn|application deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|revocation|lapsed|not maintained|request for re-establishment.*rejected|rights restored refused|withdrawn by applicant|deemed withdrawn/.test(low),
-    },
-    {
-      level: 'warn',
-      test: (low) => /deadline|time limit|final date|summons to oral proceedings|rule\s*116|article\s*94\(3\)|art\.?\s*94\(3\)|rule\s*71\(3\)|intention to grant|communication from the examining|communication under|opposition|third party observations|request for re-establishment|further processing/.test(low),
-    },
-    {
-      level: 'ok',
-      test: (low) => /mention of grant|patent granted|grant decision|fee paid|renewal paid|annual fee paid|validation|registered|recorded/.test(low),
-    },
-  ]);
+  
 
-  function timelineAttorneyImportance(title, detail = '', source = '', actor = 'Other', baseLevel = 'info') {
-    const base = ['bad', 'warn', 'ok', 'info'].includes(baseLevel) ? baseLevel : 'info';
-    const low = normalize(`${title || ''}\n${detail || ''}\n${source || ''}\n${actor || ''}`).toLowerCase();
-    for (const rule of TIMELINE_LEVEL_RULES) {
-      if (rule.test(low)) return rule.level;
-      if (base === rule.level) return rule.level;
-    }
-    return 'info';
-  }
+  
 
   function sourceStamp(c, key) {
     const src = c?.sources?.[key] || {};
@@ -9205,48 +11965,13 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return bits[0] || procedure || 'All documents';
   }
 
-  const PACKET_EXPLANATION_MAP = Object.freeze({
-    'international search / iprp': 'ISA/IPRP packet from the international phase.',
-    'partial international search': 'Partial international search packet with the provisional opinion/search results.',
-    'european search package': 'European search report packet, including ESR opinion/strategy where present.',
-    'extended european search package': 'European search packet including an extended-ESR annex.',
-    'supplementary european search package': 'Supplementary European search packet for Euro-PCT regional phase entry.',
-    'intention to grant (r71(3) epc)': 'Rule 71(3) grant-intention packet, including text-for-grant documents.',
-    'response to intention to grant': 'Applicant response packet to the Rule 71(3) / grant-intention communication.',
-    'grant decision': 'Formal grant decision from the EPO.',
-    'further processing': 'Recovery packet showing further processing after a missed time limit.',
-    'euro-pct non-entry failure': 'Loss-of-rights packet showing failure to complete Euro-PCT entry acts in time.',
-    'grant-formalities failure': 'Loss-of-rights packet caused by missing grant-formality acts or payments.',
-    'fees / written-opinion failure': 'Loss-of-rights packet caused by fee non-payment and/or no reply to the written opinion.',
-    'written-opinion loss': 'Loss-of-rights packet caused by no reply to the written opinion.',
-  });
+  
 
-  function docPacketExplanation(label = '') {
-    return PACKET_EXPLANATION_MAP[normalize(label).toLowerCase()] || '';
-  }
+  
 
-  function timelineSubtitleText(item = {}) {
-    const detailBits = String(item.detail || '')
-      .split(/\s*(?:·|\n)+\s*/)
-      .map((bit) => normalize(bit))
-      .filter(Boolean);
-    const actor = normalize(item.actor || '');
-    const explanation = normalize(item.explanation || '');
-    const bits = [...detailBits, explanation, normalize(item.source || ''), actor && actor !== 'Other' ? actor : '']
-      .filter(Boolean)
-      .filter((bit, idx, arr) => arr.findIndex((other) => other.toLowerCase() === bit.toLowerCase()) === idx);
-    return bits.join(' · ');
-  }
+  
 
-  function shouldAppendSingleRunLabel(itemDetail = '', groupLabel = '') {
-    const detail = normalize(itemDetail).toLowerCase();
-    const label = normalize(groupLabel).toLowerCase();
-    if (!label) return false;
-    if (!detail) return true;
-    if (detail.includes(label)) return false;
-    if (/^(examination|other|formalities \/ other)$/i.test(groupLabel)) return false;
-    return true;
-  }
+  
 
   function timelineDocItemsFromDocs(caseNo, docs = [], pdfDeadlines = {}) {
     const groupableBundles = new Set(['Search package', 'Grant communication', 'Grant response', 'Examination communication', 'Examination response', 'Examination', 'Filing package', 'Applicant filings', 'Response to search']);
@@ -9402,31 +12127,11 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return built;
   }
 
-  const COMPACT_TITLE_EXACT_MAP = new Map([
-    ['Text intended for grant (version for approval)', 'Grant text for approval'],
-    ['Text intended for grant (clean copy)', 'Grant text (clean copy)'],
-    ['Communication about intention to grant a European patent', 'Intention to grant'],
-    ['Annex to the communication about intention to grant a European patent', 'Grant communication annex'],
-    ['Bibliographic data of the European patent application', 'Bibliographic data'],
-    ['Request for correction/amendment of the text proposed for grant sent from 01.04.2012', 'Grant text correction request'],
-    ['Reminder period for payment of examination fee/designation fee and correction of deficiencies in Written Opinion/amendment', 'Exam / designation fee reminder'],
-    ['Communication regarding the transmission of the European search report', 'Search report transmission'],
-    ['Amendments received before examination', 'Amendments before examination'],
-  ]);
+  
 
-  const COMPACT_TITLE_REPLACEMENTS = Object.freeze([
-    [/\s+a European patent$/i, ''],
-    [/^New entry:\s*/i, ''],
-    [/^Deletion\s+-\s*/i, ''],
-    [/\s+sent from 01\.04\.2012$/i, ''],
-  ]);
+  
 
-  function compactOverviewTitle(title = '') {
-    const normalized = normalize(title);
-    if (!normalized) return '—';
-    if (COMPACT_TITLE_EXACT_MAP.has(normalized)) return COMPACT_TITLE_EXACT_MAP.get(normalized);
-    return COMPACT_TITLE_REPLACEMENTS.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), normalized).trim();
-  }
+  
 
   function overviewLatestActionText(doc) {
     if (!doc) return '—';
@@ -9450,65 +12155,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     };
   }
 
-  function recoveryActionModel(posture = {}, waitingOn = '', waitingDays = null, latestApplicant = null) {
-    const loss = posture?.latestLoss || null;
-    const recovery = posture?.latestRecoveryDecision || posture?.latestRecovery || null;
-    const recoveryRequest = posture?.latestRecoveryRequest || null;
-    const grant = posture?.latestGrantDecision || null;
-    const cap = (text = '') => text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : '';
-    const lossText = loss ? cap(postureLossLabel(loss)) : 'Adverse posture';
-    const recoveryText = recovery
-      ? (compactOverviewTitle(recovery.title || recovery.detail || '') || cap(postureRecoveryLabel(recovery)))
-      : '';
-    const grantText = grant ? (compactOverviewTitle(grant.title || grant.detail || '') || 'Grant decision') : '';
-    const pendingApplicant = recoveryRequest || latestApplicant || null;
-    const applicantText = pendingApplicant
-      ? `${pendingApplicant.dateStr || '—'} · ${compactOverviewTitle(pendingApplicant.title || '')}`
-      : '';
-
-    if (posture?.recovered && recovery) {
-      const summaryBits = [
-        loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
-        recovery?.dateStr ? `${recovery.dateStr} · ${recoveryText}` : recoveryText,
-        posture?.recoveredBeforeGrant && grant?.dateStr ? `${grant.dateStr} · ${grantText}` : '',
-      ].filter(Boolean);
-      return {
-        label: 'Recovery path',
-        badge: posture.recoveredBeforeGrant ? 'Recovered before grant' : 'Recovered',
-        level: 'ok',
-        summary: summaryBits.join(' → '),
-        note: posture.recoveredBeforeGrant
-          ? 'Earlier adverse posture was cured before the file returned to grant.'
-          : 'Earlier adverse posture was cured and the file later returned to the active track.',
-      };
-    }
-
-    if (waitingOn === 'EPO recovery outcome') {
-      const summaryBits = [
-        loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
-        applicantText,
-      ].filter(Boolean);
-      return {
-        label: 'Recovery path',
-        badge: 'Recovery pending',
-        level: 'warn',
-        summary: summaryBits.join(' → '),
-        note: `${recoveryRequest ? 'Recovery has been requested' : 'Applicant appears to have responded'} after the adverse posture; monitor the EPO recovery outcome${waitingDays != null ? ` (${formatDaysHuman(waitingDays)} since applicant reply)` : ''}.`,
-      };
-    }
-
-    if (posture?.currentClosed && loss) {
-      return {
-        label: 'Recovery path',
-        badge: 'Recovery options',
-        level: 'bad',
-        summary: loss?.dateStr ? `${loss.dateStr} · ${lossText}` : lossText,
-        note: 'Adverse posture detected. Check further processing first; if unavailable, consider Rule 136 re-establishment.',
-      };
-    }
-
-    return null;
-  }
+  
 
   function renderOverviewHeaderCard(m) {
     const termReference = m.deadlines.find((d) => d.reference && /20-year term from filing/i.test(String(d.label || '')));

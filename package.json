@@ -7,7 +7,8 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node tests/userscript_smoke.test.js && node tests/userscript_regression.test.js && node tests/userscript_lifecycle.test.js && node tests/userscript_parser_fixtures.test.js && node tests/userscript_real_fixtures.test.js && node tests/userscript_live_case_matrix.test.js && node tests/epo_codex_prototype.test.js && node tests/epo_v2_utils.test.js && node tests/epo_v2_normalized.test.js && node tests/epo_v2_doc_signals.test.js && node tests/epo_v2_doclist_parser.test.js && node tests/epo_v2_packet_signals.test.js && node tests/epo_v2_status_signals.test.js && node tests/epo_v2_posture_signals.test.js && node tests/epo_v2_deadline_signals.test.js && node tests/epo_v2_timeline_signals.test.js && node tests/epo_v2_procedural_parser.test.js && node tests/epo_v2_reference_parsers.test.js && node tests/epo_v2_territorial_parser.test.js && node tests/epo_v2_main_parser.test.js && node tests/epo_v2_pdf_parser.test.js && node tests/epo_v2_upc_parser.test.js && node tests/epo_v2_document_classification.test.js && node tests/epo_v2_overview_signals.test.js && node tests/epo_v2_territorial_signals.test.js && node tests/epo_v2_runtime_parity.test.js"
+    "build": "node build/build-userscript.js",
+    "test": "npm run build && node tests/userscript_smoke.test.js && node tests/userscript_regression.test.js && node tests/userscript_lifecycle.test.js && node tests/userscript_parser_fixtures.test.js && node tests/userscript_real_fixtures.test.js && node tests/userscript_live_case_matrix.test.js && node tests/epo_codex_prototype.test.js && node tests/epo_v2_utils.test.js && node tests/epo_v2_normalized.test.js && node tests/epo_v2_doc_signals.test.js && node tests/epo_v2_doclist_parser.test.js && node tests/epo_v2_packet_signals.test.js && node tests/epo_v2_status_signals.test.js && node tests/epo_v2_posture_signals.test.js && node tests/epo_v2_deadline_signals.test.js && node tests/epo_v2_timeline_signals.test.js && node tests/epo_v2_procedural_parser.test.js && node tests/epo_v2_reference_parsers.test.js && node tests/epo_v2_territorial_parser.test.js && node tests/epo_v2_main_parser.test.js && node tests/epo_v2_pdf_parser.test.js && node tests/epo_v2_upc_parser.test.js && node tests/epo_v2_document_classification.test.js && node tests/epo_v2_overview_signals.test.js && node tests/epo_v2_territorial_signals.test.js && node tests/epo_v2_runtime_parity.test.js"
   },
   "repository": {
     "type": "git",
@@ -22,6 +23,8 @@
   },
   "homepage": "https://github.com/EdLaughton/EP-Register-Pro#readme",
   "devDependencies": {
+    "acorn": "^8.16.0",
+    "acorn-walk": "^8.3.5",
     "jsdom": "^28.1.0"
   }
 }

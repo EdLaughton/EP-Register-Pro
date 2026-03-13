@@ -24,7 +24,8 @@ has(/parseUpcOptOutResult/, 'Missing UPC opt-out parser');
 hasText('IMPORTANT: UPC patent_number must be a publication number, never an EP application number.', 'UPC lookup should explicitly enforce publication-number-only input');
 hasText('UPC registry check skipped: no EP publication numbers available', 'UPC lookup should skip cleanly when no EP publication numbers are available');
 notHas(/if \(!picks\.length && \/^EP\\d\{6,\}\$\/i\.test\(caseNo \|\| ''\)/, 'UPC candidate selection should not fallback to application-number caseNo');
-hasText("upcRegistry.status || (upcRegistry.optedOut ? 'Opted out' : 'No opt-out found')", 'Overview should preserve explicit UPC registry status (e.g., Opt-out withdrawn)');
+has(/function\s+upcRegistryNoteText\s*\(/, 'Overview should preserve explicit UPC registry status (e.g., Opt-out withdrawn) via the dedicated UPC-note formatter');
+hasText("Opt-out withdrawn", 'UPC-note formatter should still preserve explicit withdrawn status text');
 hasText('opt(?:ed)?[\\s-]*out(?:\\s+\\w+){0,8}\\s+(?:register', 'UPC positive matcher should allow words between opt-out and registered/entered/effective');
 
 // Timeline grouped items UX (collapsible + arrow)
@@ -192,9 +193,9 @@ notHas(/isDivisional:\s*!!parentCase\s*\|\|\s*priorities\.some\(\(p\)\s*=>\s*\/\
 has(/function\s+extractEpNumbersByHeader\s*\(/, 'Header-based EP number extraction helper missing');
 has(/extractEpNumbersByHeader\(doc,\s*\/\\bParent application/, 'Parent application extraction should use header-scoped helper');
 has(/extractEpNumbersByHeader\(doc,\s*\/\\bDivisional application/, 'Divisional child extraction should use header-scoped helper');
-hasText('[A-Z]{2}\\d[0-9A-Z\\/\\-]{4,}', 'Priority parser should require numeric body after country code (prevents LANGUAGE false matches)');
-hasText('Filing language|Procedural language|Publication|Applicant|Representative|Status|Most recent event', 'Priority page-text fallback should stop at known next labels to avoid pulling publication rows');
-hasText('priority document|annex', 'Annex filings should be classed with the filing package when applicant-filed');
+has(/parseLine\s*=\s*\(line,\s*loose\s*=\s*false\)\s*=>[\s\S]*?\[A-Z\]\{2\}\\d\[0-9A-Z/, 'Priority parser should require numeric body after country code (prevents LANGUAGE false matches)');
+has(/Filing language\|Procedural language\|Publication\|Applicant\|Representative\|Status\|Most recent event/, 'Priority page-text fallback should stop at known next labels to avoid pulling publication rows');
+has(/priority document\|annex/, 'Annex filings should be classed with the filing package when applicant-filed');
 hasText('Response to search', 'Search-response applicant bundle should exist for grouped amendments after search report');
 hasText('isGrantContext', 'Document classifier should detect intention-to-grant / text-proposed-for-grant context');
 hasText('isGrantResponse', 'Document classifier should detect applicant responses to intention-to-grant context');
@@ -266,7 +267,7 @@ notHas(/<div class="epoRP-l">Applicant last filing<\/div>/, 'Actionable status s
 notHas(/<div class="epoRP-l">Days since applicant response<\/div>/, 'Actionable status should not render a separate day-counter row after consolidation');
 has(/const\s+liveTable\s*=\s*bestTable\(document,\s*\['date',\s*'document'\]\)\s*\|\|\s*bestTable\(document,\s*\['document type'\]\)/, 'Doclist filter should resolve current table on each input (avoid stale table reference)');
 hasText('const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();', 'Doclist parser should use a safe fallback case number for sourceUrl generation');
-hasText("sourceUrl(fallbackCaseNo, 'doclist')", 'Doclist parser should avoid undefined caseNo when generating fallback doclist URLs');
+has(/sourceUrl\(fallbackCaseNo,\s*["']doclist["']\)/, 'Doclist parser should avoid undefined caseNo when generating fallback doclist URLs');
 hasText('Intention to grant (R71(3) EPC)', 'Doclist group label should use explicit R71(3) wording for grant package groups');
 hasText('Response to intention to grant', 'Doclist grouping should expose a dedicated label for applicant responses to R71(3) packets');
 hasText('Transfer / recordal filings', 'Doclist/timeline grouping should expose a more specific register-admin label for transfer/recordal packets');
