@@ -29,6 +29,11 @@ assert.deepStrictEqual(
   [{ dateStr: '01.01.2026', title: '(Expected) grant', detail: 'published on 04.02.2026 [2026/06]', source: 'Main page' }],
   'Main parser should recover dated recent-event entries from the main tab',
 );
+assert.deepStrictEqual(
+  parseRecentEvents('30.01.2026\nLapse of the patent in a contracting state New state(s): CY\npublished on 04.03.2026 [2026/10]'),
+  [{ dateStr: '30.01.2026', title: 'Lapse of the patent in a contracting state', detail: 'New state(s): CY · published on 04.03.2026 [2026/10]', source: 'Main page' }],
+  'Main parser should move trailing state-change qualifiers out of the recent-event title and into the detail line',
+);
 
 const main19871250Doc = loadFixtureDocument(['cases', 'EP19871250', 'main.html'], 'https://register.epo.org/application?number=EP19871250&tab=main&lng=en');
 const main19871250 = parseMainRawFromDocument(main19871250Doc, 'EP19871250');

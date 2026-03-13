@@ -238,8 +238,8 @@ has(/function\s+resolvedOverviewStatus\s*\(/, 'Overview model should centralize 
 has(/posture\?\.currentLabel\s*\|\|\s*statusSummary\?\.simple|posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview status helper should prefer normalized posture labels over raw status summaries when both exist');
 has(/posture\?\.currentLevel\s*\|\|\s*statusSummary\?\.level|posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview status helper should prefer normalized posture severity over raw status-summary severity when both exist');
 hasText('Current posture', 'Actionable status should still preserve a posture row even when certainty-aware labels downgrade the wording');
-hasText('Likely current posture', 'Actionable status should downgrade posture wording when the underlying evidence is only medium confidence');
-hasText('Estimated next renewal fee', 'Overview should soften low-confidence renewal statements instead of sounding fully authoritative');
+has(/function\s+certaintyLabel\s*\([\s\S]*?return\s+low\s*===\s*'medium'\s*\?\s*`Likely\s+\$\{baseLabel\.toLowerCase\(\)\}`\s*:\s*`Estimated\s+\$\{baseLabel\.toLowerCase\(\)\}`;/, 'Actionable status should downgrade posture/waiting/renewal wording via a shared certainty-label helper');
+has(/renewalNextFeeLabel:\s*certaintyLabel\('Next renewal fee',\s*renewal\?\.confidence\s*\|\|\s*''\)/, 'Overview should soften low-confidence next-renewal-fee statements instead of sounding fully authoritative');
 hasText('Recovery path', 'Actionable status should surface recovery windows as a first-class row rather than burying them in generic notes');
 has(/function\s+proceduralPostureModel\s*\(/, 'Overview/timeline posture narrative should be derived from a dedicated procedural-posture helper');
 has(/function\s+recoveryActionModel\s*\(/, 'Actionable status should derive recovery windows from a dedicated recovery-action helper');
@@ -250,7 +250,7 @@ notHas(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Ov
 has(/if \(deadline\?\.reference(?: \|\| deadline\?\.anchorOnly)?\) continue;/, 'Deadline bucketing should still drop reference-only rows from the detailed actionable clock sections while ignoring anchor-only branch markers');
 has(/buckets\.historical\.push\(deadline\);/, 'Deadline bucketing should preserve resolved/superseded/closed-posture clocks as historical context instead of dropping them');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
-has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
+has(/const\s+waitingLabel\s*=\s*esc\(m\.presentationHints\?\.waitingLabel\s*\|\|\s*'Waiting on'\)/, 'Actionable status should render a certainty-aware waiting-party summary row');
 hasText('Adverse posture detected.', 'Actionable status should expose concise recovery guidance for adverse/loss-of-rights postures');
 hasText('Recovered before grant', 'Recovery-action state should distinguish completed pre-grant cures from generic recovery notes');
 hasText('Recovery pending', 'Recovery-action state should distinguish pending EPO recovery outcomes from completed cures');
@@ -315,8 +315,8 @@ hasText('rolled over', 'Deadline metadata should include rollover indicator when
 hasText('if (runtime.abortController === controller) runtime.abortController = null;', 'All-fresh prefetch completions should explicitly clear the current abort controller before returning');
 hasText('await refreshDerivedPrefetchSources(caseNo, controller.signal, force);', 'All-fresh prefetch completions should still refresh derived sources before returning');
 notHas(/<div class="epoRP-l">Most recent event<\/div>/, 'Actionable status should not render a separate Most recent event row');
-hasText('Likely current posture', 'Overview should soften posture wording when the supporting evidence is not fully strong');
-hasText('Estimated next renewal fee', 'Overview should soften low-confidence renewal wording instead of overstating certainty');
+has(/postureLabel:\s*certaintyLabel\('Current posture',\s*postureConfidence\)/, 'Overview should soften posture wording when the supporting evidence is not fully strong');
+has(/renewalNextFeeLabel:\s*certaintyLabel\('Next renewal fee',\s*renewal\?\.confidence\s*\|\|\s*''\)/, 'Overview should soften low-confidence renewal wording instead of overstating certainty');
 has(/el\.addEventListener\('input',\s*commit\)/, 'Options toggles should react on input events for reliable checkbox commits');
 
 console.log('userscript regression checks passed');

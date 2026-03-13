@@ -3386,12 +3386,16 @@
   }
 
   function fallbackPublicationField(doc, pageText = '') {
-    return firstPairValue(doc, ({ value, lowLabel }) => !/priority|event/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && /(EP\s*\d+|WO\d{4}|[AB]\d\b|publication)/i.test(value))
+    return firstPairValue(doc, ({ value, lowLabel }) => !/priority|event/.test(lowLabel)
+        && /\d{2}\.\d{2}\.\d{4}/.test(value)
+        && !/\b\d{6,10}\.\d\b/.test(value)
+        && (/\b(?:EP\s*\d{6,12}|WO\d{4}[A-Z]{0,2}\d{3,})\b[\s\S]{0,24}\b[A-Z]\d\b/i.test(value) || /\bpublication\b/i.test(value)))
+      || firstPairValue(doc, ({ value, lowLabel }) => !/priority|event/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && /(WO\d{4}|[AB]\d\b|publication)/i.test(value))
       || (String(pageText).match(/publication[\s\S]{0,360}/i)?.[0] || '');
   }
 
   function fallbackRecentEventField(doc) {
-    return firstPairValue(doc, ({ value, lowLabel }) => !/publication|priority|applic|represent|title/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && value.split(/\n+/).length >= 2);
+    return firstPairValue(doc, ({ value, lowLabel }) => !/publication|priority|applic|represent|title|status|former/.test(lowLabel) && /^\s*\d{2}\.\d{2}\.\d{4}\b/.test(value) && String(value).replace(/^\s*\d{2}\.\d{2}\.\d{4}\b\s*/, '').length >= 8);
   }
 
   function fallbackPartyField(doc, kind = 'applicant') {
@@ -3658,22 +3662,46 @@
     return { c, main, doclist, family, legal, federated, citations, eventHistory, ue, upcRegistry, pdfDeadlines, docs, publications };
   }
 
+  function normalizeRecentEventEntry(entry) {
+    if (!entry || !entry.title) return entry;
+    let title = String(entry.title || '').trim();
+    const detailParts = entry.detail ? [entry.detail] : [];
+
+    const movedState = title.match(/^(.*?)(\s+New state\(s\):\s*.+)$/i);
+    if (movedState?.[1] && movedState?.[2]) {
+      title = movedState[1].trim();
+      detailParts.unshift(movedState[2].trim());
+    }
+
+    const movedPublication = title.match(/^(.*?)(\s+published on\s+\d{2}\.\d{2}\.\d{4}.*)$/i);
+    if (movedPublication?.[1] && movedPublication?.[2]) {
+      title = movedPublication[1].trim();
+      detailParts.unshift(movedPublication[2].trim());
+    }
+
+    return {
+      ...entry,
+      title,
+      detail: detailParts.filter(Boolean).join(' · '),
+    };
+  }
+
   function parseRecentEvents(raw) {
     const lines = String(raw || '').split('\n').map((v) => v.trim()).filter(Boolean);
     const out = [];
     let current = null;
     for (const line of lines) {
-      const dm = line.match(/^\s*(\d{2}\.\d{2}\.\d{4})\b/);
+      const dm = line.match(/^\s*(\d{2}\.\d{2}\.\d{4})\b\s*(.*)$/);
       if (dm) {
-        if (current?.dateStr && current?.title) out.push(current);
-        current = { dateStr: dm[1], title: '', detail: '', source: 'Main page' };
+        if (current?.dateStr && current?.title) out.push(normalizeRecentEventEntry(current));
+        current = { dateStr: dm[1], title: String(dm[2] || '').trim(), detail: '', source: 'Main page' };
         continue;
       }
       if (!current) continue;
       if (!current.title) current.title = line;
       else current.detail = current.detail ? `${current.detail} · ${line}` : line;
     }
-    if (current?.dateStr && current?.title) out.push(current);
+    if (current?.dateStr && current?.title) out.push(normalizeRecentEventEntry(current));
     return dedupe(out, (e) => `${e.dateStr}|${e.title}|${e.detail}`);
   }
 
@@ -3865,7 +3893,7 @@
     const statusField = dedupeMultiline(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
     const priorityField = fieldByLabel(doc, [/^Priority\b/i]) || fallbackPriorityField(doc, pageText);
     const publicationField = publicationSections.join('\n') || fieldByLabel(doc, [/^Publication\b/i]) || fallbackPublicationField(doc, pageText);
-    const recentEventField = fieldByLabel(doc, [/^Most recent event$/i]) || fallbackRecentEventField(doc);
+    const recentEventField = fieldByLabel(doc, [/^Most recent event\b/i]) || fallbackRecentEventField(doc);
 
     const appInfo = parseApplicationField(appField);
     const priorities = parsePriority(priorityField, pageText);
@@ -3993,7 +4021,7 @@
 
     const bodyRows = [...table.querySelectorAll('tbody tr, tr')].filter((row) => row.querySelector('td'));
     const width = Math.max(0, ...bodyRows.map((row) => row.querySelectorAll('td').length));
-    const stats = Array.from({ length: width }, () => ({ dateHits: 0, linkHits: 0, textHits: 0 }));
+    const stats = Array.from({ length: width }, () => ({ dateHits: 0, linkHits: 0, textHits: 0, numberHits: 0 }));
     for (const row of bodyRows.slice(0, 24)) {
       [...row.querySelectorAll('td')].forEach((cell, idx) => {
         const value = text(cell);
@@ -4001,6 +4029,7 @@
         if (DATE_RE.test(value)) stats[idx].dateHits += 1;
         if (cell.querySelector('a')) stats[idx].linkHits += 1;
         if (value.length >= 12) stats[idx].textHits += 1;
+        if (/^\d{1,4}$/.test(value)) stats[idx].numberHits += 1;
       });
     }
 
@@ -4012,6 +4041,9 @@
     }
     if (map.procedure == null) {
       map.procedure = stats.map((stat, idx) => ({ idx, score: stat.textHits - (idx === map.date || idx === map.document ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
+    }
+    if (map.pages == null) {
+      map.pages = stats.map((stat, idx) => ({ idx, score: stat.numberHits * 4 + stat.textHits - (idx === map.date || idx === map.document || idx === map.procedure ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
     }
     return map;
   }
@@ -4102,18 +4134,58 @@
     return bundle;
   }
 
-  function doclistEntryFromRow(row, map = {}, fallbackUrl = '', rowOrder = 0) {
+  function createParseStats(source = 'parser') {
+    return {
+      source,
+      tableFound: false,
+      rowsSeen: 0,
+      rowsAccepted: 0,
+      rowsDropped: 0,
+      rowsDroppedByReason: {},
+    };
+  }
+
+  function noteParseDrop(parseStats, reason = 'unknown') {
+    if (!parseStats) return;
+    parseStats.rowsDropped += 1;
+    parseStats.rowsDroppedByReason[reason] = (parseStats.rowsDroppedByReason[reason] || 0) + 1;
+  }
+
+  function attachParseStats(result, parseStats) {
+    Object.defineProperty(result, 'parseStats', {
+      value: parseStats,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
+    return result;
+  }
+
+  function doclistEntryFromRow(row, map = {}, fallbackUrl = '', rowOrder = 0, parseStats = null) {
     const cells = [...row.querySelectorAll('td')];
-    if (!cells.length || !row.querySelector("input[type='checkbox']")) return null;
+    if (!cells.length) {
+      noteParseDrop(parseStats, 'missing-cells');
+      return null;
+    }
+    if (!row.querySelector("input[type='checkbox']")) {
+      noteParseDrop(parseStats, 'missing-checkbox');
+      return null;
+    }
     const rowText = cells.map(text).filter(Boolean).join(' ') || text(row);
     const dm = rowText.match(DATE_RE);
-    if (!dm) return null;
+    if (!dm) {
+      noteParseDrop(parseStats, 'missing-date');
+      return null;
+    }
     const dateStr = dm[1];
 
     const getCell = (i) => (i != null && i < cells.length ? text(cells[i]) : '');
     let title = getCell(map.document);
     if (!title) title = [...row.querySelectorAll('a')].map(text).filter(Boolean).sort((a, b) => b.length - a.length)[0] || '';
-    if (!title) return null;
+    if (!title) {
+      noteParseDrop(parseStats, 'missing-title');
+      return null;
+    }
 
     const url = [...row.querySelectorAll('a[href]')].map((a) => a.href).find(Boolean) || fallbackUrl;
     const procedure = getCell(map.procedure);
@@ -4122,8 +4194,10 @@
   }
 
   function parseDoclist(doc) {
+    const parseStats = createParseStats('doclist');
     const table = doclistTable(doc);
-    if (!table) return { docs: [] };
+    if (!table) return { docs: [], parseStats };
+    parseStats.tableFound = true;
     const map = tableColumnMap(table);
     const docs = [];
     const fallbackCaseNo = runtime.fetchCaseNo || runtime.appNo || detectAppNo();
@@ -4131,9 +4205,12 @@
 
     let rowOrder = 0;
     for (const row of table.querySelectorAll('tr')) {
-      const entry = doclistEntryFromRow(row, map, fallbackUrl, rowOrder);
+      if (!row.querySelector('td')) continue;
+      parseStats.rowsSeen += 1;
+      const entry = doclistEntryFromRow(row, map, fallbackUrl, rowOrder, parseStats);
       if (!entry) continue;
       rowOrder += 1;
+      parseStats.rowsAccepted += 1;
       const cls = refineDocumentClassification(entry.title, entry.procedure, classifyDocument(entry.title, entry.procedure));
       docs.push({
         ...entry,
@@ -4141,7 +4218,7 @@
       });
     }
 
-    return { docs: docs.sort(compareDateDesc) };
+    return { docs: docs.sort(compareDateDesc), parseStats };
   }
 
   function applyDoclistFilter(table, query) {
@@ -4760,23 +4837,7 @@
 
 
   function parseDatedRows(doc, url) {
-    const rows = [];
-    for (const tr of doc.querySelectorAll('tr')) {
-      const cells = [...tr.querySelectorAll('th,td')].map(text).filter(Boolean);
-      if (cells.length < 2) continue;
-      const dateCell = cells.find((v) => DATE_RE.test(v));
-      if (!dateCell) continue;
-      const dateStr = dateCell.match(DATE_RE)[1];
-      let payload = cells.filter((value, idx) => {
-        if (idx === 0 && DATE_RE.test(value)) return false;
-        return !/^(date|event|status|publication|document|document type)$/i.test(value);
-      });
-      if (!payload[0]) continue;
-      if (/^event\s*date\s*:?$/i.test(payload[0]) && payload[1]) payload = payload.slice(1);
-      if (!payload[0] || /^\d{2}\.\d{2}\.\d{4}$/.test(payload[0])) continue;
-      rows.push({ dateStr, title: payload[0], detail: payload.slice(1).join(' · '), url });
-    }
-    return dedupe(rows, (r) => `${r.dateStr}|${r.title}|${r.detail}`).sort(compareDateDesc);
+    return parseDatedRowsFromDocument(doc, url);
   }
 
   function normalizeCodexDescription(value = '') {
@@ -4850,23 +4911,38 @@
   }
 
   function parseDatedRowsFromDocument(doc, url = '') {
+    const parseStats = createParseStats('procedural-rows');
     const rows = [];
     for (const tr of doc.querySelectorAll('tr')) {
       const cells = [...tr.querySelectorAll('th,td')].map(text).filter(Boolean);
       if (cells.length < 2) continue;
       const dateCell = cells.find((value) => DATE_RE.test(value));
       if (!dateCell) continue;
+      parseStats.rowsSeen += 1;
       const dateStr = dateCell.match(DATE_RE)[1];
       let payload = cells.filter((value, idx) => {
         if (idx === 0 && DATE_RE.test(value)) return false;
         return !/^(date|event|status|publication|document|document type)$/i.test(value);
       });
-      if (!payload[0]) continue;
+      if (!payload[0]) {
+        noteParseDrop(parseStats, 'missing-payload');
+        continue;
+      }
       if (/^event\s*date\s*:?$/i.test(payload[0]) && payload[1]) payload = payload.slice(1);
-      if (!payload[0] || /^\d{2}\.\d{2}\.\d{4}$/.test(payload[0])) continue;
+      if (!payload[0] || /^\d{2}\.\d{2}\.\d{4}$/.test(payload[0])) {
+        noteParseDrop(parseStats, 'missing-title');
+        continue;
+      }
       rows.push({ dateStr, title: payload[0], detail: payload.slice(1).join(' · '), url });
     }
-    return dedupe(rows, (row) => `${row.dateStr}|${row.title}|${row.detail}`).sort(compareDateDesc);
+    const deduped = dedupe(rows, (row) => `${row.dateStr}|${row.title}|${row.detail}`).sort(compareDateDesc);
+    parseStats.rowsAccepted = deduped.length;
+    if (rows.length > deduped.length) {
+      const duplicateCount = rows.length - deduped.length;
+      parseStats.rowsDropped += duplicateCount;
+      parseStats.rowsDroppedByReason.duplicate = (parseStats.rowsDroppedByReason.duplicate || 0) + duplicateCount;
+    }
+    return attachParseStats(deduped, parseStats);
   }
 
   function extractLegalEventBlocks(doc, url) {
@@ -5042,11 +5118,17 @@
       const ym = low.match(/year\s*(\d+)/i) || low.match(/(\d+)(?:st|nd|rd|th)\s*year/i);
       renewals.push({ dateStr: e.dateStr, title: e.title, detail: e.detail, year: ym ? +ym[1] : null });
     }
-    return { events, codedEvents, renewals: renewals.sort(compareDateDesc) };
+    return {
+      events,
+      codedEvents,
+      renewals: renewals.sort(compareDateDesc),
+      parseStats: { ...(events.parseStats || createParseStats('legal')), source: 'legal' },
+    };
   }
 
   function parseEventHistory(doc, caseNo) {
-    const events = parseDatedRows(doc, sourceUrl(caseNo, 'event')).map((event) => {
+    const rawEvents = parseDatedRows(doc, sourceUrl(caseNo, 'event'));
+    const events = rawEvents.map((event) => {
       const matched = normalizeCodexSignal({ sourceDescription: event.title || '' });
       if (!matched.codexRecord) return event;
       return {
@@ -5057,7 +5139,10 @@
         matchStrategy: matched.matchStrategy,
       };
     });
-    return { events };
+    return {
+      events,
+      parseStats: { ...(rawEvents.parseStats || createParseStats('event')), source: 'event' },
+    };
   }
 
   function parseUe(doc) {
@@ -5207,6 +5292,42 @@
     }
   }
 
+  function parseStatsDiagnostics(parseStats = null) {
+    const stats = parseStats && typeof parseStats === 'object' ? parseStats : null;
+    if (!stats) return {};
+    const reasons = Object.entries(stats.rowsDroppedByReason || {})
+      .filter(([, count]) => Number(count) > 0)
+      .map(([reason, count]) => `${reason}:${count}`)
+      .join(',');
+    return {
+      parseRowsSeen: Number(stats.rowsSeen || 0),
+      parseRowsAccepted: Number(stats.rowsAccepted || 0),
+      parseRowsDropped: Number(stats.rowsDropped || 0),
+      parseDropReasons: reasons,
+    };
+  }
+
+  function parserWarningMeta(sourceKey, data) {
+    const stats = data?.parseStats;
+    if (!stats || typeof stats !== 'object') return null;
+    const seen = Number(stats.rowsSeen || 0);
+    const accepted = Number(stats.rowsAccepted || 0);
+    const dropped = Number(stats.rowsDropped || 0);
+    if (seen > 5 && accepted === 0) {
+      return {
+        level: 'warn',
+        message: `Parser warning ${sourceKey}: 0 of ${seen} candidate rows were accepted`,
+      };
+    }
+    if (seen > 5 && dropped >= Math.max(3, accepted)) {
+      return {
+        level: 'warn',
+        message: `Parser warning ${sourceKey}: dropped ${dropped} of ${seen} candidate rows`,
+      };
+    }
+    return null;
+  }
+
   function sourceDiagnostics(sourceKey, data) {
     const d = data && typeof data === 'object' ? data : {};
     if (sourceKey === 'main') {
@@ -5217,18 +5338,21 @@
         publications: Array.isArray(d.publications) ? d.publications.length : 0,
         recentEvents: Array.isArray(d.recentEvents) ? d.recentEvents.length : 0,
         status: d.statusSimple || 'Unknown',
+        ...parseStatsDiagnostics(d.parseStats),
       };
     }
     if (sourceKey === 'doclist') {
       return {
         source: sourceKey,
         docs: Array.isArray(d.docs) ? d.docs.length : 0,
+        ...parseStatsDiagnostics(d.parseStats),
       };
     }
     if (sourceKey === 'event') {
       return {
         source: sourceKey,
         events: Array.isArray(d.events) ? d.events.length : 0,
+        ...parseStatsDiagnostics(d.parseStats),
       };
     }
     if (sourceKey === 'family') {
@@ -5242,6 +5366,7 @@
         source: sourceKey,
         events: Array.isArray(d.events) ? d.events.length : 0,
         renewals: Array.isArray(d.renewals) ? d.renewals.length : 0,
+        ...parseStatsDiagnostics(d.parseStats),
       };
     }
     if (sourceKey === 'federated') {
@@ -5266,7 +5391,7 @@
         upcOptOut: d.upcOptOut || '',
       };
     }
-    return { source: sourceKey };
+    return { source: sourceKey, ...parseStatsDiagnostics(d.parseStats) };
   }
 
   function captureLiveSource(caseNo) {
@@ -5282,6 +5407,8 @@
           : 'Live parse result empty';
       const parseLevel = classified.status === 'ok' ? 'info' : classified.status === 'notFound' ? 'warn' : 'info';
       addLog(caseNo, parseLevel, parseMessage, { transport: 'dom', status: classified.status, reason: classified.reason, ...sourceDiagnostics(sourceKey, data) });
+      const parserWarning = parserWarningMeta(sourceKey, data);
+      if (parserWarning) addLog(caseNo, parserWarning.level, parserWarning.message, { transport: 'dom', ...sourceDiagnostics(sourceKey, data) });
       storeCaseSource(caseNo, sourceKey, {
         status: classified.status,
         url: location.href,
@@ -7011,6 +7138,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           : `Parse result empty ${src.key}`;
       const parseLevel = classified.status === 'ok' ? 'ok' : classified.status === 'notFound' ? 'warn' : 'info';
       addLog(caseNo, parseLevel, parseMessage, { transport: 'fetch', status: classified.status, reason: classified.reason, ...sourceDiagnostics(src.key, parsed) });
+      const parserWarning = parserWarningMeta(src.key, parsed);
+      if (parserWarning) addLog(caseNo, parserWarning.level, parserWarning.message, { transport: 'fetch', ...sourceDiagnostics(src.key, parsed) });
 
       storeCaseSource(caseNo, src.key, {
         title: src.title,
@@ -9317,7 +9446,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       waitingLabel: certaintyLabel('Waiting on', nextDeadline?.confidence || postureConfidence),
       nextDeadlineLabel: certaintyLabel('Next deadline', nextDeadline?.confidence || ''),
       renewalLabel: certaintyLabel('Renewal status', renewal?.confidence || ''),
-      renewalNextFeeLabel: certaintyLabel('Next fee', renewal?.confidence || ''),
+      renewalNextFeeLabel: certaintyLabel('Next renewal fee', renewal?.confidence || ''),
     };
   }
 
@@ -9572,7 +9701,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const confidenceBadge = `<span class="epoRP-bdg info">${esc(`${m.renewal.confidence || 'low'} confidence`)}</span>`;
     const postureNote = terminalPosture ? 'Shown as historical fee context because the case appears closed/withdrawn.' : '';
     const renewalLabel = esc(m.presentationHints?.renewalLabel || 'Renewals');
-    const renewalNextFeeLabel = esc(m.presentationHints?.renewalNextFeeLabel || 'Next fee');
+    const renewalNextFeeLabel = esc(m.presentationHints?.renewalNextFeeLabel || 'Next renewal fee');
 
     return `<div class="epoRP-c"><h4>${renewalLabel}</h4><div class="epoRP-g">
       <div class="epoRP-l">Status</div><div class="epoRP-v">${esc(patentYearStatus)}<div class="epoRP-m">${esc(latestRenewalNote)}</div></div>

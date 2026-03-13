@@ -28,6 +28,17 @@ assert.deepStrictEqual(syntheticEventRows, [{
   detail: 'published on 04.02.2026 [2026/06]',
   url: 'https://register.epo.org/application?number=EP00000000&tab=event&lng=en',
 }], 'Procedural parser should extract and dedupe dated event/legal rows');
+assert.deepStrictEqual(
+  syntheticEventRows.parseStats,
+  {
+    source: 'procedural-rows',
+    rowsSeen: 2,
+    rowsAccepted: 1,
+    rowsDropped: 1,
+    rowsDroppedByReason: { duplicate: 1 },
+  },
+  'Procedural parser should expose duplicate/drop diagnostics for dated event/legal rows',
+);
 
 const syntheticLegalDoc = new JSDOM(`<!doctype html><html><body><table><tbody>
   <tr><th>Event date</th><td>01.01.2026</td></tr>

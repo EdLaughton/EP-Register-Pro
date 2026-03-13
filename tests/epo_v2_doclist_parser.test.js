@@ -28,6 +28,18 @@ assert.deepStrictEqual(
   ],
   'Doclist parser should extract ordered raw rows from the Register-style document table',
 );
+assert.deepStrictEqual(
+  parsedSynthetic.parseStats,
+  {
+    source: 'doclist',
+    tableFound: true,
+    rowsSeen: 3,
+    rowsAccepted: 2,
+    rowsDropped: 1,
+    rowsDroppedByReason: { 'missing-checkbox': 1 },
+  },
+  'Doclist parser should expose row-drop diagnostics when table rows are skipped',
+);
 
 const nonEnglishDoc = new JSDOM(`<!doctype html><html><body>
   <table id="real-non-en"><thead><tr><th><input type="checkbox"></th><th>Datum</th><th>Dokumenttyp</th><th>Verfahren</th><th>Seiten</th></tr></thead><tbody>
