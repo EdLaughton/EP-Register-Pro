@@ -300,6 +300,14 @@ npm test
   - and reversed/fragmented variants (e.g. `months ... 2` style ordering).
 - Keeps these targeted phrase detections lower-priority than explicit legal-wording matches.
 
+### 7.0.62
+- Tightened deadline inference to match the external EPO documentation pack more closely:
+  - Rule 71(3) now anchors to the underlying communication/despatch packet instead of later announcement/status rows.
+  - Generic Art. 94(3) metadata no longer fabricates a default 4-month due date; it stays classification/review-only unless the communication text itself yields an explicit period or deadline.
+  - Search-report publication alone is no longer used to create a direct-EP reply deadline.
+  - Appeal clocks are now generated only from appealable first-instance decisions (for example grant/refusal/revocation/maintenance), not from further-processing decisions.
+  - Euro-PCT later-of anchoring now prefers qualifying ISR/WO packets rather than later consequence rows.
+
 ### 7.0.61
 - Improved robustness of **Registered Letter proof-line extraction**:
   - handles same-line payloads after `Registered Letter`
