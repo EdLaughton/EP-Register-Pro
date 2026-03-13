@@ -3,6 +3,7 @@ const { addCalendarMonthsDetailed, buildDeadlineComputationContext, inferProcedu
 const { loadUserscriptHooks, loadFixtureDocument, loadFixtureText } = require('./userscript_fixture_utils');
 
 const hooks = loadUserscriptHooks();
+const localDateKey = (date) => (date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '');
 
 const rolled = addCalendarMonthsDetailed(new Date('2025-01-31T00:00:00Z'), 1);
 assert.strictEqual(rolled.rolledOver, true, 'Shared deadline helpers should preserve end-of-month rollover diagnostics');
@@ -149,7 +150,7 @@ const syntheticFamilyDeadlines = inferProceduralDeadlinesFromSources({
 });
 assert.strictEqual(syntheticFamilyDeadlines.find((d) => d.label === 'Rule 62a invitation period')?.date?.toISOString().slice(0, 10), '2026-03-10', 'Shared deadline inference should compute Rule 62a as a fixed 2-month search-stage deadline');
 assert.strictEqual(syntheticFamilyDeadlines.find((d) => d.label === 'Rule 63 invitation period')?.date && syntheticFamilyDeadlines.find((d) => d.label === 'Rule 63 invitation period').date.toISOString().slice(0, 10), '2026-03-11', 'Shared deadline inference should compute Rule 63 as a fixed 2-month search-stage deadline');
-assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 64 additional search fees / unity selection (manual review)' && d.reviewOnly), true, 'Shared deadline inference should surface Rule 64 as a review-only communication-specific search-fee branch');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 64 additional search fees / unity selection' && d.reviewOnly), true, 'Shared deadline inference should surface Rule 64 as a review-only communication-specific search-fee branch');
 assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 70(2) / Rule 70a shared response period'), true, 'Shared deadline inference should collapse paired Rule 70(2)/70a communications into one shared deadline');
 assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 70(2) confirmation/response period'), false, 'Shared deadline inference should suppress the standalone Rule 70(2) clock when a combined Rule 70(2)/70a communication governs');
 assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 161/162 mandatory response period'), true, 'Shared deadline inference should distinguish mandatory Rule 161/162 variants when the communication text says reply required');
@@ -167,6 +168,59 @@ assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Opposition 
 assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Limitation Rule 95(2) correction period'), true, 'Shared deadline inference should compute Rule 95(2) limitation-correction windows');
 assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Limitation Rule 95(3) translations + fee'), true, 'Shared deadline inference should compute Rule 95(3) limitation translation/fee windows');
 assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 112 decision-request review window' && d.reviewOnly), true, 'Shared deadline inference should surface Rule 112 consequence notices as review-only remedy windows rather than ordinary office-action deadlines');
+
+const structuredFieldDeadlines = inferProceduralDeadlinesFromSources({
+  main: { applicationType: 'PCT application (E/PCT)', filingDate: '01.01.2024', priorities: [{ dateStr: '01.01.2024' }] },
+  docs: [],
+  eventHistory: {
+    events: [
+      { dateStr: '05.03.2026', title: 'Publication of mention of grant', detail: '' },
+    ],
+  },
+  legal: {
+    events: [],
+    codedEvents: [
+      { dateStr: '05.02.2026', title: 'Communication from the opposition division', detail: '', originalCode: 'OREX', codexPhase: 'opposition', dispatchDate: '06.02.2026', timeLimitMonths: 4 },
+      { dateStr: '07.02.2026', title: 'Communication from the examining division in a limitation procedure', detail: '', originalCode: 'LIRE', codexPhase: 'limitation', dispatchDate: '08.02.2026', timeLimitDate: '10.05.2026' },
+      { dateStr: '09.02.2026', title: 'Communication from the Examining Division pursuant to Article 94(3) EPC', detail: '', codexPhase: 'examination', dispatchDate: '10.02.2026', timeLimitMonths: 4 },
+      { dateStr: '11.02.2026', title: 'Minutes of a consultation by telephone issued as first action', detail: '', codexPhase: 'examination', dispatchDate: '12.02.2026', timeLimitDate: '15.05.2026' },
+      { dateStr: '13.02.2026', title: 'Summons to oral proceedings', detail: 'Examining Division', codexPhase: 'examination', dispatchDate: '14.02.2026', timeLimitDate: '20.04.2026' },
+      { dateStr: '14.02.2026', title: 'Summons to oral proceedings', detail: 'Opposition Division', codexPhase: 'opposition', dispatchDate: '15.02.2026', timeLimitDate: '25.04.2026' },
+      { dateStr: '16.02.2026', title: 'Communication under Rules 161 and 162 EPC', detail: 'No reply required; voluntary amendment window', codexPhase: 'regional_phase_entry', dispatchDate: '17.02.2026' },
+      { dateStr: '18.02.2026', title: 'Communication about intention to grant a European patent', detail: '', codexKey: 'GRANT_R71_3', dispatchDate: '19.02.2026' },
+      { dateStr: '20.02.2026', title: 'Disapproval of the communication of intention to grant the patent', detail: '', originalCode: 'IGRE', codexKey: 'GRANT_R71_6_DISAPPROVAL', dispatchDate: '20.02.2026' },
+      { dateStr: '25.02.2026', title: 'Communication about intention to grant a European patent', detail: '', codexKey: 'GRANT_R71_3', dispatchDate: '26.02.2026' },
+      { dateStr: '01.03.2026', title: 'Refusal of the application', detail: '', dispatchDate: '02.03.2026' },
+    ],
+    renewals: [],
+  },
+  pdfData: {},
+});
+assert.strictEqual(localDateKey(structuredFieldDeadlines.find((d) => d.label === 'Opposition division communication')?.date), '2026-06-06', 'Shared deadline inference should consume ST.36 DATE_OF_DISPATCH + time-limit fields for OREX-style opposition communications');
+assert.strictEqual(structuredFieldDeadlines.find((d) => d.label === 'Opposition division communication')?.reviewOnly, false, 'Shared deadline inference should upgrade structured OREX-style deadlines out of the manual-review bucket');
+assert.strictEqual(localDateKey(structuredFieldDeadlines.find((d) => d.label === 'Limitation communication')?.date), '2026-05-10', 'Shared deadline inference should consume exact ST.36 time-limit dates for limitation communications');
+assert.strictEqual(localDateKey(structuredFieldDeadlines.find((d) => d.label === 'Art. 94(3) response period')?.date), '2026-06-10', 'Shared deadline inference should convert structured Art. 94(3) time-limit data into a real due date');
+assert.strictEqual(localDateKey(structuredFieldDeadlines.find((d) => d.label === 'Minutes-as-first-action examination communication')?.date), '2026-05-15', 'Shared deadline inference should consume structured minutes-as-first-action time-limit data when present');
+assert.strictEqual(structuredFieldDeadlines.filter((d) => d.label === 'Rule 116 final date').length, 2, 'Shared deadline inference should keep distinct examination and opposition Rule 116 final dates when structured summons data exists');
+assert.strictEqual(structuredFieldDeadlines.some((d) => d.label === 'Rule 161/162 voluntary amendment / claims-fee period'), true, 'Shared deadline inference should distinguish voluntary Rule 161/162 variants when the communication text says no reply is required');
+assert.strictEqual(structuredFieldDeadlines.find((d) => d.label === 'R71(3) response period')?.internalKey, 'GRANT_POST_71_3_AMENDMENT', 'Shared deadline inference should tag fresh post-disapproval Rule 71(3) issuances explicitly as GRANT_POST_71_3_AMENDMENT branches');
+assert.strictEqual(structuredFieldDeadlines.find((d) => d.label === 'R71(3) response period')?.supersedesKey, 'GRANT_R71_3', 'Shared deadline inference should mark post-71(3) amendment branches as superseding the earlier grant cycle');
+assert.strictEqual(structuredFieldDeadlines.some((d) => d.internalKey === 'DECISION_REFUSAL' && d.anchorOnly), true, 'Shared deadline inference should represent refusal decisions explicitly as appeal-branch anchors');
+assert.strictEqual(structuredFieldDeadlines.some((d) => d.label === 'Appeal notice + fee' && d.internalKey === 'APPEAL_EVENT' && d.anchorInternalKey === 'DECISION_REFUSAL'), true, 'Shared deadline inference should tag appeal clocks explicitly and link refusal decisions to the appeal branch');
+assert.strictEqual(structuredFieldDeadlines.some((d) => d.label === 'Unitary effect request window' && d.internalKey === 'UNITARY_PATENT_EVENT'), true, 'Shared deadline inference should tag unitary-effect windows explicitly in the separate UP namespace');
+
+const summonsReviewDeadlines = inferProceduralDeadlinesFromSources({
+  main: { applicationType: 'European patent application', filingDate: '01.01.2020' },
+  docs: [
+    { dateStr: '01.04.2026', title: 'Summons to oral proceedings', procedure: 'Examining division', actor: 'EPO' },
+    { dateStr: '02.04.2026', title: 'Summons to oral proceedings', procedure: 'Opposition Division', actor: 'EPO' },
+  ],
+  eventHistory: { events: [] },
+  legal: { events: [], codedEvents: [], renewals: [] },
+  pdfData: {},
+});
+assert.strictEqual(summonsReviewDeadlines.some((d) => d.label === 'Examination summons / Rule 116 review' && d.reviewOnly), true, 'Shared deadline inference should keep naked examination summons in the review bucket when no parsed annex date or ST.36 time-limit is available');
+assert.strictEqual(summonsReviewDeadlines.some((d) => d.label === 'Opposition summons / Rule 116 review' && d.reviewOnly), true, 'Shared deadline inference should keep naked opposition summons in the review bucket when no parsed annex date or ST.36 time-limit is available');
 
 const codexGenericDeadlines = inferProceduralDeadlinesFromSources({
   main: { applicationType: 'European patent application', filingDate: '01.01.2020' },

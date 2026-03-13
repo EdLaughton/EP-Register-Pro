@@ -244,7 +244,7 @@ has(/const\s+termReference\s*=\s*m\.deadlines\.find\(/, 'Overview should compute
 has(/const\s+filingSummary\s*=\s*normalize\(\[/, 'Overview should build a condensed filing summary line');
 hasText("termReferenceDate ? `20-year term ${termReferenceDate}` : ''", 'Overview filing summary should include the 20-year term reference inline without extra years-remaining noise');
 notHas(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Overview should not render a separate 20-year term row after condensing filing metadata');
-has(/if \(deadline\?\.reference\) continue;/, 'Deadline bucketing should still drop reference-only rows from the detailed actionable clock sections');
+has(/if \(deadline\?\.reference(?: \|\| deadline\?\.anchorOnly)?\) continue;/, 'Deadline bucketing should still drop reference-only rows from the detailed actionable clock sections while ignoring anchor-only branch markers');
 has(/buckets\.historical\.push\(deadline\);/, 'Deadline bucketing should preserve resolved/superseded/closed-posture clocks as historical context instead of dropping them');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
 has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');

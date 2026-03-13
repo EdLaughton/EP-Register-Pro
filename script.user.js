@@ -4610,11 +4610,58 @@
     return normalize(value).toLowerCase();
   }
 
+  function normalizeStructuredLabel(value = '') {
+    return normalize(value).toLowerCase().replace(/[_-]+/g, ' ');
+  }
+
+  function normalizeStructuredDate(value = '') {
+    const raw = normalize(value);
+    if (!raw) return '';
+    const compact = raw.match(/^(19|20)\d{6}$/)?.[0] || '';
+    if (compact) return `${compact.slice(6, 8)}.${compact.slice(4, 6)}.${compact.slice(0, 4)}`;
+    const dated = raw.match(/(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})/);
+    if (!dated) return '';
+    const dd = String(dated[1] || '').padStart(2, '0');
+    const mm = String(dated[2] || '').padStart(2, '0');
+    const yyRaw = String(dated[3] || '');
+    const yyyy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
+    return `${dd}.${mm}.${yyyy}`;
+  }
+
+  function parseSmallNumberToken(token = '') {
+    const t = normalize(String(token || '')).toLowerCase();
+    if (!t) return 0;
+    if (/^\d{1,2}$/.test(t)) return Number(t);
+    return {
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+      eleven: 11,
+      twelve: 12,
+    }[t] || 0;
+  }
+
+  function parseStructuredTimeLimit(value = '') {
+    const raw = normalize(value);
+    if (!raw) return { raw: '', months: 0, dateStr: '' };
+    const dateStr = normalizeStructuredDate(raw);
+    const monthToken = raw.match(/(?:within\s+)?(?:a\s+)?(?:period|time\s+limit)?\s*(?:of\s+)?([a-z]+|\d{1,2})\s+months?/i)?.[1] || '';
+    const months = parseSmallNumberToken(monthToken);
+    return { raw, months, dateStr };
+  }
+
   function legalCodeRecord(code) {
     return code ? (EPO_CODEX_DATA.byCode[String(code).toUpperCase()] || null) : null;
   }
 
-  function codexDescriptionRecord(description) {
+  function codexDescriptionRecord(description = '') {
     const key = normalizeCodexDescription(description);
     return key ? (EPO_CODEX_DATA.byDescription[key] || null) : null;
   }
@@ -4627,6 +4674,26 @@
     const fallback = codexDescriptionRecord(sourceDescription);
     if (fallback) return { ...raw, matchStrategy: 'description-fallback', codexRecord: fallback };
     return { ...raw, matchStrategy: 'unmapped', codexRecord: null };
+  }
+
+  function parseDatedRowsFromDocument(doc, url = '') {
+    const rows = [];
+    for (const tr of doc.querySelectorAll('tr')) {
+      const cells = [...tr.querySelectorAll('th,td')].map(text).filter(Boolean);
+      if (cells.length < 2) continue;
+      const dateCell = cells.find((value) => DATE_RE.test(value));
+      if (!dateCell) continue;
+      const dateStr = dateCell.match(DATE_RE)[1];
+      let payload = cells.filter((value, idx) => {
+        if (idx === 0 && DATE_RE.test(value)) return false;
+        return !/^(date|event|status|publication|document|document type)$/i.test(value);
+      });
+      if (!payload[0]) continue;
+      if (/^event\s*date\s*:?$/i.test(payload[0]) && payload[1]) payload = payload.slice(1);
+      if (!payload[0] || /^\d{2}\.\d{2}\.\d{4}$/.test(payload[0])) continue;
+      rows.push({ dateStr, title: payload[0], detail: payload.slice(1).join(' · '), url });
+    }
+    return dedupe(rows, (row) => `${row.dateStr}|${row.title}|${row.detail}`).sort(compareDateDesc);
   }
 
   function extractLegalEventBlocks(doc, url) {
@@ -4644,6 +4711,7 @@
           current.codexClass = matched.codexRecord.classification;
         }
       }
+      if (current.paymentDates?.length) current.paymentDate = current.paymentDates[current.paymentDates.length - 1] || '';
       if (current.dateStr || current.title || current.detail) blocks.push(current);
       current = null;
     };
@@ -4653,8 +4721,9 @@
       if (!cells.length) continue;
       const label = cells[0];
       const value = normalize(cells.slice(1).join(' · '));
+      const labelKey = normalizeStructuredLabel(label);
 
-      if (/^Event date:?$/i.test(label) && DATE_RE.test(value)) {
+      if (/^event date:?$/i.test(label) && DATE_RE.test(value)) {
         pushCurrent();
         current = {
           dateStr: value.match(DATE_RE)?.[1] || '',
@@ -4667,16 +4736,26 @@
           codexKey: '',
           codexPhase: '',
           codexClass: '',
+          stepDescriptionName: '',
+          dispatchDate: '',
+          replyDate: '',
+          paymentDate: '',
+          paymentDates: [],
+          requestDate: '',
+          resultDate: '',
+          timeLimitRaw: '',
+          timeLimitMonths: 0,
+          timeLimitDate: '',
         };
         continue;
       }
 
       if (!current) continue;
-      if (/^Event description:?$/i.test(label)) {
+      if (/^event description:?$/i.test(label)) {
         current.title = value;
         continue;
       }
-      if (/^Free Format Text:?$/i.test(label)) {
+      if (/^free format text:?$/i.test(label)) {
         current.freeFormatText = value;
         current.detail = current.detail ? `${current.detail} · ${value}` : value;
         const originalCode = normalize(value.match(/ORIGINAL CODE:\s*([A-Z0-9]+)/i)?.[1] || '').toUpperCase();
@@ -4690,13 +4769,12 @@
         }
         continue;
       }
-      if (/^Effective DATE:?$/i.test(label)) {
-        current.effectiveDate = value;
+      if (/^effective date:?$/i.test(label)) {
+        current.effectiveDate = normalizeStructuredDate(value) || value;
         current.detail = current.detail ? `${current.detail} · Effective DATE ${value}` : `Effective DATE ${value}`;
         continue;
       }
-      if (/^Event description:?$/i.test(label)) continue;
-      if (/^Original code:?$/i.test(label)) {
+      if (/^original code:?$/i.test(label)) {
         const originalCode = value.toUpperCase();
         const matched = normalizeCodexSignal({ sourceCode: originalCode, sourceDescription: current.title || current.detail || value });
         current.originalCode = originalCode;
@@ -4708,10 +4786,43 @@
         }
         continue;
       }
+      if (/^step description name:?$/.test(labelKey)) {
+        current.stepDescriptionName = value;
+        continue;
+      }
+      if (/^date of dispatch:?$/.test(labelKey) || /^dispatch date:?$/.test(labelKey)) {
+        current.dispatchDate = normalizeStructuredDate(value) || value;
+        continue;
+      }
+      if (/^date of reply:?$/.test(labelKey)) {
+        current.replyDate = normalizeStructuredDate(value) || value;
+        continue;
+      }
+      if (/^date of payment\d*:?$/.test(labelKey) || /^date of payment:?$/.test(labelKey)) {
+        const dateStr = normalizeStructuredDate(value) || value;
+        if (dateStr) current.paymentDates.push(dateStr);
+        current.paymentDate = current.paymentDates[current.paymentDates.length - 1] || '';
+        continue;
+      }
+      if (/^date of request:?$/.test(labelKey)) {
+        current.requestDate = normalizeStructuredDate(value) || value;
+        continue;
+      }
+      if (/^result date:?$/.test(labelKey)) {
+        current.resultDate = normalizeStructuredDate(value) || value;
+        continue;
+      }
+      if (/^time limit:?$/.test(labelKey) || /^time limit in record:?$/.test(labelKey) || /^time limit value:?$/.test(labelKey)) {
+        const parsed = parseStructuredTimeLimit(value);
+        current.timeLimitRaw = parsed.raw;
+        current.timeLimitMonths = parsed.months;
+        current.timeLimitDate = parsed.dateStr;
+        continue;
+      }
     }
 
     pushCurrent();
-    return dedupe(blocks, (event) => `${event.dateStr}|${event.title}|${event.detail}|${event.originalCode}`).sort(compareDateDesc);
+    return dedupe(blocks, (event) => `${event.dateStr}|${event.title}|${event.detail}|${event.originalCode}|${event.dispatchDate}|${event.timeLimitRaw}`).sort(compareDateDesc);
   }
 
   function parseFamily(doc) {
@@ -6899,6 +7010,19 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         codexKey: e.codexKey || '',
         codexPhase: e.codexPhase || '',
         codexClass: e.codexClass || '',
+        originalCode: e.originalCode || '',
+        effectiveDate: e.effectiveDate || '',
+        freeFormatText: e.freeFormatText || '',
+        stepDescriptionName: e.stepDescriptionName || '',
+        dispatchDate: e.dispatchDate || '',
+        replyDate: e.replyDate || '',
+        paymentDate: e.paymentDate || '',
+        paymentDates: Array.isArray(e.paymentDates) ? [...e.paymentDates] : [],
+        requestDate: e.requestDate || '',
+        resultDate: e.resultDate || '',
+        timeLimitRaw: e.timeLimitRaw || '',
+        timeLimitMonths: Number(e.timeLimitMonths || 0),
+        timeLimitDate: e.timeLimitDate || '',
       })),
     ], (r) => `${r.dateStr}|${r.title}|${r.detail}|${r.source}|${r.codexKey || ''}`).sort(compareDateDesc);
   }
@@ -7068,6 +7192,54 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return !!(a && b && String(a.dateStr || '') === String(b.dateStr || ''));
   }
 
+  function structuredAnchorDate(record = {}) {
+    return parseDateString(record?.dispatchDate || '')
+      || parseDateString(record?.dateStr || '')
+      || parseDateString(record?.effectiveDate || '')
+      || null;
+  }
+
+  function structuredExactDueDate(record = {}) {
+    return parseDateString(record?.timeLimitDate || '') || null;
+  }
+
+  function structuredReplyOrPaymentSeen(record = {}) {
+    return !!(
+      parseDateString(record?.replyDate || '')
+      || parseDateString(record?.paymentDate || '')
+      || (Array.isArray(record?.paymentDates) && record.paymentDates.some((value) => parseDateString(value)))
+      || parseDateString(record?.resultDate || '')
+    );
+  }
+
+  function inferProceduralPhase(item = {}) {
+    const source = normalize(`${item?.title || ''} ${item?.detail || item?.procedure || ''} ${item?.codexPhase || ''} ${item?.freeFormatText || ''}`).toLowerCase();
+    const code = normalize(item?.originalCode || '').toUpperCase();
+    if (!source && !code) return '';
+    if (/appeal|board of appeal/.test(source)) return 'appeal';
+    if (/opposition/.test(source) || ['OREX', 'PMAP', 'DOBS', 'IDOP'].includes(code)) return 'opposition';
+    if (/limitation|revocation request/.test(source) || ['LIRE', 'REJR'].includes(code)) return 'limitation';
+    if (/grant|rule\s*71/.test(source) || ['IGRA', 'IGRE', 'ACOR', 'CDEC'].includes(code)) return 'grant';
+    if (/search|supplementary search|rule\s*62a|rule\s*63|rule\s*64|rule\s*70a/.test(source)) return 'search';
+    if (/examin|art\.\s*94\(3\)|article\s*94\(3\)|rule\s*116|minutes/.test(source)) return 'examination';
+    return '';
+  }
+
+  function inferMissedActFromReason(textValue = '') {
+    const low = normalize(textValue).toLowerCase();
+    if (!low) return '';
+    if (/non-entry into european phase|rule\s*159|regional phase/.test(low)) return 'Euro-PCT entry acts';
+    if (/rule\s*62a/.test(low)) return 'Rule 62a invitation';
+    if (/rule\s*63/.test(low)) return 'Rule 63 invitation';
+    if (/rule\s*64|additional search fee|lack of unity/.test(low)) return 'Rule 64 search-fee branch';
+    if (/written opinion|search opinion|eesr|rule\s*70a/.test(low)) return 'search-opinion / Rule 70a reply';
+    if (/article\s*94\(3\)|art\.\s*94\(3\)|examination report|communication from the examining division/.test(low)) return 'Art. 94(3) examination reply';
+    if (/rule\s*71\(3\)|intention to grant|translations of claims|grant and publication fee|grant and publishing fee/.test(low)) return 'Rule 71(3) grant formalities';
+    if (/prior art/.test(low)) return 'prior-art information response';
+    if (/renewal fee|examination fee|designation fee/.test(low)) return 'fee payment';
+    return '';
+  }
+
   function buildDeadlineComputationContext(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
     const out = [];
     const records = buildDeadlineRecords(docs, eventHistory, legal);
@@ -7094,26 +7266,44 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       actor: item.actor || '',
       source: source || item.source || '',
       codexKey: item.codexKey || '',
+      codexPhase: item.codexPhase || '',
       originalCode: item.originalCode || '',
       effectiveDate: item.effectiveDate || '',
+      freeFormatText: item.freeFormatText || '',
+      stepDescriptionName: item.stepDescriptionName || '',
+      dispatchDate: item.dispatchDate || '',
+      replyDate: item.replyDate || '',
+      paymentDate: item.paymentDate || '',
+      paymentDates: Array.isArray(item.paymentDates) ? [...item.paymentDates] : [],
+      requestDate: item.requestDate || '',
+      resultDate: item.resultDate || '',
+      timeLimitRaw: item.timeLimitRaw || '',
+      timeLimitMonths: Number(item.timeLimitMonths || 0),
+      timeLimitDate: item.timeLimitDate || '',
     });
 
-    const pickPreferredAnchor = (plans = []) => {
+    const collectPreferredAnchors = (plans = []) => {
+      const found = [];
       for (const plan of plans) {
         const items = Array.isArray(plan?.items) ? plan.items : [];
         const predicate = typeof plan?.predicate === 'function' ? plan.predicate : null;
         if (!predicate) continue;
-        const match = items.find((item) => predicate(item, normalize(`${item?.title || ''} ${rawItemDetail(item)}`.toLowerCase())));
-        if (match) return anchorRecordFromItem(match, plan.source);
+        for (const item of items) {
+          if (!predicate(item, normalize(`${item?.title || ''} ${rawItemDetail(item)}`.toLowerCase()))) continue;
+          found.push(anchorRecordFromItem(item, plan.source));
+        }
       }
-      return null;
+      return dedupe(found, (item) => `${item.dateStr}|${item.title}|${item.detail}|${item.source}|${item.originalCode || ''}|${item.codexKey || ''}`)
+        .sort(compareDateDesc);
     };
+
+    const pickPreferredAnchor = (plans = []) => collectPreferredAnchors(plans)[0] || null;
 
     const hasAfter = (anchorDate, predicate) => {
       const ts = anchorDate?.getTime?.() || 0;
       if (!ts) return false;
       return records.some((r) => {
-        const dt = parseDateString(r.dateStr);
+        const dt = structuredAnchorDate(r);
         return dt && dt.getTime() > ts && predicate(r, dt);
       });
     };
@@ -7122,9 +7312,9 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       const ts = anchorDate?.getTime?.() || 0;
       if (!ts) return null;
       return [...records]
-        .sort((a, b) => (parseDateString(a.dateStr)?.getTime?.() || 0) - (parseDateString(b.dateStr)?.getTime?.() || 0))
+        .sort((a, b) => (structuredAnchorDate(a)?.getTime?.() || 0) - (structuredAnchorDate(b)?.getTime?.() || 0))
         .find((r) => {
-          const dt = parseDateString(r.dateStr);
+          const dt = structuredAnchorDate(r);
           return !!(dt && dt.getTime() > ts && predicate(r, dt));
         }) || null;
     };
@@ -7153,6 +7343,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const recordConfidence = (record = null, fallback = 'medium') => {
       const source = normalize(record?.source || '').toLowerCase();
+      if (record?.dispatchDate && (record?.timeLimitDate || record?.timeLimitMonths || record?.replyDate || record?.paymentDate || record?.requestDate)) return 'high';
+      if (record?.dispatchDate && source === 'coded legal event') return 'high';
       if (!source) return fallback;
       if (source === 'documents') return 'high';
       if (source === 'coded legal event') return 'medium';
@@ -7180,20 +7372,21 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       out.push(next);
     };
 
-    const pushReviewItem = ({ label, record = null, level = 'warn', confidence = '', method = '', namespace = '', internalKey = '', phase = '', date = null, resolved = false }) => {
+    const pushReviewItem = ({ label, record = null, level = 'warn', confidence = '', method = '', namespace = '', internalKey = '', phase = '', date = null, resolved = false, extra = {} }) => {
       const derivedConfidence = confidence || recordConfidence(record, 'low');
       push({
         label,
         date,
         level,
         confidence: derivedConfidence,
-        sourceDate: String(record?.dateStr || ''),
+        sourceDate: String(record?.dispatchDate || record?.dateStr || ''),
         resolved,
         reviewOnly: true,
         namespace,
         internalKey,
         phase,
         method,
+        ...extra,
       });
     };
 
@@ -7222,35 +7415,37 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       return hasApplicantResponseAfter(anchorDate);
     };
 
-    const addMonthsDeadline = ({ record = null, triggerRegex = null, label, months, level, confidence = '', resolvedBy, reviewOnly = false, methodPrefix = 'Heuristic', namespace = '', internalKey = '', phase = '', supersededBy = null, reference = false }) => {
+    const addMonthsDeadline = ({ record = null, triggerRegex = null, label, months, level, confidence = '', resolvedBy, reviewOnly = false, methodPrefix = 'Heuristic', namespace = '', internalKey = '', phase = '', supersededBy = null, reference = false, extra = {} }) => {
       if (hasPdfHint(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) return null;
       const rec = record || (triggerRegex ? latestRecord(triggerRegex) : null);
       if (!rec) return null;
-      const anchor = parseDateString(rec.dateStr);
+      const anchor = structuredAnchorDate(rec);
       if (!anchor) return null;
 
       const resolved = typeof resolvedBy === 'function'
         ? !!resolvedBy(anchor, rec)
-        : hasApplicantResponseAfter(anchor);
+        : (structuredReplyOrPaymentSeen(rec) || hasApplicantResponseAfter(anchor));
 
       const calc = addCalendarMonthsDetailed(anchor, months);
-      const derivedConfidence = confidence || recordConfidence(rec, 'medium');
+      const derivedConfidence = confidence || (rec.dispatchDate ? 'high' : recordConfidence(rec, 'medium'));
       const sourceLabel = normalize(String(rec.source || 'preferred source')).toLowerCase() || 'preferred source';
+      const anchorLabel = rec.dispatchDate ? 'DATE_OF_DISPATCH' : 'trigger';
       const entry = {
         label,
         date: calc.date,
         level,
         confidence: derivedConfidence,
-        sourceDate: rec.dateStr,
+        sourceDate: rec.dispatchDate || rec.dateStr,
         resolved,
         reviewOnly: !!reviewOnly || derivedConfidence === 'low',
-        method: `${methodPrefix}: +${months} month(s) from ${sourceLabel} trigger`,
+        method: `${methodPrefix}: +${months} month(s) from ${sourceLabel} ${anchorLabel}`,
         rolledOver: calc.rolledOver,
         rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
         namespace,
         internalKey,
         phase,
         reference,
+        ...extra,
       };
 
       if (typeof supersededBy === 'function') {
@@ -7266,15 +7461,96 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       return entry;
     };
 
-    const addAbsoluteDateEntry = ({ record = null, label, level = 'warn', confidence = '', namespace = '', internalKey = '', phase = '', method = '', resolved = false, reference = false, reviewOnly = false }) => {
+    const addStructuredOrReviewDeadline = ({ record = null, label, reviewLabel = '', level = 'warn', fixedMonths = 0, confidence = '', namespace = '', internalKey = '', phase = '', resolvedBy, method = '', reviewMethod = '', supersededBy = null, extra = {} }) => {
       const rec = record || null;
-      const date = parseDateString(rec?.dateStr || '');
+      if (!rec) return null;
+      const exactDue = structuredExactDueDate(rec);
+      const anchor = structuredAnchorDate(rec);
+      if (exactDue) {
+        const derivedConfidence = confidence || (rec.dispatchDate ? 'high' : recordConfidence(rec, 'medium'));
+        const resolved = typeof resolvedBy === 'function'
+          ? !!resolvedBy(anchor || exactDue, rec)
+          : (structuredReplyOrPaymentSeen(rec) || (anchor ? hasApplicantResponseAfter(anchor) : false));
+        const entry = {
+          label,
+          date: exactDue,
+          level,
+          confidence: derivedConfidence,
+          sourceDate: rec.dispatchDate || rec.dateStr || rec.timeLimitDate,
+          resolved,
+          reviewOnly: derivedConfidence === 'low',
+          namespace,
+          internalKey,
+          phase,
+          method: method || 'Structured ST.36 time-limit date',
+          ...extra,
+        };
+        if (typeof supersededBy === 'function') {
+          const superseding = supersededBy(anchor || exactDue, rec);
+          if (superseding) {
+            entry.superseded = true;
+            entry.supersededBy = { dateStr: superseding.dateStr, title: superseding.title || '', detail: superseding.detail || '' };
+            entry.method = normalize([entry.method, `superseded by ${superseding.title || 'later governing communication'} on ${superseding.dateStr}`].filter(Boolean).join(' · '));
+          }
+        }
+        push(entry);
+        return entry;
+      }
+      if (Number(rec?.timeLimitMonths || 0) > 0 && anchor) {
+        return addMonthsDeadline({
+          record: rec,
+          label,
+          months: Number(rec.timeLimitMonths || 0),
+          level,
+          confidence: confidence || (rec.dispatchDate ? 'high' : recordConfidence(rec, 'medium')),
+          resolvedBy,
+          methodPrefix: 'Structured ST.36 time-limit',
+          namespace,
+          internalKey,
+          phase,
+          supersededBy,
+          extra,
+        });
+      }
+      if (fixedMonths > 0 && anchor) {
+        return addMonthsDeadline({
+          record: rec,
+          label,
+          months: fixedMonths,
+          level,
+          confidence,
+          resolvedBy,
+          methodPrefix: rec.dispatchDate ? 'Structured ST.36 DATE_OF_DISPATCH' : 'Rule-based',
+          namespace,
+          internalKey,
+          phase,
+          supersededBy,
+          extra,
+        });
+      }
+      pushReviewItem({
+        label: reviewLabel || label,
+        record: rec,
+        level,
+        confidence: confidence || recordConfidence(rec, 'low'),
+        method: reviewMethod || method || 'Review communication text / ST.36 fields for the governing deadline.',
+        namespace,
+        internalKey,
+        phase,
+        extra,
+      });
+      return null;
+    };
+
+    const addAbsoluteDateEntry = ({ record = null, label, level = 'warn', confidence = '', namespace = '', internalKey = '', phase = '', method = '', resolved = false, reference = false, reviewOnly = false, extra = {} }) => {
+      const rec = record || null;
+      const date = structuredAnchorDate(rec);
       push({
         label,
         date,
         level,
         confidence: confidence || recordConfidence(rec, 'medium'),
-        sourceDate: String(rec?.dateStr || ''),
+        sourceDate: String(rec?.dispatchDate || rec?.dateStr || ''),
         resolved,
         reference,
         reviewOnly,
@@ -7282,6 +7558,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         internalKey,
         phase,
         method,
+        ...extra,
       });
     };
 
@@ -7292,12 +7569,20 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       { items: records, source: 'Event', predicate: (r, low) => /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
     ]);
 
-    const findR71Anchor = () => pickPreferredAnchor([
+    const r71AnchorPlans = [
       { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /communication about intention to grant a european patent|communication of intention to grant a patent/.test(low) },
       { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /text intended for grant|intention to grant \(signatures\)|annex to the communication about intention to grant/.test(low) },
-      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'EPIDOSNIGR1' || /despatch of communication of intention to grant a patent/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'EPIDOSNIGR1' || e.codexKey === 'GRANT_R71_3' || /despatch of communication of intention to grant a patent/.test(low) },
       { items: eventDesc, source: 'Event', predicate: (e, low) => e.codexKey === 'GRANT_R71_3_EVENT' || /new entry: communication of intention to grant a patent|communication of intention to grant a patent/.test(low) },
       { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /despatch of communication of intention to grant a patent/.test(low) },
+    ];
+    const findR71Anchors = () => collectPreferredAnchors(r71AnchorPlans);
+    const findR71Anchor = () => findR71Anchors()[0] || null;
+
+    const findRule716DisapprovalAnchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'Applicant' && /disapproval of the communication of intention to grant|rule\s*71\(6\)|disapproval.*intention to grant/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'IGRE' || e.codexKey === 'GRANT_R71_6_DISAPPROVAL' || /disapproval of the communication of intention to grant|rule\s*71\(6\)/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /disapproval of the communication of intention to grant|rule\s*71\(6\)/.test(low) },
     ]);
 
     const findRule62aAnchor = () => pickPreferredAnchor([
@@ -7332,6 +7617,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const findMinutesFirstActionAnchor = () => pickPreferredAnchor([
       { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low) },
       { items: eventDesc, source: 'Event', predicate: (e, low) => /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low) },
     ]);
 
@@ -7375,13 +7661,19 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         source: 'Documents',
         predicate: (d, low) => d.actor === 'EPO'
           && /summons to oral proceedings/.test(low)
-          && (phase === 'all' || (phase === 'opposition' ? /opposition/.test(low) : !/opposition/.test(low))),
+          && (phase === 'all' || inferProceduralPhase({ ...d, detail: rawItemDetail(d) }) === phase),
+      },
+      {
+        items: codedEventsDesc,
+        source: 'Coded legal event',
+        predicate: (e, low) => /summons to oral proceedings/.test(low)
+          && (phase === 'all' || inferProceduralPhase(e) === phase),
       },
       {
         items: eventDesc,
         source: 'Event',
         predicate: (e, low) => /summons to oral proceedings/.test(low)
-          && (phase === 'all' || (phase === 'opposition' ? /opposition/.test(low) : !/opposition/.test(low))),
+          && (phase === 'all' || inferProceduralPhase(e) === phase),
       },
     ]);
 
@@ -7391,14 +7683,14 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         source: 'Coded legal event',
         predicate: (e, low) => (e.originalCode === 'ORAL' || /^oral proceedings\b/.test(low) || /\boral proceedings\b/.test(low))
           && !/summons/.test(low)
-          && (phase === 'all' || (phase === 'opposition' ? /opposition/.test(low) : !/opposition/.test(low))),
+          && (phase === 'all' || inferProceduralPhase(e) === phase),
       },
       {
         items: eventDesc,
         source: 'Event',
         predicate: (e, low) => /\boral proceedings\b/.test(low)
           && !/summons/.test(low)
-          && (phase === 'all' || (phase === 'opposition' ? /opposition/.test(low) : !/opposition/.test(low))),
+          && (phase === 'all' || inferProceduralPhase(e) === phase),
       },
     ]);
 
@@ -7481,10 +7773,10 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     ]);
 
     const rule161162Variant = (record = null) => {
-      const low = normalize(`${record?.title || ''} ${record?.detail || ''}`).toLowerCase();
+      const low = normalize(`${record?.title || ''} ${record?.detail || ''} ${record?.stepDescriptionName || ''}`).toLowerCase();
       if (!low) return 'generic';
       if (/mandatory|required reply|must reply|mandatory reply|non-extendable.*reply/.test(low)) return 'mandatory';
-      if (/voluntary|no mandatory substantive reply|amendment window|claims fee consequences/.test(low)) return 'voluntary';
+      if (/voluntary|no mandatory substantive reply|no reply required|amendment window|claims fee consequences/.test(low)) return 'voluntary';
       return 'generic';
     };
 
@@ -7510,9 +7802,12 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       resolveHintByActivity,
       recordConfidence,
       addMonthsDeadline,
+      addStructuredOrReviewDeadline,
       addAbsoluteDateEntry,
       findNoOppositionRecord,
+      findR71Anchors,
       findR71Anchor,
+      findRule716DisapprovalAnchor,
       findRule62aAnchor,
       findRule63Anchor,
       findRule64Anchor,
@@ -7592,14 +7887,15 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const rule64 = ctx.findRule64Anchor();
     if (rule64 && !ctx.hasPdfHint(/Rule 64 additional search/i)) {
-      ctx.pushReviewItem({
-        label: 'Rule 64 additional search fees / unity selection (manual review)',
+      ctx.addStructuredOrReviewDeadline({
         record: rule64,
+        label: 'Rule 64 additional search fees / unity selection',
         level: 'bad',
         internalKey: 'SEARCH_R64_ADDITIONAL_FEES',
         phase: 'search',
         namespace: 'first_instance',
-        method: 'Communication-specific fee/choice deadline; review explicit time limit from the communication/PDF.',
+        method: 'Structured ST.36 Rule 64 deadline from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'Communication-specific fee/choice deadline; review explicit time limit from the communication/PDF.',
       });
     }
 
@@ -7632,41 +7928,56 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function appendCoreCommunicationDeadlines(ctx) {
+    const r71Anchors = ctx.findR71Anchors();
+    const latestR71 = r71Anchors[0] || null;
+    const previousR71 = r71Anchors[1] || null;
+    const rule716 = ctx.findRule716DisapprovalAnchor();
+    const latestR71Date = structuredAnchorDate(latestR71);
+    const previousR71Date = structuredAnchorDate(previousR71);
+    const rule716Date = structuredAnchorDate(rule716);
+    const post713Branch = !!(latestR71 && ((previousR71Date && latestR71Date && previousR71Date.getTime() < latestR71Date.getTime()) || (rule716Date && latestR71Date && rule716Date.getTime() < latestR71Date.getTime())));
+
     ctx.addMonthsDeadline({
-      record: ctx.findR71Anchor(),
+      record: latestR71,
       label: 'R71(3) response period',
       months: 4,
       level: 'bad',
       confidence: 'high',
-      internalKey: 'GRANT_R71_3',
+      internalKey: post713Branch ? 'GRANT_POST_71_3_AMENDMENT' : 'GRANT_R71_3',
       phase: 'grant',
       namespace: 'first_instance',
-      resolvedBy: (anchor) => ctx.hasFeeSignalAfter(anchor, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections/i) || ctx.hasApplicantResponseAfter(anchor),
+      extra: post713Branch ? { supersedesKey: 'GRANT_R71_3', branchContext: 'fresh Rule 71(3) issued after disapproval / amendment' } : {},
+      resolvedBy: (anchor, rec) => structuredReplyOrPaymentSeen(rec) || ctx.hasFeeSignalAfter(anchor, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections/i) || ctx.hasApplicantResponseAfter(anchor),
     });
 
     const art94 = ctx.findArt94Anchor();
     if (art94 && !ctx.hasPdfHint(/Art\. 94\(3\) response period/i)) {
-      ctx.pushReviewItem({
-        label: 'Art. 94(3) examination communication (manual review)',
+      ctx.addStructuredOrReviewDeadline({
         record: art94,
+        label: 'Art. 94(3) response period',
+        reviewLabel: 'Art. 94(3) examination communication (manual review)',
         level: 'warn',
         internalKey: 'EXAMINATION_ART94_COMM',
         phase: 'examination',
         namespace: 'first_instance',
-        method: 'The communication is response-bearing, but the period is communication-specific unless the parsed document text yields an explicit date/period.',
+        method: 'Structured ST.36 Art. 94(3) deadline from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'The communication is response-bearing, but the period is communication-specific unless the parsed document text or ST.36 fields yield an explicit date/period.',
+        resolvedBy: (anchor, rec) => structuredReplyOrPaymentSeen(rec) || ctx.hasApplicantResponseAfter(anchor, /reply|response|observations|arguments|amend|claims|request|further processing|re-establishment/i),
       });
     }
 
     const minutes = ctx.findMinutesFirstActionAnchor();
     if (minutes) {
-      ctx.pushReviewItem({
-        label: 'Minutes-as-first-action examination communication (manual review)',
+      ctx.addStructuredOrReviewDeadline({
         record: minutes,
+        label: 'Minutes-as-first-action examination communication',
+        reviewLabel: 'Minutes-as-first-action examination communication (manual review)',
         level: 'warn',
         internalKey: 'EXAMINATION_MINUTES_AS_FIRST_ACTION',
         phase: 'examination',
         namespace: 'first_instance',
-        method: 'Review the minutes/consultation text to confirm whether they replace the first Art. 94(3) action and set a response period.',
+        method: 'Structured ST.36 deadline from first-action minutes / consultation record',
+        reviewMethod: 'Review the minutes/consultation text or structured fields to confirm whether they replace the first Art. 94(3) action and set a response period.',
       });
     }
 
@@ -7700,7 +8011,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         internalKey: variant === 'mandatory' ? 'EUROPCT_R161_162_MANDATORY' : (variant === 'voluntary' ? 'EUROPCT_R161_162_VOLUNTARY' : 'EUROPCT_R161_162'),
         phase: 'regional_phase_entry',
         namespace: 'first_instance',
-        resolvedBy: (anchor) => ctx.hasApplicantResponseAfter(anchor, /reply|response|amend|claims|observations|arguments/i) || ctx.hasFeeSignalAfter(anchor, /claims fee|fee payment received/i),
+        resolvedBy: (anchor, rec) => structuredReplyOrPaymentSeen(rec) || ctx.hasApplicantResponseAfter(anchor, /reply|response|amend|claims|observations|arguments/i) || ctx.hasFeeSignalAfter(anchor, /claims fee|fee payment received/i),
         methodPrefix: 'Rule-based',
         reviewOnly: variant === 'generic',
       });
@@ -7722,27 +8033,31 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const rule1642 = ctx.findRule1642Anchor();
     if (ctx.isEuroPct && rule1642) {
-      ctx.pushReviewItem({
-        label: 'Rule 164(2) unsearched-inventions communication (manual review)',
+      ctx.addStructuredOrReviewDeadline({
         record: rule1642,
+        label: 'Rule 164(2) unsearched-inventions communication',
+        reviewLabel: 'Rule 164(2) unsearched-inventions communication (manual review)',
         level: 'bad',
         internalKey: 'EUROPCT_R164_2_UNSEARCHED',
         phase: 'examination_start',
         namespace: 'first_instance',
-        method: 'The fee/selection period is communication-specific; review the communication/PDF for the governing due date.',
+        method: 'Structured ST.36 Rule 164(2) deadline from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'The fee/selection period is communication-specific; review the communication/PDF or ST.36 fields for the governing due date.',
       });
     }
 
     const examSummons = ctx.findSummonsAnchor('examination');
     if (examSummons && !ctx.hasPdfHint(/Rule 116 final date|Oral proceedings date/i)) {
-      ctx.pushReviewItem({
-        label: 'Examination summons / Rule 116 review',
+      ctx.addStructuredOrReviewDeadline({
         record: examSummons,
+        label: 'Rule 116 final date',
+        reviewLabel: 'Examination summons / Rule 116 review',
         level: 'warn',
         internalKey: 'EXAMINATION_SUMMONS',
         phase: 'examination',
         namespace: 'first_instance',
-        method: 'Summons require annex parsing: store the oral-proceedings date and any Rule 116 final written-submissions date.',
+        method: 'Structured ST.36 summons final date from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'Summons require annex parsing: store the oral-proceedings date and any Rule 116 final written-submissions date.',
       });
     }
 
@@ -7813,6 +8128,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   function appendLossOfRightsAndRemedyDeadlines(ctx) {
     const rule112 = ctx.findRule112Anchor();
     if (rule112) {
+      const underlyingMissedAct = inferMissedActFromReason(`${rule112.stepDescriptionName || ''} ${rule112.detail || ''} ${rule112.title || ''}`);
       ctx.addMonthsDeadline({
         record: rule112,
         label: 'Rule 112 decision-request review window',
@@ -7824,7 +8140,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         phase: 'loss_of_rights',
         namespace: 'first_instance',
         methodPrefix: 'Conditional EPC remedy',
-        resolvedBy: (anchor) => ctx.hasApplicantResponseAfter(anchor, /request for decision|further processing|re-establishment|decision request/i),
+        extra: underlyingMissedAct ? { underlyingMissedAct } : {},
+        resolvedBy: (anchor, rec) => structuredReplyOrPaymentSeen(rec) || ctx.hasApplicantResponseAfter(anchor, /request for decision|further processing|re-establishment|decision request/i),
       });
     }
   }
@@ -7846,40 +8163,46 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const r793 = ctx.findOppositionRule793Anchor();
     if (r793 && !ctx.hasPdfHint(/Rule 79\(3\)/i)) {
-      ctx.pushReviewItem({
-        label: 'Opposition Rule 79(3) party-reply communication (manual review)',
+      ctx.addStructuredOrReviewDeadline({
         record: r793,
+        label: 'Opposition Rule 79(3) party-reply communication',
+        reviewLabel: 'Opposition Rule 79(3) party-reply communication (manual review)',
         level: 'warn',
         internalKey: 'OPPOSITION_R79_3_OTHER_PARTIES_REPLY',
         phase: 'opposition',
         namespace: 'opposition',
-        method: 'The party-reply period is communication-specific; review the communication/PDF for the due date.',
+        method: 'Structured ST.36 opposition reply deadline from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'The party-reply period is communication-specific; review the communication/PDF or ST.36 fields for the due date.',
       });
     }
 
     const orex = ctx.findOppositionOrexAnchor();
     if (orex && !r791 && !r793 && !ctx.hasPdfHint(/Opposition/i)) {
-      ctx.pushReviewItem({
-        label: 'Opposition division communication (manual review)',
+      ctx.addStructuredOrReviewDeadline({
         record: orex,
+        label: 'Opposition division communication',
+        reviewLabel: 'Opposition division communication (manual review)',
         level: 'warn',
         internalKey: 'OPPOSITION_DIVISION_COMMUNICATION',
         phase: 'opposition',
         namespace: 'opposition',
-        method: 'Generic OREX-style opposition communication detected; review the communication text for the governing deadline.',
+        method: 'Structured ST.36 opposition deadline from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'Generic OREX-style opposition communication detected; review the communication text or ST.36 fields for the governing deadline.',
       });
     }
 
     const oppSummons = ctx.findSummonsAnchor('opposition');
     if (oppSummons && !ctx.hasPdfHint(/Rule 116 final date|Oral proceedings date/i)) {
-      ctx.pushReviewItem({
-        label: 'Opposition summons / Rule 116 review',
+      ctx.addStructuredOrReviewDeadline({
         record: oppSummons,
+        label: 'Rule 116 final date',
+        reviewLabel: 'Opposition summons / Rule 116 review',
         level: 'warn',
         internalKey: 'OPPOSITION_SUMMONS',
         phase: 'opposition',
         namespace: 'opposition',
-        method: 'Summons require annex parsing: store the oral-proceedings date and any Rule 116 final written-submissions date.',
+        method: 'Structured ST.36 summons final date from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'Summons require annex parsing: store the oral-proceedings date and any Rule 116 final written-submissions date.',
       });
     }
 
@@ -7941,14 +8264,16 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const pmap = ctx.findOppositionPmapAnchor();
     if (pmap && !r821 && !r822 && !r823 && !ctx.hasPdfHint(/Rule 82/i)) {
-      ctx.pushReviewItem({
-        label: 'Opposition Rule 82 branch (manual review)',
+      ctx.addStructuredOrReviewDeadline({
         record: pmap,
+        label: 'Opposition Rule 82 branch',
+        reviewLabel: 'Opposition Rule 82 branch (manual review)',
         level: 'bad',
         internalKey: 'OPPOSITION_R82_BRANCH',
         phase: 'opposition_endgame',
         namespace: 'opposition',
-        method: 'PMAP-style maintenance branch detected; review the communication text to distinguish Rule 82(1)/(2)/(3) and its governing due date.',
+        method: 'Structured ST.36 Rule 82 branch from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'PMAP-style maintenance branch detected; review the communication text or ST.36 fields to distinguish Rule 82(1)/(2)/(3) and its governing due date.',
       });
     }
 
@@ -7982,14 +8307,16 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const lire = ctx.findLimitationLireAnchor();
     if (lire && !l952 && !l953 && !ctx.hasPdfHint(/Rule 95/i)) {
-      ctx.pushReviewItem({
-        label: 'Limitation communication (manual review)',
+      ctx.addStructuredOrReviewDeadline({
         record: lire,
+        label: 'Limitation communication',
+        reviewLabel: 'Limitation communication (manual review)',
         level: 'warn',
         internalKey: 'LIMITATION_COMMUNICATION',
         phase: 'limitation',
         namespace: 'limitation',
-        method: 'Limitation communication detected; review the communication text to distinguish the applicable Rule 95 branch and due date.',
+        method: 'Structured ST.36 limitation deadline from DATE_OF_DISPATCH + time-limit in record',
+        reviewMethod: 'Limitation communication detected; review the communication text or ST.36 fields to distinguish the applicable Rule 95 branch and due date.',
       });
     }
   }
@@ -8029,6 +8356,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           rolledOver: calcUe.rolledOver,
           rolloverNote: calcUe.rolledOver ? `day ${calcUe.fromDay}→${calcUe.toDay}` : '',
           namespace: 'unitary_patent',
+          internalKey: 'UNITARY_PATENT_EVENT',
           phase: 'up',
         });
       }
@@ -8036,20 +8364,39 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const decision = ctx.findAppealableDecisionAnchor();
     if (decision) {
-      const anchor = parseDateString(decision.dateStr);
+      const anchor = structuredAnchorDate(decision);
       if (anchor) {
+        const decisionLow = normalize(`${decision.title || ''} ${decision.detail || ''}`).toLowerCase();
+        const decisionAnchorKey = /refusal|decision to refuse|refusal of the application/.test(decisionLow) ? 'DECISION_REFUSAL' : '';
+        if (decisionAnchorKey) {
+          ctx.push({
+            label: 'Refusal decision / appeal anchor',
+            date: anchor,
+            level: 'info',
+            confidence: ctx.recordConfidence ? ctx.recordConfidence(decision, 'high') : 'high',
+            sourceDate: decision.dispatchDate || decision.dateStr,
+            resolved: false,
+            anchorOnly: true,
+            namespace: 'appeal',
+            internalKey: decisionAnchorKey,
+            phase: 'decision',
+            method: 'Decision anchor routed to appeal branch.',
+          });
+        }
         const calcNotice = addCalendarMonthsDetailed(anchor, 2);
         ctx.push({
           label: 'Appeal notice + fee',
           date: calcNotice.date,
           level: 'bad',
           confidence: 'high',
-          sourceDate: decision.dateStr,
+          sourceDate: decision.dispatchDate || decision.dateStr,
           resolved: ctx.hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcNotice.date),
           method: 'Rule-based: decision date +2 months',
           rolledOver: calcNotice.rolledOver,
           rolloverNote: calcNotice.rolledOver ? `day ${calcNotice.fromDay}→${calcNotice.toDay}` : '',
           namespace: 'appeal',
+          internalKey: 'APPEAL_EVENT',
+          anchorInternalKey: decisionAnchorKey,
           phase: 'appeal',
         });
         const calcGrounds = addCalendarMonthsDetailed(anchor, 4);
@@ -8058,12 +8405,14 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           date: calcGrounds.date,
           level: 'bad',
           confidence: 'high',
-          sourceDate: decision.dateStr,
+          sourceDate: decision.dispatchDate || decision.dateStr,
           resolved: ctx.hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcGrounds.date),
           method: 'Rule-based: decision date +4 months',
           rolledOver: calcGrounds.rolledOver,
           rolloverNote: calcGrounds.rolledOver ? `day ${calcGrounds.fromDay}→${calcGrounds.toDay}` : '',
           namespace: 'appeal',
+          internalKey: 'APPEAL_EVENT',
+          anchorInternalKey: decisionAnchorKey,
           phase: 'appeal',
         });
       }
@@ -8115,7 +8464,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     appendOppositionAndLimitationDeadlines(ctx);
     appendPostGrantDeadlines(ctx);
     appendReferenceDeadlines(ctx);
-    return dedupe(ctx.out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}|${d.reviewOnly ? 'review' : ''}`);
+    return dedupe(ctx.out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}|${d.reviewOnly ? 'review' : ''}|${d.internalKey || ''}|${d.namespace || ''}|${d.anchorOnly ? 'anchor' : ''}`);
   }
 
   function inferRenewalModel(main, legal, ue, federated = {}) {
@@ -8202,7 +8551,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   }
 
   function isReviewDeadline(deadline = {}) {
-    if (!deadline || deadline.reference) return false;
+    if (!deadline || deadline.reference || deadline.anchorOnly) return false;
     if (deadline.reviewOnly) return true;
     if (!deadline.date || Number.isNaN(deadline.date?.getTime?.())) return true;
     return String(deadline.confidence || '').toLowerCase() === 'low';
@@ -8211,7 +8560,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   function deadlinePresentationBuckets(deadlines = [], currentClosedPosture = false) {
     const buckets = { active: [], monitoring: [], review: [], historical: [] };
     for (const deadline of (deadlines || [])) {
-      if (deadline?.reference) continue;
+      if (deadline?.reference || deadline?.anchorOnly) continue;
       if (currentClosedPosture) {
         buckets.historical.push(deadline);
         continue;

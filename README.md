@@ -300,6 +300,16 @@ npm test
   - and reversed/fragmented variants (e.g. `months ... 2` style ordering).
 - Keeps these targeted phrase detections lower-priority than explicit legal-wording matches.
 
+### 7.0.64
+- Closed the remaining documentation-audit gaps around structured procedural data and branch modeling:
+  - the procedural parser now preserves structured legal-event fields such as **STEP_DESCRIPTION_NAME**, **DATE_OF_DISPATCH**, **DATE_OF_REPLY**, **DATE_OF_PAYMENT**, **DATE_OF_REQUEST**, **RESULT_DATE**, and **time-limit** values
+  - the deadline engine now consumes those structured ST.36-style fields where available instead of relying only on title/event heuristics
+  - communication-specific branches such as **OREX**, **LIRE**, **Art. 94(3)**, first-action minutes, summons review, and similar records can now upgrade from manual-review to real deadlines when structured dispatch/time-limit data is present
+  - Rule 71 replacement cycles now tag fresh post-disapproval grant communications explicitly as **GRANT_POST_71_3_AMENDMENT** branches
+  - refusal decisions now surface as explicit appeal-branch anchors, while appeal and unitary-effect windows carry explicit branch keys
+  - summons phase routing now prefers procedural/division metadata over plain opposition-text heuristics where possible
+  - overview bucketing now ignores anchor-only branch markers while still excluding reference-only rows and isolating review-only items from active reminders
+
 ### 7.0.63
 - Added broader documentation-driven deadline coverage across the shared lib and userscript runtime:
   - search-stage fixed-term branches for **Rule 62a** and **Rule 63**

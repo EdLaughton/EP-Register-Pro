@@ -63,6 +63,15 @@ assert.strictEqual(
   'Overview helper should explain review-only states distinctly from actionable deadlines',
 );
 
+const anchorOnly = [
+  { label: 'Refusal decision / appeal anchor', date: new Date('2026-03-02T00:00:00Z'), anchorOnly: true, internalKey: 'DECISION_REFUSAL' },
+];
+assert.deepStrictEqual(
+  deadlinePresentationBuckets(anchorOnly, false),
+  { active: [], monitoring: [], review: [], historical: [] },
+  'Overview helper should ignore anchor-only branch markers when presenting actionable deadlines',
+);
+
 const recoveredBeforeGrant = recoveryActionModel({
   recovered: true,
   recoveredBeforeGrant: true,
