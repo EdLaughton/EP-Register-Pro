@@ -173,6 +173,13 @@ assert.deepStrictEqual(
     nextDeadline: null,
     nextDeadlineNote: 'No active applicant/EPO deadline detected; remaining clocks are third-party monitoring windows.',
     recoveryAction: null,
+    presentationHints: {
+      postureLabel: 'Current posture',
+      waitingLabel: 'Waiting on',
+      nextDeadlineLabel: 'Next deadline',
+      renewalLabel: 'Renewal status',
+      renewalNextFeeLabel: 'Next renewal fee',
+    },
   }),
   'Lib overview composition helper should produce the expected monitoring-only actionable state',
 );
