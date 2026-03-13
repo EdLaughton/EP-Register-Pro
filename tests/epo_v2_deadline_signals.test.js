@@ -107,4 +107,86 @@ const recoveryLegal = hooks.parseLegal(loadFixtureDocument(['cases', recoveryCas
 const recoveryDeadlines = inferProceduralDeadlinesFromSources({ main: recoveryMain, docs: recoveryDoclist.docs, eventHistory: recoveryEventHistory, legal: recoveryLegal, pdfData: {} });
 assert.strictEqual(recoveryDeadlines.some((d) => d.label === 'Appeal notice + fee'), false, 'Shared deadline inference should not fabricate appeal clocks from further-processing decisions');
 
+const syntheticFamilyDeadlines = inferProceduralDeadlinesFromSources({
+  main: {
+    applicationType: 'PCT application (E/PCT)',
+    priorities: [{ dateStr: '01.01.2024' }],
+    filingDate: '01.01.2024',
+  },
+  docs: [
+    { dateStr: '10.01.2026', title: 'Invitation under Rule 62a EPC', procedure: 'Search', actor: 'EPO' },
+    { dateStr: '11.01.2026', title: 'Communication under Rule 63 EPC', procedure: 'Search', actor: 'EPO' },
+    { dateStr: '12.01.2026', title: 'Additional search fee under Rule 64 EPC', procedure: 'Search', actor: 'EPO' },
+    { dateStr: '13.01.2026', title: 'Invitation under Rule 70(2) EPC and Rule 70a EPC', procedure: 'Search / examination', actor: 'EPO' },
+    { dateStr: '14.01.2026', title: 'Communication under Rules 161 and 162 EPC (mandatory reply required)', procedure: 'Search / examination', actor: 'EPO' },
+    { dateStr: '15.01.2026', title: 'Communication under Rule 164(1) EPC – additional search fees', procedure: 'Search / examination', actor: 'EPO' },
+    { dateStr: '16.01.2026', title: 'Communication under Rule 164(2) EPC – unsearched inventions', procedure: 'Search / examination', actor: 'EPO' },
+    { dateStr: '17.01.2026', title: 'Communication from the Examining Division pursuant to Article 94(3) EPC', procedure: 'Search / examination', actor: 'EPO' },
+    { dateStr: '18.01.2026', title: 'Minutes of a consultation by telephone issued as first action', procedure: 'Examination', actor: 'EPO' },
+    { dateStr: '20.01.2026', title: 'Invitation to file observations under Rule 79(1) EPC', procedure: 'Opposition', actor: 'EPO' },
+    { dateStr: '21.01.2026', title: 'Invitation to reply under Rule 79(3) EPC', procedure: 'Opposition', actor: 'EPO' },
+    { dateStr: '22.01.2026', title: 'Communication under Rule 82(1) EPC', procedure: 'Opposition', actor: 'EPO' },
+    { dateStr: '23.01.2026', title: 'Communication under Rule 82(2) EPC – file translations of the amended claims and publication fee', procedure: 'Opposition', actor: 'EPO' },
+    { dateStr: '24.01.2026', title: 'Further invitation under Rule 82(3) EPC with surcharge', procedure: 'Opposition', actor: 'EPO' },
+    { dateStr: '25.01.2026', title: 'Communication under Rule 95(2) EPC', procedure: 'Limitation', actor: 'EPO' },
+    { dateStr: '26.01.2026', title: 'Communication under Rule 95(3) EPC', procedure: 'Limitation', actor: 'EPO' },
+    { dateStr: '27.01.2026', title: 'Communication under Rule 112(1) EPC (loss of rights)', procedure: 'Examination', actor: 'EPO' },
+  ],
+  eventHistory: { events: [] },
+  legal: {
+    events: [],
+    codedEvents: [
+      { dateStr: '20.05.2026', title: 'Oral proceedings', detail: 'Opposition', originalCode: 'ORAL' },
+    ],
+    renewals: [],
+  },
+  pdfData: {
+    hints: [
+      { label: 'Rule 116 final date', dateStr: '15.04.2026', sourceDate: '19.01.2026', confidence: 'high', evidence: 'PDF parse' },
+      { label: 'Opposition oral proceedings date', dateStr: '20.05.2026', sourceDate: '19.01.2026', confidence: 'high', evidence: 'PDF parse' },
+    ],
+  },
+});
+assert.strictEqual(syntheticFamilyDeadlines.find((d) => d.label === 'Rule 62a invitation period')?.date?.toISOString().slice(0, 10), '2026-03-10', 'Shared deadline inference should compute Rule 62a as a fixed 2-month search-stage deadline');
+assert.strictEqual(syntheticFamilyDeadlines.find((d) => d.label === 'Rule 63 invitation period')?.date && syntheticFamilyDeadlines.find((d) => d.label === 'Rule 63 invitation period').date.toISOString().slice(0, 10), '2026-03-11', 'Shared deadline inference should compute Rule 63 as a fixed 2-month search-stage deadline');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 64 additional search fees / unity selection (manual review)' && d.reviewOnly), true, 'Shared deadline inference should surface Rule 64 as a review-only communication-specific search-fee branch');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 70(2) / Rule 70a shared response period'), true, 'Shared deadline inference should collapse paired Rule 70(2)/70a communications into one shared deadline');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 70(2) confirmation/response period'), false, 'Shared deadline inference should suppress the standalone Rule 70(2) clock when a combined Rule 70(2)/70a communication governs');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 161/162 mandatory response period'), true, 'Shared deadline inference should distinguish mandatory Rule 161/162 variants when the communication text says reply required');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 164(1) additional search fees'), true, 'Shared deadline inference should compute Rule 164(1) fee windows as fixed 2-month Euro-PCT deadlines');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 164(2) unsearched-inventions communication (manual review)' && d.reviewOnly), true, 'Shared deadline inference should route Rule 164(2) communications into manual review when the due date is communication-specific');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Art. 94(3) examination communication (manual review)' && d.reviewOnly), true, 'Shared deadline inference should surface explicit Art. 94(3) communications for manual review when the period is not stated in parsed text');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Minutes-as-first-action examination communication (manual review)' && d.reviewOnly), true, 'Shared deadline inference should keep minutes-as-first-action examination communications in the manual-review queue');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 116 final date'), true, 'Shared deadline inference should preserve Rule 116 final dates parsed from summons material');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Opposition oral proceedings date'), true, 'Shared deadline inference should preserve parsed/stored oral-proceedings dates for opposition summons branches');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Opposition Rule 79(1) proprietor reply'), true, 'Shared deadline inference should compute the proprietor’s first opposition reply under Rule 79(1)');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Opposition Rule 79(3) party-reply communication (manual review)' && d.reviewOnly), true, 'Shared deadline inference should surface Rule 79(3) follow-on communications for manual review');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Opposition Rule 82(1) maintenance-text observations'), true, 'Shared deadline inference should compute Rule 82(1) maintenance-text windows');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Opposition Rule 82(2) translations + publication fee' && d.superseded), true, 'Shared deadline inference should supersede Rule 82(2) deadlines when a later Rule 82(3) further invitation appears');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Opposition Rule 82(3) surcharge period'), true, 'Shared deadline inference should compute Rule 82(3) surcharge periods');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Limitation Rule 95(2) correction period'), true, 'Shared deadline inference should compute Rule 95(2) limitation-correction windows');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Limitation Rule 95(3) translations + fee'), true, 'Shared deadline inference should compute Rule 95(3) limitation translation/fee windows');
+assert.strictEqual(syntheticFamilyDeadlines.some((d) => d.label === 'Rule 112 decision-request review window' && d.reviewOnly), true, 'Shared deadline inference should surface Rule 112 consequence notices as review-only remedy windows rather than ordinary office-action deadlines');
+
+const codexGenericDeadlines = inferProceduralDeadlinesFromSources({
+  main: { applicationType: 'European patent application', filingDate: '01.01.2020' },
+  docs: [],
+  eventHistory: { events: [] },
+  legal: {
+    events: [],
+    codedEvents: [
+      { dateStr: '01.02.2026', title: 'Communication from the opposition division', detail: '', originalCode: 'OREX' },
+      { dateStr: '02.02.2026', title: 'Preparation for maintenance of the patent in an amended form', detail: '', originalCode: 'PMAP' },
+      { dateStr: '03.02.2026', title: 'Communication from the examining division in a limitation procedure', detail: '', originalCode: 'LIRE' },
+      { dateStr: '04.02.2026', title: 'Oral proceedings', detail: 'Opposition', originalCode: 'ORAL' },
+    ],
+    renewals: [],
+  },
+  pdfData: {},
+});
+assert.strictEqual(codexGenericDeadlines.some((d) => d.label === 'Opposition division communication (manual review)' && d.reviewOnly), true, 'Shared deadline inference should use OREX-style procedural-step markers as opposition manual-review anchors');
+assert.strictEqual(codexGenericDeadlines.some((d) => d.label === 'Opposition Rule 82 branch (manual review)' && d.reviewOnly), true, 'Shared deadline inference should use PMAP-style procedural-step markers as Rule 82 branch anchors');
+assert.strictEqual(codexGenericDeadlines.some((d) => d.label === 'Limitation communication (manual review)' && d.reviewOnly), true, 'Shared deadline inference should use LIRE-style procedural-step markers as limitation manual-review anchors');
+assert.strictEqual(codexGenericDeadlines.some((d) => d.label === 'Opposition oral proceedings date'), true, 'Shared deadline inference should store ORAL-coded opposition hearing dates directly from coded procedural events');
+
 console.log('epo_v2_deadline_signals.test.js passed');

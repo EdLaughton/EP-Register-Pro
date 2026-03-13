@@ -24,7 +24,7 @@ const monitoringOnly = [
 ];
 assert.deepStrictEqual(
   deadlinePresentationBuckets(monitoringOnly, false),
-  { active: [], monitoring: monitoringOnly, historical: [] },
+  { active: [], monitoring: monitoringOnly, review: [], historical: [] },
   'Overview helper should bucket monitoring windows separately from active procedural clocks',
 );
 assert.strictEqual(
@@ -42,6 +42,25 @@ assert.strictEqual(
   activeDeadlineNoteText([{ label: 'R71(3) response period', date: new Date('2024-02-10T00:00:00Z'), resolved: false, superseded: true }], true),
   'No active procedural deadline detected; later loss-of-rights events superseded earlier response periods.',
   'Overview helper should keep the closed-posture superseded-deadline explanation',
+);
+
+const reviewOnly = [
+  { label: 'Art. 94(3) examination communication (manual review)', date: null, resolved: false, superseded: false, reviewOnly: true, confidence: 'low' },
+];
+assert.deepStrictEqual(
+  deadlinePresentationBuckets(reviewOnly, false),
+  { active: [], monitoring: [], review: reviewOnly, historical: [] },
+  'Overview helper should isolate low-confidence/manual-review items from auto-remindable active deadlines',
+);
+assert.strictEqual(
+  selectNextDeadline(reviewOnly, false, new Date('2026-03-01T00:00:00Z')),
+  null,
+  'Overview helper should not promote review-only items as the active next deadline',
+);
+assert.strictEqual(
+  activeDeadlineNoteText(reviewOnly, false),
+  'No auto-remindable deadline detected; 1 low-confidence or manual-review item remain.',
+  'Overview helper should explain review-only states distinctly from actionable deadlines',
 );
 
 const recoveredBeforeGrant = recoveryActionModel({

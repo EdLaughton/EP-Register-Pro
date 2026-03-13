@@ -169,7 +169,7 @@ assert.deepStrictEqual(
   })),
   plain({
     status: { simple: 'Granted', level: 'ok' },
-    deadlineBuckets: { active: [], monitoring: monitoringDeadlines, historical: [] },
+    deadlineBuckets: { active: [], monitoring: monitoringDeadlines, review: [], historical: [] },
     nextDeadline: null,
     nextDeadlineNote: 'No active applicant/EPO deadline detected; remaining clocks are third-party monitoring windows.',
     recoveryAction: null,

@@ -300,6 +300,17 @@ npm test
   - and reversed/fragmented variants (e.g. `months ... 2` style ordering).
 - Keeps these targeted phrase detections lower-priority than explicit legal-wording matches.
 
+### 7.0.63
+- Added broader documentation-driven deadline coverage across the shared lib and userscript runtime:
+  - search-stage fixed-term branches for **Rule 62a** and **Rule 63**
+  - review-only handling for communication-specific branches such as **Rule 64**, **Art. 94(3)**, **Rule 164(2)**, first-action minutes, opposition communications, and limitation communications
+  - combined **Rule 70(2) / Rule 70a** handling when a shared communication governs the response window
+  - split handling for **Rule 161/162** when the communication text clearly signals a mandatory variant
+  - **Rule 164(1)**, **Rule 79(1)**, **Rule 82(1)/(2)/(3)**, **Rule 95(2)/(3)**, and **Rule 112** remedy-review coverage
+  - oral-proceedings date extraction plus **Rule 116** final-date extraction from summons PDFs
+  - low-confidence/manual-review deadline bucketing so review items stop surfacing as the active next reminder
+  - namespace tagging for opposition, appeal, limitation, and unitary-effect windows
+
 ### 7.0.62
 - Tightened deadline inference to match the external EPO documentation pack more closely:
   - Rule 71(3) now anchors to the underlying communication/despatch packet instead of later announcement/status rows.

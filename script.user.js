@@ -5512,7 +5512,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       candidates.push({ dateStr, evidence, score });
     };
 
-    for (const m of textRaw.matchAll(/(?:\bfinal\s+date\b[\s\S]{0,32}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+    for (const m of textRaw.matchAll(/(?:\bfinal\s+date\b[\s\S]{0,96}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
       push(m[1], 'Explicit final date found in PDF communication text', 130);
     }
     for (const m of textRaw.matchAll(/(?:\bdeadline\b[\s\S]{0,32}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
@@ -5528,10 +5528,60 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     if (!candidates.length) return { dateStr: '', evidence: '' };
 
     const best = candidates
-      .map((c) => ({ ...c, ts: parseDateString(c.dateStr)?.getTime() || 0 }))
+      .map((candidate) => ({ ...candidate, ts: parseDateString(candidate.dateStr)?.getTime() || 0 }))
       .sort((a, b) => (b.score - a.score) || (b.ts - a.ts))[0];
 
     return { dateStr: best?.dateStr || '', evidence: best?.evidence || '' };
+  }
+
+  function extractRegisteredLetterProofLine(textBlock) {
+    const raw = String(textBlock || '');
+    if (!raw) return { registeredLetterLine: '', proofLine: '' };
+
+    const lines = raw
+      .split(/\r?\n/)
+      .map((line) => normalize(line))
+      .filter(Boolean);
+
+    const idx = lines.findIndex((line) => /\bregistered\s+letter\b/i.test(line));
+    if (idx >= 0) {
+      const current = lines[idx] || '';
+      const tail = normalize(current.replace(/.*?\bregistered\s+letter\b[:\s\-]*/i, ''));
+      if (tail && !/\bregistered\s+letter\b/i.test(tail)) {
+        return { registeredLetterLine: current, proofLine: tail.slice(0, 180) };
+      }
+
+      for (let i = idx + 1; i < Math.min(lines.length, idx + 10); i++) {
+        const line = normalize(lines[i]);
+        if (!line) continue;
+        if (/\bregistered\s+letter\b/i.test(line)) continue;
+        return { registeredLetterLine: current, proofLine: line };
+      }
+
+      for (let i = Math.max(0, idx - 4); i < idx; i++) {
+        const line = normalize(lines[i]);
+        if (!line) continue;
+        if (/\bregistered\s+letter\b/i.test(line)) continue;
+        if (/\bepo\s*form\b|\(\d{2}\.\d{2}\.\d{4}\)/i.test(line)) {
+          return { registeredLetterLine: current, proofLine: line };
+        }
+      }
+
+      return { registeredLetterLine: current, proofLine: '' };
+    }
+
+    const inline = normalize(raw).match(/registered\s+letter\s*[:\-]?\s*([^\n\r]{3,180})/i);
+    if (inline?.[1]) {
+      const proof = normalize(String(inline[1] || '').split(/\s{2,}/)[0]);
+      if (proof) return { registeredLetterLine: 'Registered Letter', proofLine: proof };
+    }
+
+    const nearby = normalize(raw).match(/(epo\s*form[^\n\r]{0,140}\(\d{2}\.\d{2}\.\d{4}\))/i);
+    if (nearby?.[1]) {
+      return { registeredLetterLine: 'Registered Letter', proofLine: normalize(nearby[1]) };
+    }
+
+    return { registeredLetterLine: '', proofLine: '' };
   }
 
   function extractCommunicationDateFromPdf(textBlock, context = {}) {
@@ -5547,51 +5597,40 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       candidates.push({ dateStr, score, evidence });
     };
 
-    // Common letter header table: Application No. / Ref. / Date
     for (const m of textRaw.matchAll(/application\s*no\.?[\s\S]{0,120}?\bref\.?[\s\S]{0,80}?\bdate\b[^\d]{0,16}(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
       push(m[1], 185, 'Date extracted from Application/Ref/Date header table in PDF');
     }
-
     for (const m of textRaw.matchAll(/(?:date\s+of\s+(?:this\s+)?(?:communication|notification|letter)[\s\S]{0,20}?)(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
       push(m[1], 180, 'Date of communication field found in PDF');
     }
-
     for (const m of textRaw.matchAll(/\bdate\b\s*[:\-]?\s*(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
       const idx = m.index || 0;
       const snippet = textRaw.slice(Math.max(0, idx - 24), Math.min(textRaw.length, idx + String(m[0] || '').length + 24));
       push(m[1], 150, 'Date field found in PDF communication header', snippet);
     }
-
     for (const m of textRaw.matchAll(/(?:communication(?:\s+pursuant\s+to[^\n]{0,40})?[^\n]{0,80}?\bdated\b[^\d]{0,12})(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
       push(m[1], 145, 'Dated communication line found in PDF');
     }
 
     const registered = extractRegisteredLetterProofLine(textRaw);
-    const proofDate = normalizeDateString(String(registered.proofLine || '').match(DATE_RE)?.[1] || '');
-    if (proofDate) {
-      push(proofDate, 105, 'Date extracted from line below "Registered Letter" in PDF (dispatch proof context)');
-    }
+    const proofDate = normalizeDateString(String(registered.proofLine || '').match(/\b(\d{2}\.\d{2}\.\d{4})\b/)?.[1] || '');
+    if (proofDate) push(proofDate, 105, 'Date extracted from line below "Registered Letter" in PDF (dispatch proof context)');
 
-    const registeredLineDate = normalizeDateString(String(registered.registeredLetterLine || '').match(DATE_RE)?.[1] || '');
-    if (registeredLineDate) {
-      push(registeredLineDate, 95, 'Date extracted from "Registered Letter" line in PDF (dispatch proof context)');
-    }
+    const registeredLineDate = normalizeDateString(String(registered.registeredLetterLine || '').match(/\b(\d{2}\.\d{2}\.\d{4})\b/)?.[1] || '');
+    if (registeredLineDate) push(registeredLineDate, 95, 'Date extracted from "Registered Letter" line in PDF (dispatch proof context)');
 
     for (const m of textRaw.matchAll(/epo\s*form[^\n\r]{0,80}\((\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})\)/gi)) {
       push(m[1], 100, 'Date extracted from EPO form stamp near Registered Letter (dispatch proof context)');
     }
 
-    if (docDateStr) {
-      push(docDateStr, 30, 'Doclist date fallback for communication date');
-    }
-
+    if (docDateStr) push(docDateStr, 30, 'Doclist date fallback for communication date');
     if (!candidates.length) return { dateStr: '', evidence: '' };
 
     const best = candidates
-      .map((c) => ({
-        ...c,
-        bonus: docDateStr && c.dateStr === docDateStr ? 8 : 0,
-        ts: parseDateString(c.dateStr)?.getTime() || 0,
+      .map((candidate) => ({
+        ...candidate,
+        bonus: docDateStr && candidate.dateStr === docDateStr ? 8 : 0,
+        ts: parseDateString(candidate.dateStr)?.getTime() || 0,
       }))
       .sort((a, b) => ((b.score + b.bonus) - (a.score + a.bonus)) || (b.ts - a.ts))[0];
 
@@ -5621,97 +5660,64 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     for (const m of textRaw.matchAll(/\bof\s+([a-z]+|\d{1,2})\s+months?\b/gi)) {
       push(m[1], `Derived from fragmented phrase "${String(m[0] || '').trim()}" in PDF text`, 70);
     }
-
-    // OCR/fragmented fallback phrases that often surface as short "X months" snippets.
-    for (const m of textRaw.matchAll(/\b((?:2|3|5|6|two|three|five|six))\s+months?\b/gi)) {
+    for (const m of textRaw.matchAll(/\b((?:2|3|4|5|6|two|three|four|five|six))\s+months?\b/gi)) {
       push(m[1], `Derived from fragmented target phrase "${String(m[0] || '').trim()}" in PDF text`, 62);
     }
-    for (const m of textRaw.matchAll(/\bmonths?\s*(?:of|:|-)?\s*((?:2|3|5|6|two|three|five|six))\b/gi)) {
+    for (const m of textRaw.matchAll(/\bmonths?\s*(?:of|:|-)?\s*((?:2|3|4|5|6|two|three|four|five|six))\b/gi)) {
       push(m[1], `Derived from reversed fragmented target phrase "${String(m[0] || '').trim()}" in PDF text`, 58);
     }
 
     if (!candidates.length) return { months: 0, evidence: '' };
-
     const best = candidates.sort((a, b) => b.score - a.score)[0];
     return { months: best?.months || 0, evidence: best?.evidence || '' };
   }
 
-  function extractRegisteredLetterProofLine(textBlock) {
-    const raw = String(textBlock || '');
-    if (!raw) return { registeredLetterLine: '', proofLine: '' };
+  function extractOralProceedingsDateFromPdf(textBlock) {
+    const textRaw = String(textBlock || '');
+    if (!textRaw) return { dateStr: '', evidence: '' };
 
-    const lines = raw
-      .split(/\r?\n/)
-      .map((line) => normalize(line))
-      .filter(Boolean);
+    const candidates = [];
+    const push = (rawDate, evidence, score = 100) => {
+      const dateStr = normalizeDateString(rawDate);
+      if (!dateStr) return;
+      candidates.push({ dateStr, evidence, score, ts: parseDateString(dateStr)?.getTime() || 0 });
+    };
 
-    const idx = lines.findIndex((line) => /\bregistered\s+letter\b/i.test(line));
-    if (idx >= 0) {
-      const current = lines[idx] || '';
-      const tail = normalize(current.replace(/.*?\bregistered\s+letter\b[:\s\-]*/i, ''));
-      if (tail && !/\bregistered\s+letter\b/i.test(tail)) {
-        return {
-          registeredLetterLine: current,
-          proofLine: tail.slice(0, 180),
-        };
-      }
-
-      for (let i = idx + 1; i < Math.min(lines.length, idx + 10); i++) {
-        const line = normalize(lines[i]);
-        if (!line) continue;
-        if (/\bregistered\s+letter\b/i.test(line)) continue;
-        return {
-          registeredLetterLine: current,
-          proofLine: line,
-        };
-      }
-
-      for (let i = Math.max(0, idx - 4); i < idx; i++) {
-        const line = normalize(lines[i]);
-        if (!line) continue;
-        if (/\bregistered\s+letter\b/i.test(line)) continue;
-        if (/\bepo\s*form\b|\(\d{2}\.\d{2}\.\d{4}\)/i.test(line)) {
-          return {
-            registeredLetterLine: current,
-            proofLine: line,
-          };
-        }
-      }
-
-      return {
-        registeredLetterLine: current,
-        proofLine: '',
-      };
+    for (const m of textRaw.matchAll(/oral proceedings(?:\s+will)?(?:\s+take\s+place|\s+be\s+held|\s+are\s+appointed)?(?:\s+on|\s+for)?[^\d]{0,24}(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 'Oral-proceedings date found in PDF text', 140);
+    }
+    for (const m of textRaw.matchAll(/proceedings are appointed for[^\d]{0,24}(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 'Oral-proceedings appointment date found in PDF text', 145);
+    }
+    for (const m of textRaw.matchAll(/summons to oral proceedings[\s\S]{0,80}?(\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4})/gi)) {
+      push(m[1], 'Date found near summons-to-oral-proceedings heading in PDF text', 90);
     }
 
-    const inline = normalize(raw).match(/registered\s+letter\s*[:\-]?\s*([^\n\r]{3,180})/i);
-    if (inline?.[1]) {
-      const proof = normalize(String(inline[1] || '').split(/\s{2,}/)[0]);
-      if (proof) {
-        return {
-          registeredLetterLine: 'Registered Letter',
-          proofLine: proof,
-        };
-      }
-    }
-
-    const nearby = normalize(raw).match(/(epo\s*form[^\n\r]{0,140}\(\d{2}\.\d{2}\.\d{4}\))/i);
-    if (nearby?.[1]) {
-      return {
-        registeredLetterLine: 'Registered Letter',
-        proofLine: normalize(nearby[1]),
-      };
-    }
-
-    return { registeredLetterLine: '', proofLine: '' };
+    if (!candidates.length) return { dateStr: '', evidence: '' };
+    const best = candidates.sort((a, b) => (b.score - a.score) || (a.ts - b.ts))[0];
+    return { dateStr: best?.dateStr || '', evidence: best?.evidence || '' };
   }
 
   function inferDeadlineCategoryFromContext(context = {}) {
     const low = `${String(context.docTitle || '')} ${String(context.docProcedure || '')}`.toLowerCase();
     if (!normalize(low)) return { category: '', evidence: '' };
-
     if (/rule\s*71\s*\(\s*3\s*\)|intention to grant|text intended for grant/.test(low)) {
       return { category: 'R71(3) response period', evidence: 'Inferred from document title/procedure metadata (Rule 71(3) / intention to grant signal)' };
+    }
+    if (/rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(low)) {
+      return { category: 'Rule 62a invitation period', evidence: 'Inferred from document title/procedure metadata (Rule 62a search-stage signal)' };
+    }
+    if (/rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(low)) {
+      return { category: 'Rule 63 invitation period', evidence: 'Inferred from document title/procedure metadata (Rule 63 search-stage signal)' };
+    }
+    if (/rule\s*64|additional search fee|further search fees|lack of unity/.test(low)) {
+      return { category: 'Rule 64 additional search fees / unity selection', evidence: 'Inferred from document title/procedure metadata (Rule 64 search-fee signal)' };
+    }
+    if (/rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(low)) {
+      return { category: 'Rule 70a reply to search opinion', evidence: 'Inferred from document title/procedure metadata (Rule 70a search-opinion reply signal)' };
+    }
+    if (/rule\s*70\(2\)|wish to proceed further|desire to proceed further/.test(low)) {
+      return { category: 'Rule 70(2) confirmation/response period', evidence: 'Inferred from document title/procedure metadata (Rule 70(2) proceed-further signal)' };
     }
     if (/\brule\s*116\b|summons to oral proceedings/.test(low)) {
       return { category: 'Rule 116 final date', evidence: 'Inferred from document title/procedure metadata (Rule 116 / summons signal)' };
@@ -5719,21 +5725,59 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     if (/\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)|communication pursuant to article 94\(3\)/.test(low)) {
       return { category: 'Art. 94(3) response period', evidence: 'Inferred from document title/procedure metadata (explicit Art. 94(3) signal)' };
     }
+    if (/minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low)) {
+      return { category: 'Minutes-as-first-action examination communication', evidence: 'Inferred from document title/procedure metadata (minutes / consultation first-action signal)' };
+    }
     if (/\brule\s*161\b|\brule\s*162\b/.test(low)) {
       return { category: 'Rule 161/162 response period', evidence: 'Inferred from document title/procedure metadata (Rule 161/162 signal)' };
+    }
+    if (/rule\s*164\(1\)|additional search fees|further search fees/.test(low)) {
+      return { category: 'Rule 164(1) additional search fees', evidence: 'Inferred from document title/procedure metadata (Rule 164(1) Euro-PCT search-fee signal)' };
+    }
+    if (/rule\s*164\(2\)|unsearched invention/.test(low)) {
+      return { category: 'Rule 164(2) unsearched-inventions communication', evidence: 'Inferred from document title/procedure metadata (Rule 164(2) unsearched-inventions signal)' };
+    }
+    if (/rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(low)) {
+      return { category: 'Opposition Rule 79(1) proprietor reply', evidence: 'Inferred from document title/procedure metadata (Rule 79(1) opposition signal)' };
+    }
+    if (/rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(low)) {
+      return { category: 'Opposition Rule 79(3) party-reply communication', evidence: 'Inferred from document title/procedure metadata (Rule 79(3) opposition signal)' };
+    }
+    if (/rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(low)) {
+      return { category: 'Opposition Rule 82(1) maintenance-text observations', evidence: 'Inferred from document title/procedure metadata (Rule 82(1) opposition signal)' };
+    }
+    if (/rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(low)) {
+      return { category: 'Opposition Rule 82(2) translations + publication fee', evidence: 'Inferred from document title/procedure metadata (Rule 82(2) opposition signal)' };
+    }
+    if (/rule\s*82\(3\)|further invitation|surcharge/.test(low)) {
+      return { category: 'Opposition Rule 82(3) surcharge period', evidence: 'Inferred from document title/procedure metadata (Rule 82(3) opposition signal)' };
+    }
+    if (/rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(low)) {
+      return { category: 'Limitation Rule 95(2) correction period', evidence: 'Inferred from document title/procedure metadata (Rule 95(2) limitation signal)' };
+    }
+    if (/rule\s*95\(3\)|allowable request|translations of the amended claims/.test(low)) {
+      return { category: 'Limitation Rule 95(3) translations + fee', evidence: 'Inferred from document title/procedure metadata (Rule 95(3) limitation signal)' };
     }
     if (/\bcommunication\b|\bnotification\b|\bsummons\b|\binvitation\b|\bofficial communication\b|\boffice action\b/.test(low)) {
       return { category: 'Communication response period', evidence: 'Inferred from document title/procedure metadata (generic communication signal)' };
     }
-
     return { category: '', evidence: '' };
   }
 
   function defaultResponseMonthsForCategory(category) {
     const c = String(category || '').toLowerCase();
+    if (c.includes('rule 62a')) return 2;
+    if (c.includes('rule 63')) return 2;
     if (c.includes('r71(3)')) return 4;
     if (c.includes('rule 70(2)')) return 6;
     if (c.includes('rule 161/162')) return 6;
+    if (c.includes('rule 164(1)')) return 2;
+    if (c.includes('rule 79(1)')) return 4;
+    if (c.includes('rule 82(1)')) return 2;
+    if (c.includes('rule 82(2)')) return 3;
+    if (c.includes('rule 82(3)')) return 2;
+    if (c.includes('rule 95(2)')) return 2;
+    if (c.includes('rule 95(3)')) return 3;
     return 0;
   }
 
@@ -5751,6 +5795,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       responseEvidence: '',
       explicitDeadlineDate: '',
       explicitDeadlineEvidence: '',
+      oralProceedingsDate: '',
+      oralProceedingsEvidence: '',
       registeredLetterLine: '',
       registeredLetterProofLine: '',
     };
@@ -5758,7 +5804,6 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     if (!textLower) return { hints: [], diagnostics };
 
     const hints = [];
-
     const pushHint = (hint) => {
       const date = parseDateString(hint?.dateStr || '');
       if (!date) return;
@@ -5776,21 +5821,48 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const categoryFromText = /rule\s*71\s*\(\s*3\s*\)|intention to grant/.test(textLower)
       ? 'R71(3) response period'
-      : /\brule\s*116\b|summons to oral proceedings/.test(textLower)
-        ? 'Rule 116 final date'
-        : /\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)/.test(textLower)
-          ? 'Art. 94(3) response period'
-          : /\brule\s*161\b|\brule\s*162\b/.test(textLower)
-            ? 'Rule 161/162 response period'
-            : '';
+      : /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(textLower)
+        ? 'Rule 62a invitation period'
+        : /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(textLower)
+          ? 'Rule 63 invitation period'
+          : /rule\s*64|additional search fee|further search fees|lack of unity/.test(textLower)
+            ? 'Rule 64 additional search fees / unity selection'
+            : /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(textLower)
+              ? 'Rule 70a reply to search opinion'
+              : /rule\s*70\(2\)|wish to proceed further|desire to proceed further/.test(textLower)
+                ? 'Rule 70(2) confirmation/response period'
+                : /\brule\s*116\b|summons to oral proceedings/.test(textLower)
+                  ? 'Rule 116 final date'
+                  : /\barticle\s*94\s*\(\s*3\s*\)|\bart\.?\s*94\s*\(\s*3\s*\)/.test(textLower)
+                    ? 'Art. 94(3) response period'
+                    : /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(textLower)
+                      ? 'Minutes-as-first-action examination communication'
+                      : /\brule\s*161\b|\brule\s*162\b/.test(textLower)
+                        ? 'Rule 161/162 response period'
+                        : /rule\s*164\(1\)|additional search fees|further search fees/.test(textLower)
+                          ? 'Rule 164(1) additional search fees'
+                          : /rule\s*164\(2\)|unsearched invention/.test(textLower)
+                            ? 'Rule 164(2) unsearched-inventions communication'
+                            : /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(textLower)
+                              ? 'Opposition Rule 79(1) proprietor reply'
+                              : /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(textLower)
+                                ? 'Opposition Rule 79(3) party-reply communication'
+                                : /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(textLower)
+                                  ? 'Opposition Rule 82(1) maintenance-text observations'
+                                  : /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(textLower)
+                                    ? 'Opposition Rule 82(2) translations + publication fee'
+                                    : /rule\s*82\(3\)|further invitation|surcharge/.test(textLower)
+                                      ? 'Opposition Rule 82(3) surcharge period'
+                                      : /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(textLower)
+                                        ? 'Limitation Rule 95(2) correction period'
+                                        : /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(textLower)
+                                          ? 'Limitation Rule 95(3) translations + fee'
+                                          : '';
 
     const categoryFromContext = inferDeadlineCategoryFromContext(context);
     let category = categoryFromText || categoryFromContext.category;
-
     diagnostics.category = category;
-    diagnostics.categoryEvidence = categoryFromText
-      ? 'Detected from communication text'
-      : (categoryFromContext.evidence || '');
+    diagnostics.categoryEvidence = categoryFromText ? 'Detected from communication text' : (categoryFromContext.evidence || '');
 
     const registeredLetter = extractRegisteredLetterProofLine(textRaw);
     diagnostics.registeredLetterLine = registeredLetter.registeredLetterLine || '';
@@ -5801,6 +5873,10 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const communicationDate = parseDateString(communicationDateStr);
     diagnostics.communicationDate = communicationDateStr || '';
     diagnostics.communicationEvidence = communication.evidence || (docDateStr ? 'Doclist date fallback for communication date' : '');
+
+    const oralProceedings = extractOralProceedingsDateFromPdf(textRaw);
+    diagnostics.oralProceedingsDate = oralProceedings.dateStr || '';
+    diagnostics.oralProceedingsEvidence = oralProceedings.evidence || '';
 
     const monthPeriod = extractResponseMonthsFromPdf(textRaw);
     let responseMonths = monthPeriod.months || 0;
@@ -5829,9 +5905,18 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         : 'Inferred from generic communication text signal';
     }
 
-    if (!category) {
-      return { hints: [], diagnostics };
+    if (oralProceedings.dateStr) {
+      pushHint({
+        label: /opposition/i.test(String(context.docProcedure || '')) ? 'Opposition oral proceedings date' : 'Oral proceedings date',
+        dateStr: oralProceedings.dateStr,
+        sourceDate: communicationDateStr || docDateStr,
+        confidence: 'high',
+        level: 'warn',
+        evidence: oralProceedings.evidence,
+      });
     }
+
+    if (!category) return { hints: dedupe(hints, (hint) => `${hint.label}|${hint.dateStr}`), diagnostics };
 
     let explicitAdded = false;
     if (explicitDue.dateStr) {
@@ -5840,7 +5925,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         dateStr: explicitDue.dateStr,
         sourceDate: communicationDateStr || docDateStr,
         confidence: 'high',
-        level: /rule\s*116/i.test(category) ? 'warn' : 'bad',
+        level: /rule\s*116|oral proceedings/i.test(category) ? 'warn' : 'bad',
         evidence: explicitDue.evidence,
       });
       explicitAdded = true;
@@ -5849,24 +5934,18 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     if (!explicitAdded && responseMonths && communicationDate) {
       const calc = addCalendarMonthsDetailed(communicationDate, responseMonths);
       const communicationFromDocFallback = /doclist date fallback/i.test(String(diagnostics.communicationEvidence || ''));
-      const confidence = monthPeriod.months
-        ? (communicationFromDocFallback ? 'medium' : 'high')
-        : 'low';
-
+      const confidence = monthPeriod.months ? (communicationFromDocFallback ? 'medium' : 'high') : 'low';
       pushHint({
         label: category,
         dateStr: formatDate(calc.date),
         sourceDate: communicationDateStr,
         confidence,
-        level: /rule\s*116/i.test(category) ? 'warn' : 'bad',
+        level: /rule\s*116|oral proceedings/i.test(category) ? 'warn' : 'bad',
         evidence: `${responseEvidence || `Derived from ${responseMonths} month response period`} from communication date ${communicationDateStr}${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
       });
     }
 
-    return {
-      hints: dedupe(hints, (h) => `${h.label}|${h.dateStr}`),
-      diagnostics,
-    };
+    return { hints: dedupe(hints, (hint) => `${hint.label}|${hint.dateStr}`), diagnostics };
   }
 
   function normalizePdfDocumentUrl(rawUrl) {
@@ -6981,6 +7060,14 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return /publication of (?:the )?mention of grant|mention of grant|european patent granted|patent has been granted|the patent has been granted|\bpatent granted\b/.test(low);
   }
 
+  function isValidDate(value) {
+    return value instanceof Date && !Number.isNaN(value.getTime());
+  }
+
+  function sameDay(a, b) {
+    return !!(a && b && String(a.dateStr || '') === String(b.dateStr || ''));
+  }
+
   function buildDeadlineComputationContext(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
     const out = [];
     const records = buildDeadlineRecords(docs, eventHistory, legal);
@@ -6998,75 +7085,6 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const latestRecord = (regex) => records.find((r) => regex.test(`${r.title || ''} ${r.detail || ''}`));
     const hasPdfHint = (regex) => pdfHints.some((h) => regex.test(String(h.label || '')));
-    const hasAfter = (anchorDate, predicate) => {
-      const ts = anchorDate?.getTime?.() || 0;
-      if (!ts) return false;
-      return records.some((r) => {
-        const dt = parseDateString(r.dateStr);
-        return dt && dt.getTime() > ts && predicate(r, dt);
-      });
-    };
-
-    const hasApplicantResponseAfter = (anchorDate, regex = /reply|response|observations|arguments|amended|amendment|claims|request|translation|appeal/i) =>
-      hasAfter(anchorDate, (r) => r.actor === 'Applicant' && regex.test(`${r.title} ${r.detail}`));
-
-    const hasFeeSignalAfter = (anchorDate, regex = /payment|fee paid|paid|examination fee|designation fee|grant and publishing fee|grant and publication fee|renewal fee/i) =>
-      hasAfter(anchorDate, (r) => regex.test(`${r.title} ${r.detail}`));
-
-    const terminalEpoOutcomeAfter = (anchorDate, dueDate = null) => {
-      const anchorTs = anchorDate?.getTime?.() || 0;
-      const dueTs = dueDate?.getTime?.() || 0;
-      let match = null;
-      for (const r of [...records].sort((a, b) => (parseDateString(a.dateStr)?.getTime?.() || 0) - (parseDateString(b.dateStr)?.getTime?.() || 0))) {
-        const dt = parseDateString(r.dateStr);
-        if (!dt || r.actor !== 'EPO') continue;
-        if (anchorTs && dt.getTime() <= anchorTs) continue;
-        if (dueTs && dt.getTime() <= dueTs) continue;
-        if (!isTerminalEpoOutcomeText(`${r.title} ${r.detail}`)) continue;
-        match = { dateStr: r.dateStr, title: r.title || '', detail: r.detail || '' };
-        break;
-      }
-      return match;
-    };
-
-    const push = (entry) => {
-      if (!entry?.date || Number.isNaN(entry.date.getTime())) return;
-      const dueDate = entry.date;
-      const anchorDate = parseDateString(entry.sourceDate || '') || dueDate;
-      const terminal = terminalEpoOutcomeAfter(anchorDate, dueDate);
-      const next = { ...entry };
-      if (terminal && !next.resolved) {
-        next.superseded = true;
-        next.supersededBy = terminal;
-        next.method = normalize([next.method || '', `superseded by later EPO outcome on ${terminal.dateStr}`].filter(Boolean).join(' · '));
-      }
-      out.push(next);
-    };
-
-    const resolveHintByActivity = (label, anchorDate) => {
-      const l = String(label || '').toLowerCase();
-      if (!anchorDate) return false;
-
-      if (/r71\(3\)|intention to grant/.test(l)) {
-        return hasFeeSignalAfter(anchorDate, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections|approval of text|text proposed for grant/i)
-          || hasApplicantResponseAfter(anchorDate, /reply|response|amend|correction|claims|translation|approval|text proposed for grant|request for correction/i);
-      }
-
-      if (/art\.?\s*94\(3\)|communication response period/.test(l)) {
-        return hasApplicantResponseAfter(anchorDate, /reply|response|observations|arguments|amend|claims|request|further processing|re-establishment/i);
-      }
-
-      if (/rule 161\/162/.test(l)) {
-        return hasApplicantResponseAfter(anchorDate, /reply|response|amend|claims|observations|arguments/i)
-          || hasFeeSignalAfter(anchorDate, /claims fee|fee payment received/i);
-      }
-
-      if (/rule 116/.test(l)) {
-        return hasApplicantResponseAfter(anchorDate, /response|request|submission|oral proceedings|withdrawal/i);
-      }
-
-      return hasApplicantResponseAfter(anchorDate);
-    };
 
     const rawItemDetail = (item = {}) => item.detail || item.procedure || item.freeFormatText || '';
     const anchorRecordFromItem = (item = {}, source = '') => ({
@@ -7091,37 +7109,187 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       return null;
     };
 
-    const addMonthsDeadline = ({ record = null, triggerRegex = null, label, months, level, confidence = 'medium', resolvedBy }) => {
-      if (hasPdfHint(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) return;
+    const hasAfter = (anchorDate, predicate) => {
+      const ts = anchorDate?.getTime?.() || 0;
+      if (!ts) return false;
+      return records.some((r) => {
+        const dt = parseDateString(r.dateStr);
+        return dt && dt.getTime() > ts && predicate(r, dt);
+      });
+    };
+
+    const findLaterRecordAfter = (anchorDate, predicate) => {
+      const ts = anchorDate?.getTime?.() || 0;
+      if (!ts) return null;
+      return [...records]
+        .sort((a, b) => (parseDateString(a.dateStr)?.getTime?.() || 0) - (parseDateString(b.dateStr)?.getTime?.() || 0))
+        .find((r) => {
+          const dt = parseDateString(r.dateStr);
+          return !!(dt && dt.getTime() > ts && predicate(r, dt));
+        }) || null;
+    };
+
+    const hasApplicantResponseAfter = (anchorDate, regex = /reply|response|observations|arguments|amended|amendment|claims|request|translation|appeal/i) =>
+      hasAfter(anchorDate, (r) => r.actor === 'Applicant' && regex.test(`${r.title} ${r.detail}`));
+
+    const hasFeeSignalAfter = (anchorDate, regex = /payment|fee paid|paid|examination fee|designation fee|grant and publishing fee|grant and publication fee|renewal fee/i) =>
+      hasAfter(anchorDate, (r) => regex.test(`${r.title} ${r.detail}`));
+
+    const terminalEpoOutcomeAfter = (anchorDate, dueDate = null) => {
+      const anchorTs = anchorDate?.getTime?.() || 0;
+      const dueTs = dueDate?.getTime?.() || 0;
+      let match = null;
+      for (const r of [...records].sort((a, b) => (parseDateString(a.dateStr)?.getTime?.() || 0) - (parseDateString(b.dateStr)?.getTime?.() || 0))) {
+        const dt = parseDateString(r.dateStr);
+        if (!dt || r.actor !== 'EPO') continue;
+        if (anchorTs && dt.getTime() <= anchorTs) continue;
+        if (dueTs && dt.getTime() <= dueTs) continue;
+        if (!isTerminalEpoOutcomeText(`${r.title} ${r.detail}`)) continue;
+        match = { dateStr: r.dateStr, title: r.title || '', detail: r.detail || '' };
+        break;
+      }
+      return match;
+    };
+
+    const recordConfidence = (record = null, fallback = 'medium') => {
+      const source = normalize(record?.source || '').toLowerCase();
+      if (!source) return fallback;
+      if (source === 'documents') return 'high';
+      if (source === 'coded legal event') return 'medium';
+      if (source === 'event') return 'low';
+      return fallback;
+    };
+
+    const push = (entry) => {
+      const validDate = isValidDate(entry?.date);
+      if (!validDate && !entry?.reviewOnly) return;
+
+      const next = { ...entry };
+      if (validDate) {
+        const dueDate = next.date;
+        const anchorDate = parseDateString(next.sourceDate || '') || dueDate;
+        const terminal = terminalEpoOutcomeAfter(anchorDate, dueDate);
+        if (terminal && !next.resolved && !next.superseded) {
+          next.superseded = true;
+          next.supersededBy = terminal;
+          next.method = normalize([next.method || '', `superseded by later EPO outcome on ${terminal.dateStr}`].filter(Boolean).join(' · '));
+        }
+      } else {
+        next.date = null;
+      }
+      out.push(next);
+    };
+
+    const pushReviewItem = ({ label, record = null, level = 'warn', confidence = '', method = '', namespace = '', internalKey = '', phase = '', date = null, resolved = false }) => {
+      const derivedConfidence = confidence || recordConfidence(record, 'low');
+      push({
+        label,
+        date,
+        level,
+        confidence: derivedConfidence,
+        sourceDate: String(record?.dateStr || ''),
+        resolved,
+        reviewOnly: true,
+        namespace,
+        internalKey,
+        phase,
+        method,
+      });
+    };
+
+    const resolveHintByActivity = (label, anchorDate) => {
+      const l = String(label || '').toLowerCase();
+      if (!anchorDate) return false;
+
+      if (/r71\(3\)|intention to grant/.test(l)) {
+        return hasFeeSignalAfter(anchorDate, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections|approval of text|text proposed for grant/i)
+          || hasApplicantResponseAfter(anchorDate, /reply|response|amend|correction|claims|translation|approval|text proposed for grant|request for correction/i);
+      }
+
+      if (/art\.?\s*94\(3\)|communication response period/.test(l)) {
+        return hasApplicantResponseAfter(anchorDate, /reply|response|observations|arguments|amend|claims|request|further processing|re-establishment/i);
+      }
+
+      if (/rule 161\/162/.test(l)) {
+        return hasApplicantResponseAfter(anchorDate, /reply|response|amend|claims|observations|arguments/i)
+          || hasFeeSignalAfter(anchorDate, /claims fee|fee payment received/i);
+      }
+
+      if (/rule 116|oral proceedings/.test(l)) {
+        return hasApplicantResponseAfter(anchorDate, /response|request|submission|oral proceedings|withdrawal/i);
+      }
+
+      return hasApplicantResponseAfter(anchorDate);
+    };
+
+    const addMonthsDeadline = ({ record = null, triggerRegex = null, label, months, level, confidence = '', resolvedBy, reviewOnly = false, methodPrefix = 'Heuristic', namespace = '', internalKey = '', phase = '', supersededBy = null, reference = false }) => {
+      if (hasPdfHint(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) return null;
       const rec = record || (triggerRegex ? latestRecord(triggerRegex) : null);
-      if (!rec) return;
+      if (!rec) return null;
       const anchor = parseDateString(rec.dateStr);
-      if (!anchor) return;
+      if (!anchor) return null;
 
       const resolved = typeof resolvedBy === 'function'
         ? !!resolvedBy(anchor, rec)
         : hasApplicantResponseAfter(anchor);
 
       const calc = addCalendarMonthsDetailed(anchor, months);
+      const derivedConfidence = confidence || recordConfidence(rec, 'medium');
       const sourceLabel = normalize(String(rec.source || 'preferred source')).toLowerCase() || 'preferred source';
-      push({
+      const entry = {
         label,
         date: calc.date,
         level,
-        confidence,
+        confidence: derivedConfidence,
         sourceDate: rec.dateStr,
         resolved,
-        method: `Heuristic: +${months} month(s) from ${sourceLabel} trigger`,
+        reviewOnly: !!reviewOnly || derivedConfidence === 'low',
+        method: `${methodPrefix}: +${months} month(s) from ${sourceLabel} trigger`,
         rolledOver: calc.rolledOver,
         rolloverNote: calc.rolledOver ? `day ${calc.fromDay}→${calc.toDay}` : '',
+        namespace,
+        internalKey,
+        phase,
+        reference,
+      };
+
+      if (typeof supersededBy === 'function') {
+        const superseding = supersededBy(anchor, rec);
+        if (superseding) {
+          entry.superseded = true;
+          entry.supersededBy = { dateStr: superseding.dateStr, title: superseding.title || '', detail: superseding.detail || '' };
+          entry.method = normalize([entry.method, `superseded by ${superseding.title || 'later governing communication'} on ${superseding.dateStr}`].filter(Boolean).join(' · '));
+        }
+      }
+
+      push(entry);
+      return entry;
+    };
+
+    const addAbsoluteDateEntry = ({ record = null, label, level = 'warn', confidence = '', namespace = '', internalKey = '', phase = '', method = '', resolved = false, reference = false, reviewOnly = false }) => {
+      const rec = record || null;
+      const date = parseDateString(rec?.dateStr || '');
+      push({
+        label,
+        date,
+        level,
+        confidence: confidence || recordConfidence(rec, 'medium'),
+        sourceDate: String(rec?.dateStr || ''),
+        resolved,
+        reference,
+        reviewOnly,
+        namespace,
+        internalKey,
+        phase,
+        method,
       });
     };
 
     const findNoOppositionRecord = () => pickPreferredAnchor([
-      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.codexKey === 'NO_OPPOSITION_FILED' || /no opposition filed within time limit|no opposition filed/.test(low) },
-      { items: eventDesc, source: 'Event', predicate: (e, low) => e.codexKey === 'NO_OPPOSITION_FILED' || /no opposition filed within time limit|no opposition filed/.test(low) },
-      { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /no opposition filed within time limit|no opposition filed/.test(low) },
-      { items: records, source: 'Event', predicate: (r, low) => /no opposition filed within time limit|no opposition filed/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.codexKey === 'NO_OPPOSITION_FILED' || /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => e.codexKey === 'NO_OPPOSITION_FILED' || /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
+      { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
+      { items: records, source: 'Event', predicate: (r, low) => /no opposition filed within time limit|\bno opposition filed\b/.test(low) },
     ]);
 
     const findR71Anchor = () => pickPreferredAnchor([
@@ -7132,10 +7300,39 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /despatch of communication of intention to grant a patent/.test(low) },
     ]);
 
+    const findRule62aAnchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*62a|plurality of independent claims|indicate.*claim.*search/.test(low) },
+    ]);
+
+    const findRule63Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*63|incomplete search|meaningful search|subject-matter to be searched/.test(low) },
+    ]);
+
+    const findRule64Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /additional search fee|lack of unity.*search|rule\s*64|further search fees/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /additional search fee|lack of unity.*search|rule\s*64|further search fees/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /additional search fee|lack of unity.*search|rule\s*64|further search fees/.test(low) },
+    ]);
+
+    const findRule70aAnchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*70a|reply to the search opinion|invitation to respond to the european search opinion/.test(low) },
+    ]);
+
     const findArt94Anchor = () => pickPreferredAnchor([
       { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
       { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
       { items: eventDesc, source: 'Event', predicate: (e, low) => /article\s*94\(3\)|art\.\s*94\(3\)|communication pursuant to article 94\(3\)/.test(low) },
+    ]);
+
+    const findMinutesFirstActionAnchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /minutes.*consultation|consultation by telephone|minutes issued as first action/.test(low) },
     ]);
 
     const findRule702Anchor = () => pickPreferredAnchor([
@@ -7145,9 +7342,21 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     ]);
 
     const findRule161162Anchor = () => pickPreferredAnchor([
-      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
-      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
-      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*161|rule\s*162|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /\brule\s*161\b|\brule\s*162\b|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /\brule\s*161\b|\brule\s*162\b|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /\brule\s*161\b|\brule\s*162\b|communication pursuant to rule 161|rules?\s*161.*162/.test(low) },
+    ]);
+
+    const findRule1641Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*164\(1\)|additional search fees|further search fees|lack of unity/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*164\(1\)|additional search fees|further search fees|lack of unity/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*164\(1\)|additional search fees|further search fees|lack of unity/.test(low) },
+    ]);
+
+    const findRule1642Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*164\(2\)|unsearched invention|further search fees/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*164\(2\)|unsearched invention|further search fees/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*164\(2\)|unsearched invention|further search fees/.test(low) },
     ]);
 
     const findEuroPctSearchAnchor = () => pickPreferredAnchor([
@@ -7155,9 +7364,48 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         items: docsDesc,
         source: 'Documents',
         predicate: (d, low) => d.actor === 'EPO'
-          && (/copy of the international search report|international publication of the international search report|written opinion of the isa|partial international search report|isr:/.test(low))
+          && (/copy of the international search report|international publication of the international search report|written opinion of the isa|partial international search report|\bisr:\b/.test(low))
           && !(/non-reply to written opinion|correction of deficiencies in written opinion|reply to|communication concerning|reminder period|deemed to be withdrawn/.test(low)),
       },
+    ]);
+
+    const findSummonsAnchor = (phase = 'all') => pickPreferredAnchor([
+      {
+        items: docsDesc,
+        source: 'Documents',
+        predicate: (d, low) => d.actor === 'EPO'
+          && /summons to oral proceedings/.test(low)
+          && (phase === 'all' || (phase === 'opposition' ? /opposition/.test(low) : !/opposition/.test(low))),
+      },
+      {
+        items: eventDesc,
+        source: 'Event',
+        predicate: (e, low) => /summons to oral proceedings/.test(low)
+          && (phase === 'all' || (phase === 'opposition' ? /opposition/.test(low) : !/opposition/.test(low))),
+      },
+    ]);
+
+    const findOralProceedingsEvent = (phase = 'all') => pickPreferredAnchor([
+      {
+        items: codedEventsDesc,
+        source: 'Coded legal event',
+        predicate: (e, low) => (e.originalCode === 'ORAL' || /^oral proceedings\b/.test(low) || /\boral proceedings\b/.test(low))
+          && !/summons/.test(low)
+          && (phase === 'all' || (phase === 'opposition' ? /opposition/.test(low) : !/opposition/.test(low))),
+      },
+      {
+        items: eventDesc,
+        source: 'Event',
+        predicate: (e, low) => /\boral proceedings\b/.test(low)
+          && !/summons/.test(low)
+          && (phase === 'all' || (phase === 'opposition' ? /opposition/.test(low) : !/opposition/.test(low))),
+      },
+    ]);
+
+    const findRule112Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*112|loss of rights|noting of loss of rights/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.codexKey === 'LOSS_OF_RIGHTS_R112' || /rule\s*112|loss of rights|noting of loss of rights/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*112|loss of rights|noting of loss of rights/.test(low) },
     ]);
 
     const findGrantMentionAnchor = () => pickPreferredAnchor([
@@ -7167,11 +7415,78 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     ]);
 
     const findAppealableDecisionAnchor = () => pickPreferredAnchor([
-      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain/.test(low) },
-      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain/.test(low) },
-      { items: eventDesc, source: 'Event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain/.test(low) },
-      { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain/.test(low) },
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain|refusal of the application/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain|refusal of the application/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain|refusal of the application/.test(low) },
+      { items: legalEventsDesc, source: 'Event', predicate: (e, low) => /decision to grant a european patent|decision to refuse|decision to revoke|decision to maintain|refusal of the application/.test(low) },
     ]);
+
+    const findOppositionRule791Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*79\(1\)|invitation to file observations|proprietor.*comments|communication of opposition/.test(low) },
+    ]);
+
+    const findOppositionRule793Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*79\(3\)|invite.*reply|observations and amendments filed by the proprietor/.test(low) },
+    ]);
+
+    const findOppositionOrexAnchor = () => pickPreferredAnchor([
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'OREX' || /communication from the opposition division/.test(low) },
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /communication from the opposition division/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /communication from the opposition division/.test(low) },
+    ]);
+
+    const findOppositionRule821Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*82\(1\)|text in which it intends to maintain|maintain the patent as amended/.test(low) },
+    ]);
+
+    const findOppositionRule822Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*82\(2\)|file translations of the amended claims|publication fee/.test(low) },
+    ]);
+
+    const findOppositionRule823Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*82\(3\)|further invitation|surcharge/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*82\(3\)|further invitation|surcharge/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*82\(3\)|further invitation|surcharge/.test(low) },
+    ]);
+
+    const findOppositionPmapAnchor = () => pickPreferredAnchor([
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'PMAP' || /preparation for maintenance of the patent in an amended form/.test(low) },
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /preparation for maintenance of the patent in an amended form/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /preparation for maintenance of the patent in an amended form/.test(low) },
+    ]);
+
+    const findLimitationRule952Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*95\(2\)|deficiencies in the request for limitation|request for limitation/.test(low) },
+    ]);
+
+    const findLimitationRule953Anchor = () => pickPreferredAnchor([
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(low) },
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(low) },
+      { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*95\(3\)|allowable request|translations of the amended claims/.test(low) },
+    ]);
+
+    const findLimitationLireAnchor = () => pickPreferredAnchor([
+      { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => e.originalCode === 'LIRE' || /communication from the examining division in a limitation procedure|limitation procedure/.test(low) },
+      { items: docsDesc, source: 'Documents', predicate: (d, low) => d.actor === 'EPO' && /limitation procedure|request for limitation/.test(low) },
+    ]);
+
+    const rule161162Variant = (record = null) => {
+      const low = normalize(`${record?.title || ''} ${record?.detail || ''}`).toLowerCase();
+      if (!low) return 'generic';
+      if (/mandatory|required reply|must reply|mandatory reply|non-extendable.*reply/.test(low)) return 'mandatory';
+      if (/voluntary|no mandatory substantive reply|amendment window|claims fee consequences/.test(low)) return 'voluntary';
+      return 'generic';
+    };
 
     return {
       out,
@@ -7184,22 +7499,47 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       priorityDate,
       filingDate,
       push,
+      pushReviewItem,
       latestRecord,
       hasPdfHint,
       hasAfter,
+      findLaterRecordAfter,
       hasApplicantResponseAfter,
       hasFeeSignalAfter,
       terminalEpoOutcomeAfter,
       resolveHintByActivity,
+      recordConfidence,
       addMonthsDeadline,
+      addAbsoluteDateEntry,
       findNoOppositionRecord,
       findR71Anchor,
+      findRule62aAnchor,
+      findRule63Anchor,
+      findRule64Anchor,
+      findRule70aAnchor,
       findArt94Anchor,
+      findMinutesFirstActionAnchor,
       findRule702Anchor,
       findRule161162Anchor,
+      findRule1641Anchor,
+      findRule1642Anchor,
       findEuroPctSearchAnchor,
+      findSummonsAnchor,
+      findOralProceedingsEvent,
+      findRule112Anchor,
       findGrantMentionAnchor,
       findAppealableDecisionAnchor,
+      findOppositionRule791Anchor,
+      findOppositionRule793Anchor,
+      findOppositionOrexAnchor,
+      findOppositionRule821Anchor,
+      findOppositionRule822Anchor,
+      findOppositionRule823Anchor,
+      findOppositionPmapAnchor,
+      findLimitationRule952Anchor,
+      findLimitationRule953Anchor,
+      findLimitationLireAnchor,
+      rule161162Variant,
     };
   }
 
@@ -7221,9 +7561,72 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         sourceDate,
         resolved,
         fromPdf: true,
+        reviewOnly: String(hint.confidence || '').toLowerCase() === 'low',
         method: resolvedByActivity && !hint.resolved
           ? `${baseMethod} · resolved by subsequent activity`
           : baseMethod,
+      });
+    }
+  }
+
+  function appendSearchStageDeadlines(ctx) {
+    ctx.addMonthsDeadline({
+      record: ctx.findRule62aAnchor(),
+      label: 'Rule 62a invitation period',
+      months: 2,
+      level: 'bad',
+      internalKey: 'SEARCH_R62A_INVITATION',
+      phase: 'search',
+      namespace: 'first_instance',
+    });
+
+    ctx.addMonthsDeadline({
+      record: ctx.findRule63Anchor(),
+      label: 'Rule 63 invitation period',
+      months: 2,
+      level: 'bad',
+      internalKey: 'SEARCH_R63_INVITATION',
+      phase: 'search',
+      namespace: 'first_instance',
+    });
+
+    const rule64 = ctx.findRule64Anchor();
+    if (rule64 && !ctx.hasPdfHint(/Rule 64 additional search/i)) {
+      ctx.pushReviewItem({
+        label: 'Rule 64 additional search fees / unity selection (manual review)',
+        record: rule64,
+        level: 'bad',
+        internalKey: 'SEARCH_R64_ADDITIONAL_FEES',
+        phase: 'search',
+        namespace: 'first_instance',
+        method: 'Communication-specific fee/choice deadline; review explicit time limit from the communication/PDF.',
+      });
+    }
+
+    const rule70a = ctx.findRule70aAnchor();
+    const rule702 = ctx.findRule702Anchor();
+    const combined70 = rule70a && rule702 && (sameDay(rule70a, rule702) || /rule\s*70\(2\)/i.test(`${rule70a.title} ${rule70a.detail}`));
+    if (combined70) {
+      ctx.addMonthsDeadline({
+        record: rule702,
+        label: 'Rule 70(2) / Rule 70a shared response period',
+        months: 6,
+        level: 'bad',
+        internalKey: 'POST_SEARCH_R70A_REPLY',
+        phase: 'post_search',
+        namespace: 'first_instance',
+        methodPrefix: 'Rule-based',
+      });
+      ctx._skipStandaloneRule702 = true;
+    } else if (rule70a && !ctx.hasPdfHint(/Rule 70a/i)) {
+      ctx.pushReviewItem({
+        label: 'Rule 70a reply to search opinion (manual review)',
+        record: rule70a,
+        level: 'warn',
+        internalKey: 'POST_SEARCH_R70A_REPLY',
+        phase: 'post_search',
+        namespace: 'first_instance',
+        method: 'Derived from the paired Rule 70 communication; review the governing communication/PDF for the actual shared due date.',
       });
     }
   }
@@ -7235,29 +7638,126 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       months: 4,
       level: 'bad',
       confidence: 'high',
+      internalKey: 'GRANT_R71_3',
+      phase: 'grant',
+      namespace: 'first_instance',
       resolvedBy: (anchor) => ctx.hasFeeSignalAfter(anchor, /grant and (?:publishing|publication) fee|claims translation|excess claims fee|rule\s*71\(6\)|amendments\/corrections/i) || ctx.hasApplicantResponseAfter(anchor),
     });
 
-    if (ctx.findArt94Anchor() && ctx.hasPdfHint(/Art\. 94\(3\) response period/i)) {
-      // Keep explicit Art. 94(3) deadline computation tied to parsed communication text/PDF evidence.
+    const art94 = ctx.findArt94Anchor();
+    if (art94 && !ctx.hasPdfHint(/Art\. 94\(3\) response period/i)) {
+      ctx.pushReviewItem({
+        label: 'Art. 94(3) examination communication (manual review)',
+        record: art94,
+        level: 'warn',
+        internalKey: 'EXAMINATION_ART94_COMM',
+        phase: 'examination',
+        namespace: 'first_instance',
+        method: 'The communication is response-bearing, but the period is communication-specific unless the parsed document text yields an explicit date/period.',
+      });
     }
 
-    ctx.addMonthsDeadline({
-      record: ctx.findRule702Anchor(),
-      label: 'Rule 70(2) confirmation/response period',
-      months: 6,
-      level: 'warn',
-      confidence: 'high',
-    });
+    const minutes = ctx.findMinutesFirstActionAnchor();
+    if (minutes) {
+      ctx.pushReviewItem({
+        label: 'Minutes-as-first-action examination communication (manual review)',
+        record: minutes,
+        level: 'warn',
+        internalKey: 'EXAMINATION_MINUTES_AS_FIRST_ACTION',
+        phase: 'examination',
+        namespace: 'first_instance',
+        method: 'Review the minutes/consultation text to confirm whether they replace the first Art. 94(3) action and set a response period.',
+      });
+    }
 
-    ctx.addMonthsDeadline({
-      record: ctx.findRule161162Anchor(),
-      label: 'Rule 161/162 response period',
-      months: 6,
-      level: 'bad',
-      confidence: 'high',
-      resolvedBy: (anchor) => ctx.hasApplicantResponseAfter(anchor, /reply|response|amend|claims|observations|arguments/i) || ctx.hasFeeSignalAfter(anchor, /claims fee|fee payment received/i),
-    });
+    if (!ctx._skipStandaloneRule702) {
+      ctx.addMonthsDeadline({
+        record: ctx.findRule702Anchor(),
+        label: 'Rule 70(2) confirmation/response period',
+        months: 6,
+        level: 'warn',
+        internalKey: 'POST_SEARCH_R70_2_PROCEED',
+        phase: 'post_search',
+        namespace: 'first_instance',
+        methodPrefix: 'Rule-based',
+      });
+    }
+
+    const rule161162 = ctx.findRule161162Anchor();
+    if (rule161162) {
+      const variant = ctx.rule161162Variant(rule161162);
+      const label = variant === 'mandatory'
+        ? 'Rule 161/162 mandatory response period'
+        : (variant === 'voluntary'
+          ? 'Rule 161/162 voluntary amendment / claims-fee period'
+          : 'Rule 161/162 response period');
+      ctx.addMonthsDeadline({
+        record: rule161162,
+        label,
+        months: 6,
+        level: 'bad',
+        confidence: variant === 'generic' ? 'low' : '',
+        internalKey: variant === 'mandatory' ? 'EUROPCT_R161_162_MANDATORY' : (variant === 'voluntary' ? 'EUROPCT_R161_162_VOLUNTARY' : 'EUROPCT_R161_162'),
+        phase: 'regional_phase_entry',
+        namespace: 'first_instance',
+        resolvedBy: (anchor) => ctx.hasApplicantResponseAfter(anchor, /reply|response|amend|claims|observations|arguments/i) || ctx.hasFeeSignalAfter(anchor, /claims fee|fee payment received/i),
+        methodPrefix: 'Rule-based',
+        reviewOnly: variant === 'generic',
+      });
+    }
+
+    const rule1641 = ctx.findRule1641Anchor();
+    if (ctx.isEuroPct && rule1641) {
+      ctx.addMonthsDeadline({
+        record: rule1641,
+        label: 'Rule 164(1) additional search fees',
+        months: 2,
+        level: 'bad',
+        internalKey: 'EUROPCT_R164_1_FEES',
+        phase: 'supplementary_search',
+        namespace: 'first_instance',
+        methodPrefix: 'Rule-based',
+      });
+    }
+
+    const rule1642 = ctx.findRule1642Anchor();
+    if (ctx.isEuroPct && rule1642) {
+      ctx.pushReviewItem({
+        label: 'Rule 164(2) unsearched-inventions communication (manual review)',
+        record: rule1642,
+        level: 'bad',
+        internalKey: 'EUROPCT_R164_2_UNSEARCHED',
+        phase: 'examination_start',
+        namespace: 'first_instance',
+        method: 'The fee/selection period is communication-specific; review the communication/PDF for the governing due date.',
+      });
+    }
+
+    const examSummons = ctx.findSummonsAnchor('examination');
+    if (examSummons && !ctx.hasPdfHint(/Rule 116 final date|Oral proceedings date/i)) {
+      ctx.pushReviewItem({
+        label: 'Examination summons / Rule 116 review',
+        record: examSummons,
+        level: 'warn',
+        internalKey: 'EXAMINATION_SUMMONS',
+        phase: 'examination',
+        namespace: 'first_instance',
+        method: 'Summons require annex parsing: store the oral-proceedings date and any Rule 116 final written-submissions date.',
+      });
+    }
+
+    const examOral = ctx.findOralProceedingsEvent('examination');
+    if (examOral && !ctx.hasPdfHint(/Oral proceedings date/i)) {
+      ctx.addAbsoluteDateEntry({
+        record: examOral,
+        label: 'Oral proceedings date',
+        level: 'warn',
+        internalKey: 'ORAL_PROCEEDINGS_EVENT',
+        phase: 'examination',
+        namespace: 'first_instance',
+        method: 'Stored from oral-proceedings event chronology.',
+      });
+    }
   }
 
   function appendDirectOrPctDeadlines(ctx) {
@@ -7290,6 +7790,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       method: 'Rule-based: priority/filing date +31 months',
       rolledOver: calc31.rolledOver,
       rolloverNote: calc31.rolledOver ? `day ${calc31.fromDay}→${calc31.toDay}` : '',
+      namespace: 'first_instance',
+      phase: 'regional_phase_entry',
     });
 
     ctx.push({
@@ -7299,10 +7801,197 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       confidence: isrDate ? 'medium' : 'low',
       sourceDate: isrDate ? `${formatDate(base31Date)} / ${isr?.dateStr || ''}` : formatDate(base31Date),
       resolved: ctx.hasFeeSignalAfter(base31Date, /request for examination|examination fee|designation fee|extension fee|validation fee/i),
+      reviewOnly: !isrDate,
       method: isrDate ? 'Heuristic: max(31 months from priority/filing, qualifying ISR/WO issue date +6 months)' : 'Rule-based: 31 months from priority/filing (no qualifying ISR/WO date found)',
       rolledOver: dueLaterRolled,
       rolloverNote: dueLaterRollNote,
+      namespace: 'first_instance',
+      phase: 'regional_phase_entry',
     });
+  }
+
+  function appendLossOfRightsAndRemedyDeadlines(ctx) {
+    const rule112 = ctx.findRule112Anchor();
+    if (rule112) {
+      ctx.addMonthsDeadline({
+        record: rule112,
+        label: 'Rule 112 decision-request review window',
+        months: 2,
+        level: 'warn',
+        confidence: 'low',
+        reviewOnly: true,
+        internalKey: 'LOSS_OF_RIGHTS_R112',
+        phase: 'loss_of_rights',
+        namespace: 'first_instance',
+        methodPrefix: 'Conditional EPC remedy',
+        resolvedBy: (anchor) => ctx.hasApplicantResponseAfter(anchor, /request for decision|further processing|re-establishment|decision request/i),
+      });
+    }
+  }
+
+  function appendOppositionAndLimitationDeadlines(ctx) {
+    const r791 = ctx.findOppositionRule791Anchor();
+    if (r791) {
+      ctx.addMonthsDeadline({
+        record: r791,
+        label: 'Opposition Rule 79(1) proprietor reply',
+        months: 4,
+        level: 'bad',
+        internalKey: 'OPPOSITION_R79_1_PROPRIETOR_REPLY',
+        phase: 'opposition',
+        namespace: 'opposition',
+        methodPrefix: 'Rule-based',
+      });
+    }
+
+    const r793 = ctx.findOppositionRule793Anchor();
+    if (r793 && !ctx.hasPdfHint(/Rule 79\(3\)/i)) {
+      ctx.pushReviewItem({
+        label: 'Opposition Rule 79(3) party-reply communication (manual review)',
+        record: r793,
+        level: 'warn',
+        internalKey: 'OPPOSITION_R79_3_OTHER_PARTIES_REPLY',
+        phase: 'opposition',
+        namespace: 'opposition',
+        method: 'The party-reply period is communication-specific; review the communication/PDF for the due date.',
+      });
+    }
+
+    const orex = ctx.findOppositionOrexAnchor();
+    if (orex && !r791 && !r793 && !ctx.hasPdfHint(/Opposition/i)) {
+      ctx.pushReviewItem({
+        label: 'Opposition division communication (manual review)',
+        record: orex,
+        level: 'warn',
+        internalKey: 'OPPOSITION_DIVISION_COMMUNICATION',
+        phase: 'opposition',
+        namespace: 'opposition',
+        method: 'Generic OREX-style opposition communication detected; review the communication text for the governing deadline.',
+      });
+    }
+
+    const oppSummons = ctx.findSummonsAnchor('opposition');
+    if (oppSummons && !ctx.hasPdfHint(/Rule 116 final date|Oral proceedings date/i)) {
+      ctx.pushReviewItem({
+        label: 'Opposition summons / Rule 116 review',
+        record: oppSummons,
+        level: 'warn',
+        internalKey: 'OPPOSITION_SUMMONS',
+        phase: 'opposition',
+        namespace: 'opposition',
+        method: 'Summons require annex parsing: store the oral-proceedings date and any Rule 116 final written-submissions date.',
+      });
+    }
+
+    const oppOral = ctx.findOralProceedingsEvent('opposition');
+    if (oppOral && !ctx.hasPdfHint(/Oral proceedings date/i)) {
+      ctx.addAbsoluteDateEntry({
+        record: oppOral,
+        label: 'Opposition oral proceedings date',
+        level: 'warn',
+        internalKey: 'ORAL_PROCEEDINGS_EVENT',
+        phase: 'opposition',
+        namespace: 'opposition',
+        method: 'Stored from opposition oral-proceedings event chronology.',
+      });
+    }
+
+    const r821 = ctx.findOppositionRule821Anchor();
+    if (r821) {
+      ctx.addMonthsDeadline({
+        record: r821,
+        label: 'Opposition Rule 82(1) maintenance-text observations',
+        months: 2,
+        level: 'warn',
+        internalKey: 'OPPOSITION_R82_1_TEXT',
+        phase: 'opposition_endgame',
+        namespace: 'opposition',
+        methodPrefix: 'Rule-based',
+      });
+    }
+
+    const r823 = ctx.findOppositionRule823Anchor();
+    const r822 = ctx.findOppositionRule822Anchor();
+    if (r822) {
+      ctx.addMonthsDeadline({
+        record: r822,
+        label: 'Opposition Rule 82(2) translations + publication fee',
+        months: 3,
+        level: 'bad',
+        internalKey: 'OPPOSITION_R82_2_TRANSLATIONS_FEE',
+        phase: 'opposition_endgame',
+        namespace: 'opposition',
+        methodPrefix: 'Rule-based',
+        supersededBy: (anchor) => ctx.findLaterRecordAfter(anchor, (r) => /rule\s*82\(3\)|further invitation|surcharge/.test(`${r.title} ${r.detail}`)),
+      });
+    }
+
+    if (r823) {
+      ctx.addMonthsDeadline({
+        record: r823,
+        label: 'Opposition Rule 82(3) surcharge period',
+        months: 2,
+        level: 'bad',
+        internalKey: 'OPPOSITION_R82_3_SURCHARGE',
+        phase: 'opposition_endgame',
+        namespace: 'opposition',
+        methodPrefix: 'Rule-based',
+      });
+    }
+
+    const pmap = ctx.findOppositionPmapAnchor();
+    if (pmap && !r821 && !r822 && !r823 && !ctx.hasPdfHint(/Rule 82/i)) {
+      ctx.pushReviewItem({
+        label: 'Opposition Rule 82 branch (manual review)',
+        record: pmap,
+        level: 'bad',
+        internalKey: 'OPPOSITION_R82_BRANCH',
+        phase: 'opposition_endgame',
+        namespace: 'opposition',
+        method: 'PMAP-style maintenance branch detected; review the communication text to distinguish Rule 82(1)/(2)/(3) and its governing due date.',
+      });
+    }
+
+    const l952 = ctx.findLimitationRule952Anchor();
+    if (l952) {
+      ctx.addMonthsDeadline({
+        record: l952,
+        label: 'Limitation Rule 95(2) correction period',
+        months: 2,
+        level: 'warn',
+        internalKey: 'LIMITATION_R95_2_DEFICIENCIES',
+        phase: 'limitation',
+        namespace: 'limitation',
+        methodPrefix: 'Rule-based',
+      });
+    }
+
+    const l953 = ctx.findLimitationRule953Anchor();
+    if (l953) {
+      ctx.addMonthsDeadline({
+        record: l953,
+        label: 'Limitation Rule 95(3) translations + fee',
+        months: 3,
+        level: 'bad',
+        internalKey: 'LIMITATION_R95_3_ALLOWABLE',
+        phase: 'limitation',
+        namespace: 'limitation',
+        methodPrefix: 'Rule-based',
+      });
+    }
+
+    const lire = ctx.findLimitationLireAnchor();
+    if (lire && !l952 && !l953 && !ctx.hasPdfHint(/Rule 95/i)) {
+      ctx.pushReviewItem({
+        label: 'Limitation communication (manual review)',
+        record: lire,
+        level: 'warn',
+        internalKey: 'LIMITATION_COMMUNICATION',
+        phase: 'limitation',
+        namespace: 'limitation',
+        method: 'Limitation communication detected; review the communication text to distinguish the applicable Rule 95 branch and due date.',
+      });
+    }
   }
 
   function appendPostGrantDeadlines(ctx) {
@@ -7325,6 +8014,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           method: 'Rule-based: grant mention +9 months',
           rolledOver: calcOpp.rolledOver,
           rolloverNote: calcOpp.rolledOver ? `day ${calcOpp.fromDay}→${calcOpp.toDay}` : '',
+          namespace: 'opposition',
+          phase: 'post_grant',
         });
         const calcUe = addCalendarMonthsDetailed(anchor, 1);
         ctx.push({
@@ -7337,6 +8028,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           method: 'Rule-based: grant mention +1 month',
           rolledOver: calcUe.rolledOver,
           rolloverNote: calcUe.rolledOver ? `day ${calcUe.fromDay}→${calcUe.toDay}` : '',
+          namespace: 'unitary_patent',
+          phase: 'up',
         });
       }
     }
@@ -7356,6 +8049,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           method: 'Rule-based: decision date +2 months',
           rolledOver: calcNotice.rolledOver,
           rolloverNote: calcNotice.rolledOver ? `day ${calcNotice.fromDay}→${calcNotice.toDay}` : '',
+          namespace: 'appeal',
+          phase: 'appeal',
         });
         const calcGrounds = addCalendarMonthsDetailed(anchor, 4);
         ctx.push({
@@ -7368,6 +8063,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           method: 'Rule-based: decision date +4 months',
           rolledOver: calcGrounds.rolledOver,
           rolloverNote: calcGrounds.rolledOver ? `day ${calcGrounds.fromDay}→${calcGrounds.toDay}` : '',
+          namespace: 'appeal',
+          phase: 'appeal',
         });
       }
     }
@@ -7411,13 +8108,15 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
   function inferProceduralDeadlines(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
     const ctx = buildDeadlineComputationContext(main, docs, eventHistory, legal, pdfData);
     appendPdfDerivedDeadlines(ctx);
+    appendSearchStageDeadlines(ctx);
     appendCoreCommunicationDeadlines(ctx);
     appendDirectOrPctDeadlines(ctx);
+    appendLossOfRightsAndRemedyDeadlines(ctx);
+    appendOppositionAndLimitationDeadlines(ctx);
     appendPostGrantDeadlines(ctx);
     appendReferenceDeadlines(ctx);
-    return dedupe(ctx.out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}`);
+    return dedupe(ctx.out, (d) => `${d.label}|${formatDate(d.date)}|${d.sourceDate || ''}|${d.reviewOnly ? 'review' : ''}`);
   }
-
 
   function inferRenewalModel(main, legal, ue, federated = {}) {
     const now = new Date();
@@ -7502,8 +8201,15 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return /opposition period/.test(label) || /third-party monitor/.test(label);
   }
 
+  function isReviewDeadline(deadline = {}) {
+    if (!deadline || deadline.reference) return false;
+    if (deadline.reviewOnly) return true;
+    if (!deadline.date || Number.isNaN(deadline.date?.getTime?.())) return true;
+    return String(deadline.confidence || '').toLowerCase() === 'low';
+  }
+
   function deadlinePresentationBuckets(deadlines = [], currentClosedPosture = false) {
-    const buckets = { active: [], monitoring: [], historical: [] };
+    const buckets = { active: [], monitoring: [], review: [], historical: [] };
     for (const deadline of (deadlines || [])) {
       if (deadline?.reference) continue;
       if (currentClosedPosture) {
@@ -7518,16 +8224,20 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         buckets.monitoring.push(deadline);
         continue;
       }
+      if (isReviewDeadline(deadline)) {
+        buckets.review.push(deadline);
+        continue;
+      }
       buckets.active.push(deadline);
     }
-    for (const key of Object.keys(buckets)) buckets[key].sort((a, b) => a.date - b.date);
+    for (const key of Object.keys(buckets)) buckets[key].sort((a, b) => (a?.date?.getTime?.() || 0) - (b?.date?.getTime?.() || 0));
     return buckets;
   }
 
   function selectNextDeadline(deadlines = [], currentClosedPosture = false, now = new Date()) {
     const actionable = deadlinePresentationBuckets(deadlines, currentClosedPosture).active;
     if (!actionable.length) return null;
-    const upcoming = actionable.find((d) => d.date > now);
+    const upcoming = actionable.find((deadline) => deadline.date > now);
     if (upcoming) return upcoming;
     if (currentClosedPosture) return null;
     return actionable[0] || null;
@@ -7542,10 +8252,13 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     if (buckets.monitoring.length) {
       return 'No active applicant/EPO deadline detected; remaining clocks are third-party monitoring windows.';
     }
-    if (buckets.historical.some((d) => d.superseded) && currentClosedPosture) {
+    if (buckets.review.length) {
+      return `No auto-remindable deadline detected; ${buckets.review.length} low-confidence or manual-review item${buckets.review.length === 1 ? '' : 's'} remain.`;
+    }
+    if (buckets.historical.some((deadline) => deadline.superseded) && currentClosedPosture) {
       return 'No active procedural deadline detected; later loss-of-rights events superseded earlier response periods.';
     }
-    if (buckets.historical.some((d) => d.resolved)) {
+    if (buckets.historical.some((deadline) => deadline.resolved)) {
       return posture?.recovered
         ? 'No active procedural deadline detected; earlier response periods appear answered and the case later recovered from an adverse posture.'
         : 'No active procedural deadline detected; earlier response periods appear already answered.';

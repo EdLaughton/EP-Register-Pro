@@ -100,7 +100,7 @@ hasText('Date extracted from EPO form stamp near Registered Letter (dispatch pro
 hasText('PDF communication date differs from doclist date (using PDF date for deadline derivation)', 'PDF diagnostics should flag and prefer PDF communication date when it differs from doclist date');
 hasText('Default ${fallbackMonths}-month period inferred for ${category}', 'PDF parser should support conservative default response-period fallback when explicit month phrases are missing');
 hasText('Derived from fragmented phrase', 'PDF parser should detect fragmented month phrase patterns such as "of 4 months"');
-hasText('(?:2|3|5|6|two|three|five|six)', 'PDF parser should include explicit fragmented target month detection for 2/3/5/6 month phrases');
+hasText('(?:2|3|4|5|6|two|three|four|five|six)', 'PDF parser should include explicit fragmented target month detection for 2/3/4/5/6 month phrases');
 hasText('Derived from fragmented target phrase', 'PDF parser should log targeted fragmented month phrase evidence when matched');
 hasText('Derived from reversed fragmented target phrase', 'PDF parser should detect reversed fragmented month phrase ordering');
 hasText('PDF binary unavailable; using HTML fallback text extraction', 'PDF parser should log explicit HTML fallback path when binary response is not a valid PDF');
