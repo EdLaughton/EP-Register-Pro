@@ -58,7 +58,7 @@ const parsedRule62a = parsePdfDeadlineHints(rule62aText, {
 });
 assert.strictEqual(parsedRule62a.hints.length, 1, 'Shared PDF parser should emit one fallback hint for fixed-period Rule 62a communications');
 assert.strictEqual(parsedRule62a.hints[0].label, 'Rule 62a invitation period', 'Shared PDF parser should classify Rule 62a communications correctly');
-assert.strictEqual(parsedRule62a.hints[0].dateStr, '20.03.2026', 'Shared PDF parser should derive Rule 62a deadlines from communication date + Rule 126(2) 10-day notification fiction + two months when the title gives the rule family');
+assert.strictEqual(parsedRule62a.hints[0].dateStr, '10.03.2026', 'Shared PDF parser should derive Rule 62a deadlines from communication date + two months when the title gives the rule family');
 assert.strictEqual(parsedRule62a.hints[0].confidence, 'low', 'Shared PDF parser should keep metadata-only default-period inference in the low-confidence review bucket');
 
 const summonsText = 'Summons to oral proceedings\nDate of this communication: 19.01.2026\nThe oral proceedings will take place on 20.05.2026.\nFinal date for making written submissions: 15.04.2026.';
@@ -80,7 +80,7 @@ const parsedR71 = parsePdfDeadlineHints(r71Text, {
 });
 assert.strictEqual(parsedR71.hints.length, 1, 'Shared PDF parser should emit one hint for the Rule 71 communication fixture');
 assert.strictEqual(parsedR71.hints[0].label, 'R71(3) response period', 'Shared PDF parser should classify Rule 71 communications correctly');
-assert.strictEqual(parsedR71.hints[0].dateStr, '20.05.2026', 'Shared PDF parser should derive the Rule 71 deadline from communication date + Rule 126(2) 10-day notification fiction + four months');
+assert.strictEqual(parsedR71.hints[0].dateStr, '10.05.2026', 'Shared PDF parser should derive the Rule 71 deadline from communication date + four months');
 assert.strictEqual(parsedR71.diagnostics.communicationDate, '10.01.2026', 'Shared PDF parser should preserve the extracted communication date in diagnostics');
 
 const parsedArt94 = parsePdfDeadlineHints(art94Text, {

@@ -88,8 +88,7 @@ hasText('source.match(/\\/?application\\?documentId=', 'PDF URL normalizer shoul
 hasText('/[?&]documentId=/i.test(normalized)', 'PDF resolver should allow direct EPO documentId endpoints without requiring .pdf suffix');
 hasText('within\\s+(?:a\\s+)?(?:period|time\\s+limit)\\s+of\\s+([a-z]+|\\d{1,2})\\s+months?', 'PDF month parser should match "within a period of X months" wording');
 has(/communicationDateStr\s*=\s*communication\.dateStr\s*\|\|\s*docDateStr/, 'PDF hint derivation should anchor to communication date with doclist fallback');
-has(/addRule126NotificationFiction\(communicationDate,\s*10\)/, 'PDF month-based deadline should apply Rule 126(2) notification fiction to the communication date before month arithmetic');
-has(/addCalendarMonthsDetailed\(notified\.date,\s*responseMonths\)/, 'PDF month-based deadline should then be computed from the notified date + response period (explicit or fallback)');
+has(/addCalendarMonthsDetailed\(communicationDate,\s*responseMonths\)/, 'PDF month-based deadline should be computed from communication date + response period (explicit or fallback)');
 hasText('PDF proof line (below "Registered Letter")', 'PDF parser logging should report line below Registered Letter to prove document was opened');
 hasText('PDF parse diagnostics', 'PDF parser logging should emit communication-date/response-period diagnostics');
 hasText('categoryEvidence', 'PDF parse diagnostics should expose whether category came from text or document metadata');
@@ -174,7 +173,7 @@ hasText('class="epoRP-optsec"', 'Options view should organize settings into visu
 // Publications parsing + tab readability improvements
 has(/function\s+normalizePublicationNumber\s*\(/, 'Publication-number normalization helper missing');
 has(/function\s+splitPublicationNumber\s*\(/, 'Publication number/kind splitter helper missing');
-has(/const\s+publicationField\s*=\s*publicationSections\.join\('\\n'\)\s*\|\|\s*fieldByLabel\(doc,\s*\[\/\^Publication\\b\/i\]\)\s*\|\|\s*fallbackPublicationField\(doc,\s*pageText\);/, 'Main parser should match Publication* label variants including multi-row publication sections and structural fallback paths');
+has(/const\s+publicationField\s*=\s*publicationSections\.join\('\\n'\)\s*\|\|\s*fieldByLabel\(doc,\s*\[\/\^Publication\\b\/i\]\);/, 'Main parser should match Publication* label variants including multi-row publication sections');
 has(/const\s+reDateBeforeNumber\s*=\s*new RegExp/, 'Publication parser should support date-before-number layouts');
 hasText('(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)', 'Publication parser should include broad publication-country prefixes');
 has(/\.epoRP-tab\.on\{background:#bfdbfe;color:#0f172a;border-color:#93c5fd/, 'Selected tab styling should use dark text for readability');
@@ -238,8 +237,8 @@ has(/function\s+resolvedOverviewStatus\s*\(/, 'Overview model should centralize 
 has(/posture\?\.currentLabel\s*\|\|\s*statusSummary\?\.simple|posture\.currentLabel\s*\|\|\s*statusSummary\.simple/, 'Overview status helper should prefer normalized posture labels over raw status summaries when both exist');
 has(/posture\?\.currentLevel\s*\|\|\s*statusSummary\?\.level|posture\.currentLevel\s*\|\|\s*statusSummary\.level/, 'Overview status helper should prefer normalized posture severity over raw status-summary severity when both exist');
 hasText('Current posture', 'Actionable status should still preserve a posture row even when certainty-aware labels downgrade the wording');
-has(/postureLabel:\s*certaintyLabel\('Current posture',\s*postureConfidence\)/, 'Actionable status should downgrade posture wording through certainty-aware posture labels when the underlying evidence is only medium confidence');
-has(/renewalNextFeeLabel:\s*certaintyLabel\('Next fee',\s*renewal\?\.confidence\s*\|\|\s*''\)/, 'Overview should soften low-confidence renewal statements instead of sounding fully authoritative');
+hasText('Likely current posture', 'Actionable status should downgrade posture wording when the underlying evidence is only medium confidence');
+hasText('Estimated next renewal fee', 'Overview should soften low-confidence renewal statements instead of sounding fully authoritative');
 hasText('Recovery path', 'Actionable status should surface recovery windows as a first-class row rather than burying them in generic notes');
 has(/function\s+proceduralPostureModel\s*\(/, 'Overview/timeline posture narrative should be derived from a dedicated procedural-posture helper');
 has(/function\s+recoveryActionModel\s*\(/, 'Actionable status should derive recovery windows from a dedicated recovery-action helper');
@@ -250,7 +249,7 @@ notHas(/<div class="epoRP-l">20-year term from filing \(reference\)<\/div>/, 'Ov
 has(/if \(deadline\?\.reference(?: \|\| deadline\?\.anchorOnly)?\) continue;/, 'Deadline bucketing should still drop reference-only rows from the detailed actionable clock sections while ignoring anchor-only branch markers');
 has(/buckets\.historical\.push\(deadline\);/, 'Deadline bucketing should preserve resolved/superseded/closed-posture clocks as historical context instead of dropping them');
 has(/<div class="epoRP-l">Latest actions<\/div>/, 'Actionable status should combine EPO and applicant activity into one row');
-has(/const\s+waitingLabel\s*=\s*esc\(m\.presentationHints\?\.waitingLabel\s*\|\|\s*'Waiting on'\);[\s\S]*?<div class="epoRP-l">\$\{waitingLabel\}<\/div>/, 'Actionable status should render waiting-party summary row');
+has(/<div class="epoRP-l">Waiting on<\/div>/, 'Actionable status should render waiting-party summary row');
 hasText('Adverse posture detected.', 'Actionable status should expose concise recovery guidance for adverse/loss-of-rights postures');
 hasText('Recovered before grant', 'Recovery-action state should distinguish completed pre-grant cures from generic recovery notes');
 hasText('Recovery pending', 'Recovery-action state should distinguish pending EPO recovery outcomes from completed cures');
@@ -314,10 +313,9 @@ has(/nextDeadlineBadge/, 'Actionable status should show next-deadline day delta 
 hasText('rolled over', 'Deadline metadata should include rollover indicator when applicable');
 hasText('if (runtime.abortController === controller) runtime.abortController = null;', 'All-fresh prefetch completions should explicitly clear the current abort controller before returning');
 hasText('await refreshDerivedPrefetchSources(caseNo, controller.signal, force);', 'All-fresh prefetch completions should still refresh derived sources before returning');
-hasText('Rule 126(2) 10-day notification fiction', 'Dispatch-anchored deadline explanations should disclose the Rule 126(2) notification fiction in runtime output');
 notHas(/<div class="epoRP-l">Most recent event<\/div>/, 'Actionable status should not render a separate Most recent event row');
-has(/postureLabel:\s*certaintyLabel\('Current posture',\s*postureConfidence\)/, 'Overview should soften posture wording when the supporting evidence is not fully strong');
-has(/renewalNextFeeLabel:\s*certaintyLabel\('Next fee',\s*renewal\?\.confidence\s*\|\|\s*''\)/, 'Overview should soften low-confidence renewal wording instead of overstating certainty');
+hasText('Likely current posture', 'Overview should soften posture wording when the supporting evidence is not fully strong');
+hasText('Estimated next renewal fee', 'Overview should soften low-confidence renewal wording instead of overstating certainty');
 has(/el\.addEventListener\('input',\s*commit\)/, 'Options toggles should react on input events for reliable checkbox commits');
 
 console.log('userscript regression checks passed');

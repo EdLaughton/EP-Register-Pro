@@ -3386,45 +3386,12 @@
   }
 
   function fallbackPublicationField(doc, pageText = '') {
-    return firstPairValue(doc, ({ value, lowLabel }) => {
-      if (/priority|event|applic|anmel|represent|vertret|number/.test(lowLabel)) return false;
-      if (!/\d{2}\.\d{2}\.\d{4}/.test(value)) return false;
-      if (!/(EP\s*\d+|WO\d{4})/i.test(value)) return false;
-      return /\b[AB]\d\b/i.test(value) || /publication/i.test(lowLabel);
-    }) || (String(pageText).match(/publication[\s\S]{0,360}/i)?.[0] || '');
+    return firstPairValue(doc, ({ value, lowLabel }) => !/priority|event/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && /(EP\s*\d+|WO\d{4}|[AB]\d\b|publication)/i.test(value))
+      || (String(pageText).match(/publication[\s\S]{0,360}/i)?.[0] || '');
   }
 
-  function fallbackPublicationRows(raw = '', role = 'EP (this file)') {
-    const value = normalize(raw);
-    const dateStr = value.match(/(\d{2}\.\d{2}\.\d{4})/)?.[1] || '';
-    const no = value.match(/\b(EP\d{6,}|WO\d{4}\d+)\b/i)?.[1] || '';
-    const kind = value.match(/\b([AB]\d|B\d)\b/i)?.[1] || '';
-    if (!dateStr || !no || !kind) return [];
-    return [{ no: no.toUpperCase(), kind: kind.toUpperCase(), dateStr, role }];
-  }
-
-  function fallbackRecentEventField(doc, pageText = '') {
-    return firstPairValue(doc, ({ value, lowLabel }) => {
-      if (/publication|ver[öo]ffent|priority|priorit|applic|anmel|represent|vertret|status|title/.test(lowLabel)) return false;
-      if (!/\d{2}\.\d{2}\.\d{4}/.test(value)) return false;
-      if (!/(expected\)?\s*grant|published on|withdrawn|refusal|revocation|grant|loss of rights|oral proceedings|decision)/i.test(value)) return false;
-      return normalize(value.replace(/\d{2}\.\d{2}\.\d{4}/, '')).length >= 6;
-    }) || firstPairValue(doc, ({ value }) => /\(expected\)\s*grant|published on\s+\d{2}\.\d{2}\.\d{4}|withdrawn|refusal|revocation|grant|loss of rights|oral proceedings|decision/i.test(value))
-      || (String(pageText).match(/(\d{2}\.\d{2}\.\d{4}[\s\S]{0,160}(?:\(Expected\) grant|published on\s+\d{2}\.\d{2}\.\d{4}|withdrawn|refusal|revocation|loss of rights|oral proceedings|decision))/i)?.[1] || '');
-  }
-
-  function fallbackRecentEvents(raw = '') {
-    const normalized = normalize(raw);
-    const lines = normalized.split(/\n+/).map((line) => normalize(line)).filter(Boolean);
-    const dateStr = lines[0]?.match(/(\d{2}\.\d{2}\.\d{4})/)?.[1] || normalized.match(/(\d{2}\.\d{2}\.\d{4})/)?.[1] || '';
-    if (!dateStr) return [];
-    if (lines.length >= 2) {
-      return [normalizeRecentEventEntry({ dateStr, title: lines[1] || '', detail: lines.slice(2).join(' · ') })];
-    }
-    const remainder = normalize(normalized.replace(dateStr, '').trim());
-    if (!remainder) return [];
-    const parts = remainder.split(/\bpublished on\b/i).map((part) => normalize(part)).filter(Boolean);
-    return [normalizeRecentEventEntry({ dateStr, title: parts[0] || remainder, detail: parts.slice(1).join(' · ') })];
+  function fallbackRecentEventField(doc) {
+    return firstPairValue(doc, ({ value, lowLabel }) => !/publication|priority|applic|represent|title/.test(lowLabel) && /\d{2}\.\d{2}\.\d{4}/.test(value) && value.split(/\n+/).length >= 2);
   }
 
   function fallbackPartyField(doc, kind = 'applicant') {
@@ -3691,18 +3658,6 @@
     return { c, main, doclist, family, legal, federated, citations, eventHistory, ue, upcRegistry, pdfDeadlines, docs, publications };
   }
 
-  function normalizeRecentEventEntry(event = {}) {
-    const title = normalize(event?.title || '');
-    const detail = normalize(event?.detail || '');
-    const stateMatch = title.match(/^(.*?)(?:\s+)(New state\(s\):\s*.+)$/i);
-    if (!stateMatch) return { ...event, title, detail };
-    return {
-      ...event,
-      title: normalize(stateMatch[1]),
-      detail: detail ? `${normalize(stateMatch[2])} · ${detail}` : normalize(stateMatch[2]),
-    };
-  }
-
   function parseRecentEvents(raw) {
     const lines = String(raw || '').split('\n').map((v) => v.trim()).filter(Boolean);
     const out = [];
@@ -3710,7 +3665,7 @@
     for (const line of lines) {
       const dm = line.match(/^\s*(\d{2}\.\d{2}\.\d{4})\b/);
       if (dm) {
-        if (current?.dateStr && current?.title) out.push(normalizeRecentEventEntry(current));
+        if (current?.dateStr && current?.title) out.push(current);
         current = { dateStr: dm[1], title: '', detail: '', source: 'Main page' };
         continue;
       }
@@ -3718,10 +3673,7 @@
       if (!current.title) current.title = line;
       else current.detail = current.detail ? `${current.detail} · ${line}` : line;
     }
-    if (current?.dateStr && current?.title) out.push(normalizeRecentEventEntry(current));
-    if (!out.length) {
-      return fallbackRecentEvents(raw).map((event) => ({ ...normalizeRecentEventEntry(event), source: 'Main page' }));
-    }
+    if (current?.dateStr && current?.title) out.push(current);
     return dedupe(out, (e) => `${e.dateStr}|${e.title}|${e.detail}`);
   }
 
@@ -3913,7 +3865,7 @@
     const statusField = dedupeMultiline(fieldByLabel(doc, [/^Status$/i, /^Procedural status$/i]));
     const priorityField = fieldByLabel(doc, [/^Priority\b/i]) || fallbackPriorityField(doc, pageText);
     const publicationField = publicationSections.join('\n') || fieldByLabel(doc, [/^Publication\b/i]) || fallbackPublicationField(doc, pageText);
-    const recentEventField = fieldByLabel(doc, [/^Most recent event\b/i]) || fallbackRecentEventField(doc, pageText);
+    const recentEventField = fieldByLabel(doc, [/^Most recent event$/i]) || fallbackRecentEventField(doc);
 
     const appInfo = parseApplicationField(appField);
     const priorities = parsePriority(priorityField, pageText);
@@ -4004,10 +3956,10 @@
     let score = 0;
     for (const table of doc.querySelectorAll('table')) {
       const headerText = text(table.querySelector('thead') || table).toLowerCase();
-      let current = structuralTableScore(table);
-      for (const hint of hints) if (headerText.includes(hint.toLowerCase())) current += 5;
-      if (current > score) {
-        score = current;
+      let s = structuralTableScore(table);
+      for (const hint of hints) if (headerText.includes(hint.toLowerCase())) s += 5;
+      if (s > score) {
+        score = s;
         best = table;
       }
     }
@@ -4041,7 +3993,7 @@
 
     const bodyRows = [...table.querySelectorAll('tbody tr, tr')].filter((row) => row.querySelector('td'));
     const width = Math.max(0, ...bodyRows.map((row) => row.querySelectorAll('td').length));
-    const stats = Array.from({ length: width }, () => ({ dateHits: 0, linkHits: 0, textHits: 0, numericHits: 0, alphaHits: 0 }));
+    const stats = Array.from({ length: width }, () => ({ dateHits: 0, linkHits: 0, textHits: 0 }));
     for (const row of bodyRows.slice(0, 24)) {
       [...row.querySelectorAll('td')].forEach((cell, idx) => {
         const value = text(cell);
@@ -4049,22 +4001,17 @@
         if (DATE_RE.test(value)) stats[idx].dateHits += 1;
         if (cell.querySelector('a')) stats[idx].linkHits += 1;
         if (value.length >= 12) stats[idx].textHits += 1;
-        if (/^\d{1,3}$/.test(value)) stats[idx].numericHits += 1;
-        if (/\p{L}/u.test(value)) stats[idx].alphaHits += 1;
       });
     }
 
     if (map.date == null) {
-      map.date = stats.map((stat, idx) => ({ idx, score: stat.dateHits * 5 + stat.linkHits })).sort((a, b) => b.score - a.score)[0]?.idx;
+      map.date = stats.map((stat, idx) => ({ idx, score: stat.dateHits * 4 + stat.linkHits })).sort((a, b) => b.score - a.score)[0]?.idx;
     }
     if (map.document == null) {
-      map.document = stats.map((stat, idx) => ({ idx, score: stat.linkHits * 6 + stat.textHits * 2 - (idx === map.date ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
-    }
-    if (map.pages == null) {
-      map.pages = stats.map((stat, idx) => ({ idx, score: stat.numericHits * 5 - (idx === map.date || idx === map.document ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
+      map.document = stats.map((stat, idx) => ({ idx, score: stat.linkHits * 5 + stat.textHits * 2 - (idx === map.date ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
     }
     if (map.procedure == null) {
-      map.procedure = stats.map((stat, idx) => ({ idx, score: stat.alphaHits * 3 + stat.textHits - stat.linkHits - stat.numericHits * 2 - (idx === map.date || idx === map.document || idx === map.pages ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
+      map.procedure = stats.map((stat, idx) => ({ idx, score: stat.textHits - (idx === map.date || idx === map.document ? 100 : 0) })).sort((a, b) => b.score - a.score)[0]?.idx;
     }
     return map;
   }
@@ -6269,18 +6216,16 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     }
 
     if (!explicitAdded && responseMonths && communicationDate) {
-      const notified = addRule126NotificationFiction(communicationDate, 10);
-      const calc = addCalendarMonthsDetailed(notified.date, responseMonths);
+      const calc = addCalendarMonthsDetailed(communicationDate, responseMonths);
       const communicationFromDocFallback = /doclist date fallback/i.test(String(diagnostics.communicationEvidence || ''));
       const confidence = monthPeriod.months ? (communicationFromDocFallback ? 'medium' : 'high') : 'low';
       pushHint({
         label: category,
         dateStr: formatDate(calc.date),
         sourceDate: communicationDateStr,
-        notificationDate: formatDate(notified.date),
         confidence,
         level: /rule\s*116|oral proceedings/i.test(category) ? 'warn' : 'bad',
-        evidence: `${responseEvidence || `Derived from ${responseMonths} month response period`} from communication date ${communicationDateStr} + Rule 126(2) 10-day notification fiction${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
+        evidence: `${responseEvidence || `Derived from ${responseMonths} month response period`} from communication date ${communicationDateStr}${calc.rolledOver ? ` (rollover ${calc.fromDay}→${calc.toDay})` : ''}`,
       });
     }
 
@@ -7195,18 +7140,6 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     };
   }
 
-  function addCalendarDaysDetailed(date, days) {
-    const src = new Date(date);
-    if (Number.isNaN(src.getTime())) return { date: new Date(NaN), days: Number(days || 0) };
-    const next = new Date(src);
-    next.setDate(next.getDate() + Number(days || 0));
-    return { date: next, days: Number(days || 0) };
-  }
-
-  function addRule126NotificationFiction(date, days = 10) {
-    return addCalendarDaysDetailed(date, days);
-  }
-
   function addMonths(date, months) {
     return addCalendarMonthsDetailed(date, months).date;
   }
@@ -7483,39 +7416,6 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     return '';
   }
 
-  function doclistDateMayStandInForDispatch(record = {}) {
-    const sourceLow = normalize(record?.source || '').toLowerCase();
-    const actorLow = normalize(record?.actor || '').toLowerCase();
-    const textLow = normalize(`${record?.title || ''} ${record?.detail || record?.procedure || ''}`).toLowerCase();
-    if (!/documents|all documents/.test(sourceLow)) return false;
-    if (actorLow && !/epo|examining|opposition|board/.test(actorLow)) return false;
-    return /communication|invitation|summons|decision|intention to grant|rule\s*62a|rule\s*63|rule\s*70\(?2\)?|rule\s*70a|rule\s*71\(?3\)?|rule\s*79|rule\s*82|rule\s*95|rule\s*112|rule\s*161|rule\s*162|rule\s*164|art\.?\s*94\(?3\)?|article\s*94\(?3\)?|loss of rights|refusal/.test(textLow);
-  }
-
-  function notificationAnchorContext(record = {}, baseDate = null, applyNotificationFiction = true) {
-    const rawAnchor = baseDate || structuredAnchorDate(record);
-    if (!rawAnchor) return { anchorDate: null, sourceDate: String(record?.dispatchDate || record?.dateStr || ''), notificationDate: '', usedNotificationFiction: false };
-    const dispatchDate = parseDateString(record?.dispatchDate || '');
-    const surrogateDispatchDate = !dispatchDate && doclistDateMayStandInForDispatch(record) ? parseDateString(record?.dateStr || '') : null;
-    const dispatchLikeDate = dispatchDate || surrogateDispatchDate;
-    const sourceDate = String(record?.dispatchDate || (surrogateDispatchDate ? record?.dateStr : '') || record?.dateStr || '');
-    if (!applyNotificationFiction || !dispatchLikeDate) {
-      return {
-        anchorDate: rawAnchor,
-        sourceDate,
-        notificationDate: '',
-        usedNotificationFiction: false,
-      };
-    }
-    const fiction = addRule126NotificationFiction(dispatchLikeDate, 10);
-    return {
-      anchorDate: fiction.date,
-      sourceDate,
-      notificationDate: formatDate(fiction.date),
-      usedNotificationFiction: true,
-    };
-  }
-
   function buildDeadlineComputationContext(main, docs, eventHistory = {}, legal = {}, pdfData = {}) {
     const out = [];
     const records = buildDeadlineRecords(docs, eventHistory, legal);
@@ -7691,12 +7591,11 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       return hasApplicantResponseAfter(anchorDate);
     };
 
-    const addMonthsDeadline = ({ record = null, triggerRegex = null, label, months, level, confidence = '', resolvedBy, reviewOnly = false, methodPrefix = 'Heuristic', namespace = '', internalKey = '', phase = '', supersededBy = null, reference = false, extra = {}, applyNotificationFiction = true }) => {
+    const addMonthsDeadline = ({ record = null, triggerRegex = null, label, months, level, confidence = '', resolvedBy, reviewOnly = false, methodPrefix = 'Heuristic', namespace = '', internalKey = '', phase = '', supersededBy = null, reference = false, extra = {} }) => {
       if (hasPdfHint(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) return null;
       const rec = record || (triggerRegex ? latestRecord(triggerRegex) : null);
       if (!rec) return null;
-      const anchorContext = notificationAnchorContext(rec, structuredAnchorDate(rec), applyNotificationFiction);
-      const anchor = anchorContext.anchorDate;
+      const anchor = structuredAnchorDate(rec);
       if (!anchor) return null;
 
       const resolved = typeof resolvedBy === 'function'
@@ -7706,14 +7605,13 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       const calc = addCalendarMonthsDetailed(anchor, months);
       const derivedConfidence = confidence || (rec.dispatchDate ? 'high' : recordConfidence(rec, 'medium'));
       const sourceLabel = normalize(String(rec.source || 'preferred source')).toLowerCase() || 'preferred source';
-      const anchorLabel = anchorContext.usedNotificationFiction ? 'DATE_OF_DISPATCH + Rule 126(2) 10-day notification fiction' : (rec.dispatchDate ? 'DATE_OF_DISPATCH' : 'trigger');
+      const anchorLabel = rec.dispatchDate ? 'DATE_OF_DISPATCH' : 'trigger';
       const entry = {
         label,
         date: calc.date,
         level,
         confidence: derivedConfidence,
-        sourceDate: anchorContext.sourceDate,
-        notificationDate: anchorContext.notificationDate,
+        sourceDate: rec.dispatchDate || rec.dateStr,
         resolved,
         reviewOnly: !!reviewOnly || derivedConfidence === 'low',
         method: `${methodPrefix}: +${months} month(s) from ${sourceLabel} ${anchorLabel}`,
@@ -7978,22 +7876,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       { items: eventDesc, source: 'Event', predicate: (e, low) => /rule\s*112|loss of rights|noting of loss of rights/.test(low) },
     ]);
 
-    const findGrantPublicationAnchor = () => {
-      const publications = Array.isArray(main?.publications) ? main.publications : [];
-      const grantPub = [...publications]
-        .filter((publication) => /^b/i.test(String(publication?.kind || '')) && parseDateString(publication?.dateStr || ''))
-        .sort(compareDateDesc)[0];
-      if (!grantPub) return null;
-      return {
-        dateStr: grantPub.dateStr || '',
-        title: `B1 publication ${grantPub.no || ''}`.trim(),
-        detail: 'European Patent Bulletin publication',
-        actor: 'EPO',
-        source: 'Main publication',
-      };
-    };
-
-    const findGrantMentionAnchor = () => findGrantPublicationAnchor() || pickPreferredAnchor([
+    const findGrantMentionAnchor = () => pickPreferredAnchor([
       { items: legalEventsDesc, source: 'Event', predicate: (e, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
       { items: codedEventsDesc, source: 'Coded legal event', predicate: (e, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
       { items: records, source: 'Event', predicate: (r, low) => isActualGrantMentionText(low) && !(/expected grant|information on the status/.test(low)) },
@@ -8538,7 +8421,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         phase: 'opposition_endgame',
         namespace: 'opposition',
         methodPrefix: 'Rule-based',
-        supersededBy: (anchor, rec) => ctx.findLaterRecordAfter(structuredAnchorDate(rec) || anchor, (r) => /rule\s*82\(3\)|further invitation|surcharge/.test(`${r.title} ${r.detail}`)),
+        supersededBy: (anchor) => ctx.findLaterRecordAfter(anchor, (r) => /rule\s*82\(3\)|further invitation|surcharge/.test(`${r.title} ${r.detail}`)),
       });
     }
 
@@ -8657,8 +8540,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     const decision = ctx.findAppealableDecisionAnchor();
     if (decision) {
-      const anchorContext = notificationAnchorContext(decision, structuredAnchorDate(decision), true);
-      const anchor = anchorContext.anchorDate;
+      const anchor = structuredAnchorDate(decision);
       if (anchor) {
         const decisionLow = normalize(`${decision.title || ''} ${decision.detail || ''}`).toLowerCase();
         const decisionAnchorKey = /refusal|decision to refuse|refusal of the application/.test(decisionLow) ? 'DECISION_REFUSAL' : '';
@@ -8668,14 +8550,13 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
             date: anchor,
             level: 'info',
             confidence: ctx.recordConfidence ? ctx.recordConfidence(decision, 'high') : 'high',
-            sourceDate: anchorContext.sourceDate,
-            notificationDate: anchorContext.notificationDate,
+            sourceDate: decision.dispatchDate || decision.dateStr,
             resolved: false,
             anchorOnly: true,
             namespace: 'appeal',
             internalKey: decisionAnchorKey,
             phase: 'decision',
-            method: anchorContext.usedNotificationFiction ? 'Decision anchor routed to appeal branch (dispatch date + Rule 126(2) 10-day notification fiction).' : 'Decision anchor routed to appeal branch.',
+            method: 'Decision anchor routed to appeal branch.',
           });
         }
         const calcNotice = addCalendarMonthsDetailed(anchor, 2);
@@ -8684,10 +8565,9 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           date: calcNotice.date,
           level: 'bad',
           confidence: 'high',
-          sourceDate: anchorContext.sourceDate,
-          notificationDate: anchorContext.notificationDate,
+          sourceDate: decision.dispatchDate || decision.dateStr,
           resolved: ctx.hasAfter(anchor, (r) => /notice of appeal|appeal fee/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcNotice.date),
-          method: anchorContext.usedNotificationFiction ? 'Rule-based: decision dispatch + Rule 126(2) 10-day notification fiction +2 months' : 'Rule-based: decision date +2 months',
+          method: 'Rule-based: decision date +2 months',
           rolledOver: calcNotice.rolledOver,
           rolloverNote: calcNotice.rolledOver ? `day ${calcNotice.fromDay}→${calcNotice.toDay}` : '',
           namespace: 'appeal',
@@ -8701,10 +8581,9 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
           date: calcGrounds.date,
           level: 'bad',
           confidence: 'high',
-          sourceDate: anchorContext.sourceDate,
-          notificationDate: anchorContext.notificationDate,
+          sourceDate: decision.dispatchDate || decision.dateStr,
           resolved: ctx.hasAfter(anchor, (r) => /grounds of appeal|statement of grounds/i.test(`${r.title} ${r.detail}`)) || closedByNoOpposition(calcGrounds.date),
-          method: anchorContext.usedNotificationFiction ? 'Rule-based: decision dispatch + Rule 126(2) 10-day notification fiction +4 months' : 'Rule-based: decision date +4 months',
+          method: 'Rule-based: decision date +4 months',
           rolledOver: calcGrounds.rolledOver,
           rolloverNote: calcGrounds.rolledOver ? `day ${calcGrounds.fromDay}→${calcGrounds.toDay}` : '',
           namespace: 'appeal',

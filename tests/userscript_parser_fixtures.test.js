@@ -257,7 +257,7 @@ const pdfR71 = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'r71_communica
 });
 assert.strictEqual(pdfR71.hints.length, 1, 'PDF parser should emit one R71(3) deadline hint for the sample communication');
 assert.strictEqual(pdfR71.hints[0].label, 'R71(3) response period', 'PDF parser should classify Rule 71(3) communication correctly');
-assert.strictEqual(pdfR71.hints[0].dateStr, '20.05.2026', 'PDF parser should derive the R71(3) deadline from communication date + Rule 126(2) 10-day notification fiction + 4 months');
+assert.strictEqual(pdfR71.hints[0].dateStr, '10.05.2026', 'PDF parser should derive the R71(3) deadline from communication date + 4 months');
 assert.strictEqual(pdfR71.diagnostics.communicationDate, '10.01.2026', 'PDF parser should extract the communication date from the fixture letter header');
 
 const pdfArt94Fallback = hooks.parsePdfDeadlineHints(loadFixtureText('pdf', 'art94_generic.txt'), {
