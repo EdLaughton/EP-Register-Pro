@@ -49,6 +49,7 @@ hasText("saveSessionJson(`${OPTIONS_KEY}:session`, next);", 'Option writes shoul
 hasText('title=\"${esc(rightTitle)}\"', 'Top-right source badge should expose detailed per-source status on hover');
 notHas(/persistLiveTimelineGroups\(/, 'Timeline open-state persistence should be removed so timeline groups start collapsed on each render');
 has(/function\s+inferProceduralDeadlines\s*\(/, 'Deadline model should be derived by dedicated procedural deadline inference');
+hasText("u.searchParams.set('lng', 'en');", 'Background Register prefetches should force English pages regardless of the UI locale');
 has(/function\s+addCalendarMonthsDetailed\s*\(/, 'Calendar-month calculation helper (with rollover detection) missing');
 has(/function\s+timelineCacheKey\s*\(/, 'Timeline model should expose a cache key for memoization');
 has(/@grant\s+unsafeWindow/, 'Userscript metadata should grant unsafeWindow for sandbox/page pdf.js bridging');
@@ -173,7 +174,7 @@ hasText('class="epoRP-optsec"', 'Options view should organize settings into visu
 // Publications parsing + tab readability improvements
 has(/function\s+normalizePublicationNumber\s*\(/, 'Publication-number normalization helper missing');
 has(/function\s+splitPublicationNumber\s*\(/, 'Publication number/kind splitter helper missing');
-has(/const\s+publicationField\s*=\s*publicationSections\.join\('\\n'\)\s*\|\|\s*fieldByLabel\(doc,\s*\[\/\^Publication\\b\/i\]\);/, 'Main parser should match Publication* label variants including multi-row publication sections');
+has(/const\s+publicationField\s*=\s*publicationSections\.join\('\\n'\)\s*\|\|\s*fieldByLabel\(doc,\s*\[\/\^Publication\\b\/i\]\)(?:\s*\|\|\s*fallbackPublicationField\(doc,\s*pageText\))?;/, 'Main parser should match Publication* label variants including multi-row publication sections');
 has(/const\s+reDateBeforeNumber\s*=\s*new RegExp/, 'Publication parser should support date-before-number layouts');
 hasText('(?:EP|WO|US|JP|CN|KR|DE|FR|GB|CA|AU|BR|IN)', 'Publication parser should include broad publication-country prefixes');
 has(/\.epoRP-tab\.on\{background:#bfdbfe;color:#0f172a;border-color:#93c5fd/, 'Selected tab styling should use dark text for readability');

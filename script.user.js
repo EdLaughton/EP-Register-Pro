@@ -2963,7 +2963,7 @@
   function sourceUrl(caseNo, slug) {
     const u = new URL(`${location.origin}/application`);
     u.searchParams.set('number', caseNo);
-    u.searchParams.set('lng', currentLang());
+    u.searchParams.set('lng', 'en');
     u.searchParams.set('tab', slug);
     return u.toString();
   }
@@ -7243,8 +7243,11 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       || postureRecord(records, /application deemed to be withdrawn|deemed to be withdrawn|loss of rights|rule\s*112\(1\)|application refused|application rejected|revoked|withdrawn by applicant|application withdrawn/);
     const detailedLoss = postureRecord(records, /non-entry into european phase|translations of claims\/payment missing|non-payment of examination fee\/designation fee\/non-reply to written opinion|non-reply to written opinion/);
     const effectiveLoss = detailedLoss || latestLoss;
-    const latestRecovery = postureRecordByCodex(records, ['FURTHER_PROCESSING_DECISION', 'FURTHER_PROCESSING_REQUEST'])
-      || postureRecord(records, /decision to allow further processing|further processing|request for further processing|re-establishment|rights re-established/);
+    const latestRecoveryDecision = postureRecordByCodex(records, ['FURTHER_PROCESSING_DECISION'])
+      || postureRecord(records, /decision on request for further processing|decision to allow further processing|re-establishment|rights re-established/);
+    const latestRecoveryRequest = postureRecordByCodex(records, ['FURTHER_PROCESSING_REQUEST'])
+      || postureRecord(records, /request for further processing/);
+    const latestRecovery = latestRecoveryDecision || latestRecoveryRequest;
     const latestGrantDecision = postureRecordByCodex(records, ['EXPECTED_GRANT'])
       || postureRecord(records, /decision to grant a european patent|mention of grant|patent granted|the patent has been granted/);
     const latestNoOpposition = postureRecordByCodex(records, ['NO_OPPOSITION_FILED'])
@@ -7254,10 +7257,12 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const latestSearchPublication = postureRecordByCodex(records, ['SEARCH_REPORT_PUBLICATION']);
 
     const latestLossDate = postureRecordDate(latestLoss);
-    const latestRecoveryDate = postureRecordDate(latestRecovery);
+    const latestRecoveryDecisionDate = postureRecordDate(latestRecoveryDecision);
+    const latestRecoveryRequestDate = postureRecordDate(latestRecoveryRequest);
     const latestGrantDecisionDate = postureRecordDate(latestGrantDecision);
-    const recovered = !!(latestLossDate && latestRecoveryDate && latestRecoveryDate >= latestLossDate);
-    const recoveredBeforeGrant = !!(recovered && latestGrantDecisionDate && latestGrantDecisionDate >= latestRecoveryDate);
+    const recovered = !!(latestLossDate && latestRecoveryDecisionDate && latestRecoveryDecisionDate >= latestLossDate);
+    const recoveryPending = !!(latestLossDate && latestRecoveryRequestDate && latestRecoveryRequestDate >= latestLossDate && !recovered);
+    const recoveredBeforeGrant = !!(recovered && latestGrantDecisionDate && latestGrantDecisionDate >= latestRecoveryDecisionDate);
     const currentClosed = statusSummary.level === 'bad';
     const currentNoOpposition = /granted \(no opposition\)/i.test(statusSummary.simple || '') || /no opposition filed within time limit/i.test(statusLow) || !!latestNoOpposition;
     const currentGranted = currentNoOpposition || /^granted$/i.test(statusSummary.simple || '') || /patent has been granted|the patent has been granted/i.test(statusLow) || !!latestGrantDecision;
@@ -7301,9 +7306,11 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
     let note = '';
     if (recoveredBeforeGrant) {
-      note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecovery)} before grant.`;
+      note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecoveryDecision)} before grant.`;
     } else if (recovered) {
-      note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecovery)}.`;
+      note = `Recovered from earlier ${postureLossLabel(effectiveLoss)} via ${postureRecoveryLabel(latestRecoveryDecision)}.`;
+    } else if (recoveryPending) {
+      note = `Recovery requested via ${postureRecoveryLabel(latestRecoveryRequest)}; EPO outcome pending.`;
     } else if (currentClosed && effectiveLoss) {
       note = `Current controlling posture is ${postureLossLabel(effectiveLoss)}.`;
     } else if (currentNoOpposition) {
@@ -7325,6 +7332,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       currentLevel,
       note,
       recovered,
+      recoveryPending,
       recoveredBeforeGrant,
       currentClosed,
       currentGranted,
@@ -7334,6 +7342,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       currentSearch,
       latestLoss: effectiveLoss,
       latestRecovery,
+      latestRecoveryDecision,
+      latestRecoveryRequest,
       latestGrantDecision,
       latestNoOpposition,
       latestR71,
@@ -8883,7 +8893,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const applicantAfterLatestEpo = !!(latestEpoDate && latestApplicantDate && latestApplicantDate > latestEpoDate);
 
     const waitingOn = posture.currentClosed
-      ? (applicantAfterLatestEpo ? 'EPO recovery outcome' : 'No active step')
+      ? (posture.recoveryPending || applicantAfterLatestEpo ? 'EPO recovery outcome' : 'No active step')
       : posture.recovered && applicantAfterRecovery
         ? 'EPO recovery outcome'
         : (latestApplicantDate && (!latestEpoDate || latestApplicantDate > latestEpoDate) ? 'EPO' : 'Applicant');
@@ -9313,7 +9323,8 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
 
   function recoveryActionModel(posture = {}, waitingOn = '', waitingDays = null, latestApplicant = null) {
     const loss = posture?.latestLoss || null;
-    const recovery = posture?.latestRecovery || null;
+    const recovery = posture?.latestRecoveryDecision || posture?.latestRecovery || null;
+    const recoveryRequest = posture?.latestRecoveryRequest || null;
     const grant = posture?.latestGrantDecision || null;
     const cap = (text = '') => text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : '';
     const lossText = loss ? cap(postureLossLabel(loss)) : 'Adverse posture';
@@ -9321,8 +9332,9 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       ? (compactOverviewTitle(recovery.title || recovery.detail || '') || cap(postureRecoveryLabel(recovery)))
       : '';
     const grantText = grant ? (compactOverviewTitle(grant.title || grant.detail || '') || 'Grant decision') : '';
-    const applicantText = latestApplicant
-      ? `${latestApplicant.dateStr || '—'} · ${compactOverviewTitle(latestApplicant.title || '')}`
+    const pendingApplicant = recoveryRequest || latestApplicant || null;
+    const applicantText = pendingApplicant
+      ? `${pendingApplicant.dateStr || '—'} · ${compactOverviewTitle(pendingApplicant.title || '')}`
       : '';
 
     if (posture?.recovered && recovery) {
@@ -9352,7 +9364,7 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         badge: 'Recovery pending',
         level: 'warn',
         summary: summaryBits.join(' → '),
-        note: `Applicant appears to have responded after the adverse posture; monitor the EPO recovery outcome${waitingDays != null ? ` (${formatDaysHuman(waitingDays)} since applicant reply)` : ''}.`,
+        note: `${recoveryRequest ? 'Recovery has been requested' : 'Applicant appears to have responded'} after the adverse posture; monitor the EPO recovery outcome${waitingDays != null ? ` (${formatDaysHuman(waitingDays)} since applicant reply)` : ''}.`,
       };
     }
 
@@ -9418,17 +9430,31 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
         const badgeText = bucketKind === 'historical'
           ? `${ds} · historical`
           : `${ds}${Number.isFinite(dd) ? ` · ${dd >= 0 ? formatDaysHuman(dd) : `${formatDaysHuman(dd).slice(1)} overdue`}` : ''}`;
+        const confidenceLevel = String(d.confidence || '').toLowerCase() === 'high'
+          ? 'ok'
+          : String(d.confidence || '').toLowerCase() === 'medium'
+            ? 'warn'
+            : String(d.confidence || '').toLowerCase() === 'low'
+              ? 'bad'
+              : 'info';
+        const confidenceBadge = d.confidence
+          ? `<span class="epoRP-bdg ${esc(confidenceLevel)}">${esc(`${d.confidence} confidence`)}</span>`
+          : '';
+        const provenanceText = /Structured ST\.36 time-limit date/i.test(d.method || '')
+          ? 'Exact due date'
+          : bucketKind === 'monitoring'
+            ? 'Monitoring window'
+            : 'Derived clock';
         const metaParts = [
           bucketKind === 'monitoring' ? 'third-party monitoring window' : '',
           bucketKind === 'historical' ? (d.superseded ? 'superseded context' : d.resolved ? 'responded / historical context' : 'historical context') : '',
           `From ${d.sourceDate || 'procedural event'}`,
-          d.confidence ? `${d.confidence} confidence` : '',
           d.method || '',
           d.rolledOver ? `rolled over${d.rolloverNote ? ` (${d.rolloverNote})` : ''}` : '',
           d.supersededBy?.dateStr ? `later EPO outcome on ${d.supersededBy.dateStr}` : '',
           d.resolved && bucketKind !== 'historical' ? 'responded' : '',
         ].filter(Boolean);
-        rows += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(badgeText)}</span><div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div></div></div>`;
+        rows += `<div class="epoRP-dr"><div class="epoRP-dn">${esc(d.label)}</div><div class="epoRP-dd"><span class="epoRP-bdg ${esc(proximity)}">${esc(badgeText)}</span>${confidenceBadge ? ` ${confidenceBadge}` : ''}<span class="epoRP-bdg info">${esc(provenanceText)}</span><div class="epoRP-m">${esc(`(${metaParts.join(' · ')})`)}</div></div></div>`;
       }
       return `<div class="epoRP-m">${esc(title)}</div><div class="epoRP-dl">${rows}</div>`;
     };
@@ -9458,22 +9484,36 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
       nextDeadlineMethod = normalize(nextDeadlineMethod.replace(new RegExp(`\\s*from\\s+communication\\s+date\\s+${nextDeadlineSourceDate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'), ''));
     }
 
+    const nextDeadlineConfidence = String(m.nextDeadline?.confidence || '').toLowerCase();
+    const nextDeadlineConfidenceLevel = nextDeadlineConfidence === 'high'
+      ? 'ok'
+      : nextDeadlineConfidence === 'medium'
+        ? 'warn'
+        : nextDeadlineConfidence === 'low'
+          ? 'bad'
+          : 'info';
+    const nextDeadlineConfidenceBadge = m.nextDeadline?.confidence
+      ? `<span class="epoRP-bdg ${nextDeadlineConfidenceLevel}">${esc(`${m.nextDeadline.confidence} confidence`)}</span>`
+      : '';
+    const nextDeadlineProvenanceBadge = m.nextDeadline
+      ? `<span class="epoRP-bdg info">${esc(/Structured ST\.36 time-limit date/i.test(m.nextDeadline?.method || '') ? 'Exact due date' : 'Derived clock')}</span>`
+      : '';
+
     const nextDeadlineMetaLines = [];
     const nextDeadlineContextBits = [];
     if (nextDeadlineSourceDate && !sourceAlreadyInMethod) nextDeadlineContextBits.push(`From ${nextDeadlineSourceDate}`);
-    if (m.nextDeadline?.confidence) nextDeadlineContextBits.push(`${m.nextDeadline.confidence} confidence`);
     if (nextDeadlineContextBits.length) nextDeadlineMetaLines.push(nextDeadlineContextBits.join(' · '));
     if (nextDeadlineMethod) nextDeadlineMetaLines.push(`Basis: ${nextDeadlineMethod}`);
     if (m.nextDeadline?.rolledOver) nextDeadlineMetaLines.push(`Calendar rollover${m.nextDeadline.rolloverNote ? ` (${m.nextDeadline.rolloverNote})` : ''}`);
     if (m.nextDeadline?.resolved) nextDeadlineMetaLines.push('Marked as responded');
 
     const nextDeadlineMetaHtml = nextDeadlineMetaLines.map((line) => `<div class="epoRP-m">${esc(line)}</div>`).join('');
-    return { nextDeadlineBadge, nextDeadlineMetaHtml };
+    return { nextDeadlineBadge, nextDeadlineConfidenceBadge, nextDeadlineProvenanceBadge, nextDeadlineMetaHtml };
   }
 
   function renderOverviewActionableCard(m) {
     const detailedDeadlinesHtml = renderOverviewDetailedDeadlines(m);
-    const { nextDeadlineBadge, nextDeadlineMetaHtml } = overviewNextDeadlineState(m);
+    const { nextDeadlineBadge, nextDeadlineConfidenceBadge, nextDeadlineProvenanceBadge, nextDeadlineMetaHtml } = overviewNextDeadlineState(m);
     const latestEpoText = overviewLatestActionText(m.latestEpo);
     const latestApplicantText = overviewLatestActionText(m.latestApplicant);
     const waitingLevel = m.waitingDays == null ? 'info' : (m.waitingDays > 365 ? 'bad' : m.waitingDays > 180 ? 'warn' : 'ok');
@@ -9492,11 +9532,11 @@ return (typeof module !== 'undefined' && module && module.exports) ? module.expo
     const nextDeadlineLabel = esc(m.presentationHints?.nextDeadlineLabel || 'Next deadline');
     const waitingLabel = esc(m.presentationHints?.waitingLabel || 'Waiting on');
     return `<div class="epoRP-c"><h4>Actionable status</h4><div class="epoRP-g">
-      <div class="epoRP-l">${postureLabel}</div><div class="epoRP-v">${postureBadge}${m.posture?.note ? `<div class="epoRP-m">${esc(m.posture.note)}</div>` : ''}</div>
-      <div class="epoRP-l">${nextDeadlineLabel}</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}</div>${nextDeadlineMetaHtml}` : (m.nextDeadlineNote ? `<div>—</div><div class="epoRP-m">${esc(m.nextDeadlineNote)}</div>` : '—')}</div>
+      <div class="epoRP-l">${postureLabel}</div><div class="epoRP-v">${postureBadge}<span class="epoRP-bdg info">Derived</span>${m.posture?.note ? `<div class="epoRP-m">${esc(m.posture.note)}</div>` : ''}<div class="epoRP-m">Built from the main Register status plus doclist, event-history, and legal-status signals.</div></div>
+      <div class="epoRP-l">${nextDeadlineLabel}</div><div class="epoRP-v">${m.nextDeadline ? `<div>${esc(formatDate(m.nextDeadline.date))} · ${esc(m.nextDeadline.label)}${nextDeadlineBadge ? ` · ${nextDeadlineBadge}` : ''}${nextDeadlineConfidenceBadge ? ` · ${nextDeadlineConfidenceBadge}` : ''}${nextDeadlineProvenanceBadge ? ` · ${nextDeadlineProvenanceBadge}` : ''}</div>${nextDeadlineMetaHtml}` : (m.nextDeadlineNote ? `<div>—</div><div class="epoRP-m">${esc(m.nextDeadlineNote)}</div>` : '—')}</div>
       <div class="epoRP-l">Latest actions</div><div class="epoRP-v"><div>EPO: ${esc(latestEpoText)}</div><div>Applicant: ${esc(latestApplicantText)}</div></div>
       ${recoveryHtml}
-      <div class="epoRP-l">${waitingLabel}</div><div class="epoRP-v">${waitingSummary}</div>
+      <div class="epoRP-l">${waitingLabel}</div><div class="epoRP-v">${waitingSummary}<div class="epoRP-m">Derived from the latest procedural posture plus the newest applicant/EPO activity on file.</div></div>
     </div>${detailedDeadlinesHtml}</div>`;
   }
 

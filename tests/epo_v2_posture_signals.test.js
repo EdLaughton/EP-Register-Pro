@@ -63,6 +63,17 @@ assert.strictEqual(recoveredInExamination.currentLabel, 'Examination', 'Recovere
 assert.strictEqual(recoveredInExamination.recovered, true, 'Posture derivation should detect recovery after a written-opinion loss');
 assert(/Recovered from earlier no reply to the written opinion via further processing\./.test(recoveredInExamination.note), 'Posture derivation should explain the recovered examination posture');
 
+const pendingFurtherProcessing = deriveProceduralPosture({
+  statusRaw: 'Application deemed to be withdrawn (non-entry into European phase)',
+  records: [
+    { dateStr: '25.06.2024', title: 'Application deemed to be withdrawn (non-entry into European phase)', detail: 'Search / examination', actor: 'EPO', source: 'Documents' },
+    { dateStr: '10.07.2024', title: 'Request for further processing', detail: '', actor: 'EPO', source: 'Documents', codexKey: 'FURTHER_PROCESSING_REQUEST' },
+  ],
+});
+assert.strictEqual(pendingFurtherProcessing.recovered, false, 'A further-processing request alone should not mark the posture as already recovered');
+assert.strictEqual(pendingFurtherProcessing.recoveryPending, true, 'A further-processing request without a later decision should surface as a pending recovery state');
+assert(/Recovery requested via further processing; EPO outcome pending\./.test(pendingFurtherProcessing.note), 'Pending further-processing requests should be narrated as waiting on an EPO outcome rather than as a completed cure');
+
 const terminalNonEntry = deriveProceduralPosture({
   statusRaw: 'Application deemed to be withdrawn (non-entry into European phase)',
   records: [
